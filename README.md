@@ -10,8 +10,8 @@ and the Basic Client Profile (i.e. the Authorization Code flow). When used as an
 Resource Server it can validate OAuth 2.0 Bearer Access Tokens against an Authorization Server.
 
 It maintains client-side sessions leveraging `lua-resty-session` so the all of the session state
-for (OpenID Connect0 authenticated users is kept in in a browser cookie, no server-side storage is
-required. Other session management implementations may be added later as lua-resty-session adds
+for (OpenID Connect) authenticated users is kept in in a browser cookie, no server-side storage is
+required. Other session management implementations may be added later as `lua-resty-session` adds
 support for them.
 
 It supports server-wide caching of resolved Discovery documents and validated Access Tokens.
