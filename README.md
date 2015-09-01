@@ -9,10 +9,9 @@ Provider using [OpenID Connect Discovery](http://openid.net/specs/openid-connect
 and the Basic Client Profile (i.e. the Authorization Code flow). When used as an OAuth 2.0
 Resource Server it can validate OAuth 2.0 Bearer Access Tokens against an Authorization Server.
 
-It maintains client-side sessions leveraging `lua-resty-session` so the all of the session state
-for (OpenID Connect) authenticated users is kept in in a browser cookie, no server-side storage is
-required. Other session management implementations may be added later as `lua-resty-session` adds
-support for them.
+It maintains sessions for authenticated users by leveraging `lua-resty-session` thus offering
+a configurable choice between storing the session state in a client-side browser cookie or use
+in of the server-side storage mechanisms `shared-memory|memcache|redis`.
 
 It supports server-wide caching of resolved Discovery documents and validated Access Tokens.
 
@@ -27,7 +26,7 @@ It supports server-wide caching of resolved Discovery documents and validated Ac
 - [`lua-resty-string`](https://github.com/openresty/lua-resty-string)
 
 The dependencies above come automatically with [OpenResty](http://openresty.org/). You will need
-to install two extra pure-Lua dependencies that implement session management and http client functions:
+to install two extra pure-Lua dependencies that implement session management and HTTP client functions:
 
 - [`lua-resty-http`](https://github.com/pintsized/lua-resty-http)
 - [`lua-resty-session`](https://github.com/bungle/lua-resty-session)
@@ -87,6 +86,11 @@ http {
             ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
           end
          
+          -- at this point res is a Lua table with 3 keys:
+          --   id_token    : a Lua table with the claims from the id_token (required)
+          --   access_token: the access token (optional)
+          --   user        : a Lua table with the claims returned from the user info endpoint (optional)
+          
           --if res.id_token.hd ~= "pingidentity.com" then
           --  ngx.exit(ngx.HTTP_FORBIDDEN)
           --end
@@ -151,6 +155,9 @@ http {
             ngx.say(err)
             ngx.exit(ngx.HTTP_FORBIDDEN)
           end
+
+          -- at this point res is a Lua table that represents the JSON
+          -- object returned from the introspection/validation endpoint
 
           --if res.scope ~= "edit" then
           --  ngx.exit(ngx.HTTP_FORBIDDEN)
