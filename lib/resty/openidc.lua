@@ -86,7 +86,8 @@ local function openidc_validate_id_token(opts, id_token)
   end
 
   -- check issued-at timestamp
-  if id_token.iat < (os.time() - 10) then
+  local slack=opts.iat_slack and opts.iat_slack or 120
+  if id_token.iat < (os.time() - slack) then
     ngx.log(ngx.ERR, "token is not valid yet: id_token.iat=", id_token.iat, ", os.time()=", os.time())
     return false
   end

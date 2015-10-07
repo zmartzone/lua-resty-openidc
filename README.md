@@ -73,8 +73,9 @@ http {
              discovery = "https://accounts.google.com/.well-known/openid-configuration",
              client_id = "<client_id",
              client_secret = "<client_secret"
-             --authorization_params = { hd="pingidentity.com" }
+             --authorization_params = { hd="pingidentity.com" },
              --scope = "openid email profile",
+             --iat_slack = 600,
           }
 
           -- call authenticate for OpenID Connect user authentication
