@@ -77,7 +77,7 @@ local function openidc_cache_get(type, key)
 end
 
 -- validate the contents of and id_token
-local function openidc_validate_id_token(opts, id_token)
+local function openidc_validate_id_token(opts, id_token, nonce)
 
   -- check issuer
   if opts.discovery.issuer ~= id_token.iss then
@@ -85,6 +85,12 @@ local function openidc_validate_id_token(opts, id_token)
     return false
   end
 
+  -- check nonce
+  if nonce and nonce ~= id_token.nonce then
+    ngx.log(ngx.ERR, "nonce \"", id_token.nonce, " in id_token is not equal to the nonce that was sent in the request \"", nonce, "\"")
+    return false
+  end
+ 
   -- check issued-at timestamp
   local slack=opts.iat_slack and opts.iat_slack or 120
   if id_token.iat < (os.time() - slack) then
@@ -132,13 +138,20 @@ local function openidc_base64_url_decode(input)
   return ngx.decode_base64(input)
 end
 
+-- perform base64url encoding
+local function openidc_base64_url_encode(input)
+  input = ngx.encode_base64(input)
+  return input:gsub('+','-'):gsub('/','_'):gsub('=','')
+end
+
 -- send the browser of to the OP's authorization endpoint
 local function openidc_authorize(opts, session)
   local resty_random = require "resty.random"
   local resty_string = require "resty.string"
 
-  -- generate state
+  -- generate state and nonce
   local state = resty_string.to_hex(resty_random.bytes(16))
+  local nonce = resty_string.to_hex(resty_random.bytes(16))
 
   -- assemble the parameters to the authentication request
   local params = {
@@ -146,7 +159,8 @@ local function openidc_authorize(opts, session)
     response_type="code",
     scope=opts.scope and opts.scope or "openid email profile",
     redirect_uri=openidc_get_redirect_uri(opts),
-    state=state
+    state=state,
+    nonce=nonce
   }
 
   -- merge any provided extra parameters
@@ -157,6 +171,7 @@ local function openidc_authorize(opts, session)
   -- store state in the session
   session.data.original_url = ngx.var.uri
   session.data.state = state
+  session.data.nonce = nonce
   session:save()
 
   -- redirect to the /authorization endpoint
@@ -247,13 +262,34 @@ local function openidc_authorization_response(opts, session)
     return nil, err
   end
 
+  -- check the iss if returned from the OP
+  if args.iss and args.iss ~= opts.discovery.issuer then
+    err = "iss from argument: "..args.iss.." does not match expected issuer: "..opts.discovery.issuer
+    ngx.log(ngx.ERR, err)
+    return nil, err
+  end
+
+  -- check the client_id if returned from the OP
+  if args.client_id and args.client_id ~= opts.client_id then
+    err = "client_id from argument: "..args.client_id.." does not match expected client_id: "..opts.client_id
+    ngx.log(ngx.ERR, err)
+    return nil, err
+  end
+
+  -- calculate state_hash
+  local resty_sha256 = require "resty.sha256"
+  local sha256 = resty_sha256:new()
+  sha256:update(session.data.state)
+  local state_hash = openidc_base64_url_encode(sha256:final())
+    
   -- assemble the parameters to the token endpoint
   local body = {
     grant_type="authorization_code",
     client_id=opts.client_id,
     client_secret=opts.client_secret,
     code=args.code,
-    redirect_uri=openidc_get_redirect_uri(opts)
+    redirect_uri=openidc_get_redirect_uri(opts),
+    state_hash = state_hash
   }
 
   -- make the call to the token endpoint
@@ -269,7 +305,7 @@ local function openidc_authorization_response(opts, session)
   session.data.access_token = json.access_token
 
   -- validate the id_token contents
-  if openidc_validate_id_token(opts, session.data.id_token) == false then
+  if openidc_validate_id_token(opts, session.data.id_token, session.data.nonce) == false then
     err = "id_token validation failed"
     return nil, err
   end
