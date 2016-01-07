@@ -17,7 +17,7 @@ specific language governing permissions and limitations
 under the License.
 
 ***************************************************************************
-Copyright (C) 2015 Ping Identity Corporation
+Copyright (C) 2015-2016 Ping Identity Corporation
 All rights reserved.
 
 For further information please contact:
@@ -331,6 +331,9 @@ local function openidc_discover(url)
     -- make the call to the discovery endpoint
     local httpc = http.new()
     local res, error = httpc:request_uri(url)
+    --local res, error = httpc:request_uri(url, {
+    --  ssl_verify = false
+    --})
     if not res then
       err = "accessing discovery url ("..url..") failed: "..error
       ngx.log(ngx.ERR, err)
