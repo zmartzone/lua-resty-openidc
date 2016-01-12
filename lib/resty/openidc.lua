@@ -257,7 +257,7 @@ local function openidc_authorization_response(opts, session)
 
   -- check that the state returned in the response against the session; prevents CSRF
   if args.state ~= session.data.state then
-    err = "state from argument: "..args.state.." does not match state restored from session: "..session.data.state
+    err = "state from argument: "..(args.state and args.state or "nil").." does not match state restored from session: "..(session.data.state and session.data.state or "nil")
     ngx.log(ngx.ERR, err)
     return nil, err
   end
