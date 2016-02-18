@@ -276,12 +276,6 @@ local function openidc_authorization_response(opts, session)
     ngx.log(ngx.ERR, err)
     return nil, err
   end
-
-  -- calculate state_hash
-  local resty_sha256 = require "resty.sha256"
-  local sha256 = resty_sha256:new()
-  sha256:update(session.data.state)
-  local state_hash = openidc_base64_url_encode(sha256:final())
     
   -- assemble the parameters to the token endpoint
   local body = {
@@ -290,7 +284,7 @@ local function openidc_authorization_response(opts, session)
     client_secret=opts.client_secret,
     code=args.code,
     redirect_uri=openidc_get_redirect_uri(opts),
-    state_hash = state_hash
+    state = session.data.state
   }
 
   -- make the call to the token endpoint
