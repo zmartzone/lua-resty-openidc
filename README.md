@@ -69,6 +69,7 @@ http {
           local opts = {
              -- the full redirect URI must be protected by this script and becomes:
              -- ngx.var.scheme.."://"..ngx.var.http_host..opts.redirect_uri_path
+             -- unless the scheme is overridden using opts.redirect_uri_scheme or an X-Forwarded-Proto header in the incoming request
              redirect_uri_path = "/redirect_uri",
              discovery = "https://accounts.google.com/.well-known/openid-configuration",
              client_id = "<client_id",
@@ -76,6 +77,7 @@ http {
              --authorization_params = { hd="pingidentity.com" },
              --scope = "openid email profile",
              --iat_slack = 600,
+             --opts.redirect_uri_scheme = "https"
           }
 
           -- call authenticate for OpenID Connect user authentication
