@@ -77,7 +77,9 @@ http {
              --authorization_params = { hd="pingidentity.com" },
              --scope = "openid email profile",
              --iat_slack = 600,
-             --opts.redirect_uri_scheme = "https"
+             --redirect_uri_scheme = "https",
+             --logout_path = "/logout",
+             --ssl_verify = "no"
           }
 
           -- call authenticate for OpenID Connect user authentication
@@ -147,7 +149,8 @@ http {
 				grant_type="urn:pingidentity.com:oauth2:grant_type:validate_bearer",
              },
              client_id="rs_client",
-             client_secret="2Federate"
+             client_secret="2Federate",
+             ssl_verify = "no"
           }
 
           -- call introspect for OAuth 2.0 Bearer Access Token validation

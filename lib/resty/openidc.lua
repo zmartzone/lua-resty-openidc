@@ -201,7 +201,7 @@ local function openidc_parse_json_response(response)
 end
 
 -- make a call to the token endpoint
-local function openidc_call_token_endpoint(endpoint, body)
+local function openidc_call_token_endpoint(endpoint, body, ssl_verify)
 
   ngx.log(ngx.DEBUG, "request body for token endpoint call: ", ngx.encode_args(body))
 
@@ -211,7 +211,8 @@ local function openidc_call_token_endpoint(endpoint, body)
     body = ngx.encode_args(body),
     headers = {
       ["Content-Type"] = "application/x-www-form-urlencoded",
-    }
+    },
+    ssl_verify = (ssl_verify ~= "no")
   })
   if not res then
     err = "accessing token endpoint ("..endpoint..") failed: "..err
@@ -288,7 +289,7 @@ local function openidc_authorization_response(opts, session)
   }
 
   -- make the call to the token endpoint
-  local json, err = openidc_call_token_endpoint(opts.discovery.token_endpoint, body)
+  local json, err = openidc_call_token_endpoint(opts.discovery.token_endpoint, body, opts.ssl_verify)
   if err then
     return nil, err
   end
@@ -317,7 +318,7 @@ local function openidc_authorization_response(opts, session)
 end
 
 -- get the Discovery metadata from the specified URL
-local function openidc_discover(url)
+local function openidc_discover(url, ssl_verify)
 
   local err = nil
   local v = openidc_cache_get("discovery", url)
@@ -325,10 +326,9 @@ local function openidc_discover(url)
 
     -- make the call to the discovery endpoint
     local httpc = http.new()
-    local res, error = httpc:request_uri(url)
-    --local res, error = httpc:request_uri(url, {
-    --  ssl_verify = false
-    --})
+    local res, error = httpc:request_uri(url, {
+      ssl_verify = (ssl_verify ~= "no")
+    })
     if not res then
       err = "accessing discovery url ("..url..") failed: "..error
       ngx.log(ngx.ERR, err)
@@ -346,6 +346,38 @@ local function openidc_discover(url)
   return json, err
 end
 
+local openidc_transparent_pixel = "\137\080\078\071\013\010\026\010\000\000\000\013\073\072\068\082" ..
+                                  "\000\000\000\001\000\000\000\001\008\004\000\000\000\181\028\012" ..
+                                  "\002\000\000\000\011\073\068\065\084\120\156\099\250\207\000\000" .. 
+                                  "\002\007\001\002\154\028\049\113\000\000\000\000\073\069\078\068" ..
+                                  "\174\066\096\130"
+
+-- handle logout
+local function openidc_logout(opts, session)
+  session:destroy()
+  local headers = ngx.req.get_headers()
+  local header =  headers['Accept']
+  if header and header:find("image/png") then
+    ngx.header["Cache-Control"] = "no-cache, no-store"
+    ngx.header["Pragma"] = "no-cache"
+    ngx.header["P3P"] = "CAO PSA OUR"
+    ngx.header["Expires"] = "0"
+    ngx.header["X-Frame-Options"] = "DENY"
+    ngx.header.content_type = "image/png"
+    ngx.print(openidc_transparent_pixel)
+    ngx.exit(ngx.OK)
+    return
+  elseif opts.discovery.end_session_endpoint then
+    return ngx.redirect(opts.discovery.end_session_endpoint)
+  elseif opts.discovery.ping_end_session_endpoint then
+    return ngx.redirect(opts.discovery.ping_end_session_endpoint)
+  end
+  
+  ngx.header.content_type = "text/html"
+  ngx.say("<html><body>Logged Out</body></html>")
+  ngx.exit(ngx.OK)
+end
+
 -- main routine for OpenID Connect user authentication
 function openidc.authenticate(opts)
 
@@ -354,7 +386,7 @@ function openidc.authenticate(opts)
   local session = require("resty.session").start()
 
   if type(opts.discovery) == "string" then
-    opts.discovery, err = openidc_discover(opts.discovery)
+    opts.discovery, err = openidc_discover(opts.discovery, opts.ssl_verify)
     if err then
       return nil, err
     end
@@ -363,8 +395,14 @@ function openidc.authenticate(opts)
   -- see if this is a request to the redirect_uri i.e. an authorization response
   local path = ngx.var.request_uri
   path = path:match("(.-)%?") or path
+
   if path == opts.redirect_uri_path then
     return openidc_authorization_response(opts, session)
+  end
+
+  -- see if this is a request to logout
+  if path == (opts.logout_path and opts.logout_path or "/logout") then
+    return openidc_logout(opts, session)
   end
 
   -- if we have no id_token then redirect to the OP for authentication
@@ -439,7 +477,7 @@ function openidc.introspect(opts)
     end
 
     -- call the introspection endpoint
-    json, err = openidc_call_token_endpoint(opts.introspection_endpoint, body)
+    json, err = openidc_call_token_endpoint(opts.introspection_endpoint, body, opts.ssl_verify)
 
     -- cache the results
     if json then
