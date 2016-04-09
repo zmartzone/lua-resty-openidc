@@ -146,7 +146,7 @@ local function openidc_base64_url_encode(input)
 end
 
 -- send the browser of to the OP's authorization endpoint
-local function openidc_authorize(opts, session)
+local function openidc_authorize(opts, session, target_url)
   local resty_random = require "resty.random"
   local resty_string = require "resty.string"
 
@@ -170,7 +170,7 @@ local function openidc_authorize(opts, session)
   end
 
   -- store state in the session
-  session.data.original_url = ngx.var.uri
+  session.data.original_url = target_url
   session.data.state = state
   session.data.nonce = nonce
   session:save()
@@ -254,28 +254,28 @@ local function openidc_authorization_response(opts, session)
   if not args.code or not args.state then
     err = "unhandled request to the redirect_uri: "..ngx.var.request_uri
     ngx.log(ngx.ERR, err)
-    return nil, err
+    return nil, err, session.data.original_url
   end
 
   -- check that the state returned in the response against the session; prevents CSRF
   if args.state ~= session.data.state then
     err = "state from argument: "..(args.state and args.state or "nil").." does not match state restored from session: "..(session.data.state and session.data.state or "nil")
     ngx.log(ngx.ERR, err)
-    return nil, err
+    return nil, err, session.data.original_url
   end
 
   -- check the iss if returned from the OP
   if args.iss and args.iss ~= opts.discovery.issuer then
     err = "iss from argument: "..args.iss.." does not match expected issuer: "..opts.discovery.issuer
     ngx.log(ngx.ERR, err)
-    return nil, err
+    return nil, err, session.data.original_url
   end
 
   -- check the client_id if returned from the OP
   if args.client_id and args.client_id ~= opts.client_id then
     err = "client_id from argument: "..args.client_id.." does not match expected client_id: "..opts.client_id
     ngx.log(ngx.ERR, err)
-    return nil, err
+    return nil, err, session.data.original_url
   end
     
   -- assemble the parameters to the token endpoint
@@ -291,7 +291,7 @@ local function openidc_authorization_response(opts, session)
   -- make the call to the token endpoint
   local json, err = openidc_call_token_endpoint(opts.discovery.token_endpoint, body, opts.ssl_verify)
   if err then
-    return nil, err
+    return nil, err, session.data.original_url
   end
 
   -- process the token endpoint response with the id_token and access_token
@@ -303,7 +303,7 @@ local function openidc_authorization_response(opts, session)
   -- validate the id_token contents
   if openidc_validate_id_token(opts, session.data.id_token, session.data.nonce) == false then
     err = "id_token validation failed"
-    return nil, err
+    return nil, err, session.data.original_url
   end
 
   -- call the user info endpoint
@@ -379,23 +379,23 @@ local function openidc_logout(opts, session)
 end
 
 -- main routine for OpenID Connect user authentication
-function openidc.authenticate(opts)
+function openidc.authenticate(opts, target_url)
 
   local err = nil
 
   local session = require("resty.session").start()
 
+  local target_url = target_url or ngx.var.request_uri
+  
   if type(opts.discovery) == "string" then
     opts.discovery, err = openidc_discover(opts.discovery, opts.ssl_verify)
     if err then
-      return nil, err
+      return nil, err, target_url
     end
   end
 
   -- see if this is a request to the redirect_uri i.e. an authorization response
-  local path = ngx.var.request_uri
-  path = path:match("(.-)%?") or path
-
+  path = target_url:match("(.-)%?") or target_url
   if path == opts.redirect_uri_path then
     return openidc_authorization_response(opts, session)
   end
@@ -407,7 +407,7 @@ function openidc.authenticate(opts)
 
   -- if we have no id_token then redirect to the OP for authentication
   if not session.data.id_token then
-    return openidc_authorize(opts, session)
+    return openidc_authorize(opts, session, target_url)
   end
 
   -- log id_token contents
@@ -420,7 +420,8 @@ function openidc.authenticate(opts)
       access_token=session.data.access_token,
       user=session.data.user
     },
-    err
+    err,
+    target_url
 end
 
 -- main routine for OAuth 2.0 token introspection
