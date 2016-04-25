@@ -201,14 +201,14 @@ local function openidc_parse_json_response(response)
 end
 
 -- make a call to the token endpoint
-local function openidc_call_token_endpoint(opts, endpoint, body, ssl_verify)
+local function openidc_call_token_endpoint(opts, endpoint, body)
 
   ngx.log(ngx.DEBUG, "request body for token endpoint call: ", ngx.encode_args(body))
 
   local requestHeaders = {
       ["Content-Type"] = "application/x-www-form-urlencoded"
   }
-  if opts.client_authentication_mode == "client_secret_basic" then
+  if opts.token_endpoint_auth_method == "client_secret_basic" then
     requestHeaders.Authorization = "Basic "..ngx.encode_base64( opts.client_id..":"..opts.client_secret)
     ngx.log(ngx.DEBUG,"Authorization header '"..requestHeaders.Authorization.."'")
   end
@@ -291,8 +291,8 @@ local function openidc_authorization_response(opts, session)
     redirect_uri=openidc_get_redirect_uri(opts),
     state = session.data.state
   }
-  -- if opts.client_authentication_mode is set to client_secret_post we need to add client_id and _secret to the POST data
-  if opts.client_authentication_mode == "client_secret_post" then
+  -- if opts.token_endpoint_auth_method is set to client_secret_post we need to add client_id and _secret to the POST data
+  if opts.token_endpoint_auth_method == "client_secret_post" then
     ngx.log(ngx.DEBUG, "client ID and secret being sent in POST body")
     body.client_id=opts.client_id
     body.client_secret=opts.client_secret
@@ -408,23 +408,29 @@ function openidc.authenticate(opts, target_url)
   end
 
   -- if set check to make sure the discovery data includes the selected client auth method
-  if opts.client_authentication_mode ~= nil then
+  if opts.token_endpoint_auth_method ~= nil then
     for index, value in ipairs (opts.discovery.token_endpoint_auth_methods_supported) do
       ngx.log(ngx.DEBUG, index.." => "..value)
-      if value == opts.client_authentication_mode then
-        ngx.log(ngx.DEBUG, "Found it!")
+      if value == opts.token_endpoint_auth_method then
+        ngx.log(ngx.DEBUG, "configured for token_endpoint_auth_method="..opts.token_endpoint_auth_method..". Value found in token_endpoint_auth_methods_supported in metadata. OK to proceed.")
         break
       end
     end
     if err then
-      ngx.log(ngx.ERR, "client_authentication_mode not found")
+      ngx.log(ngx.ERR, "configured for token_endpoint_auth_method="..opts.token_endpoint_auth_method..". Value NOT found in token_endpoint_auth_methods_supported in metadata. Unable to proceed.")
       return nil, err, target_url
     end
   else
-    -- otherwise choose the first method specified by the OP
-      opts.client_authentication_mode=opts.discovery.token_endpoint_auth_methods_supported[1]
+    -- no configuration setting for option so select the first method specified by the OP
+      opts.token_endpoint_auth_method=opts.discovery.token_endpoint_auth_methods_supported[1]
   end
-  ngx.log(ngx.DEBUG, "client_authentication_mode set to "..opts.client_authentication_mode)
+  -- NOTE: token_endpoint_auth_methods_supported is optional in OpenID Connect metadata
+  -- so it's possible for opts.token_endpoint_auth_method to still be nil here.
+  -- In that case we just default to basic
+  if opts.token_endpoint_auth_method == nil then
+    opts.token_endpoint_auth_method = "client_secret_basic"
+  end
+  ngx.log(ngx.DEBUG, "token_endpoint_auth_method set to "..opts.token_endpoint_auth_method)
   
   -- see if this is a request to the redirect_uri i.e. an authorization response
   path = target_url:match("(.-)%?") or target_url
