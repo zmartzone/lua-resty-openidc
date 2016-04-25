@@ -201,18 +201,24 @@ local function openidc_parse_json_response(response)
 end
 
 -- make a call to the token endpoint
-local function openidc_call_token_endpoint(endpoint, body, ssl_verify)
+local function openidc_call_token_endpoint(opts, endpoint, body)
 
   ngx.log(ngx.DEBUG, "request body for token endpoint call: ", ngx.encode_args(body))
 
+  local requestHeaders = {
+      ["Content-Type"] = "application/x-www-form-urlencoded"
+  }
+  if opts.token_endpoint_auth_method == "client_secret_basic" then
+    requestHeaders.Authorization = "Basic "..ngx.encode_base64( opts.client_id..":"..opts.client_secret)
+    ngx.log(ngx.DEBUG,"Authorization header '"..requestHeaders.Authorization.."'")
+  end
+  
   local httpc = http.new()
   local res, err = httpc:request_uri(endpoint, {
     method = "POST",
     body = ngx.encode_args(body),
-    headers = {
-      ["Content-Type"] = "application/x-www-form-urlencoded",
-    },
-    ssl_verify = (ssl_verify ~= "no")
+    headers = requestHeaders,
+    ssl_verify = (opts.ssl_verify ~= "no")
   })
   if not res then
     err = "accessing token endpoint ("..endpoint..") failed: "..err
@@ -281,15 +287,19 @@ local function openidc_authorization_response(opts, session)
   -- assemble the parameters to the token endpoint
   local body = {
     grant_type="authorization_code",
-    client_id=opts.client_id,
-    client_secret=opts.client_secret,
     code=args.code,
     redirect_uri=openidc_get_redirect_uri(opts),
     state = session.data.state
   }
+  -- if opts.token_endpoint_auth_method is set to client_secret_post we need to add client_id and _secret to the POST data
+  if opts.token_endpoint_auth_method == "client_secret_post" then
+    ngx.log(ngx.DEBUG, "client ID and secret being sent in POST body")
+    body.client_id=opts.client_id
+    body.client_secret=opts.client_secret
+  end  
 
   -- make the call to the token endpoint
-  local json, err = openidc_call_token_endpoint(opts.discovery.token_endpoint, body, opts.ssl_verify)
+  local json, err = openidc_call_token_endpoint(opts, opts.discovery.token_endpoint, body)
   if err then
     return nil, err, session.data.original_url
   end
@@ -319,11 +329,13 @@ end
 
 -- get the Discovery metadata from the specified URL
 local function openidc_discover(url, ssl_verify)
-
+  ngx.log(ngx.DEBUG, "In openidc_discover - URL is "..url)
+	
   local err = nil
   local v = openidc_cache_get("discovery", url)
   if not v then
 
+    ngx.log(ngx.DEBUG, "Discovery data not in cache. Making call to discovery endpoint")
     -- make the call to the discovery endpoint
     local httpc = http.new()
     local res, error = httpc:request_uri(url, {
@@ -333,6 +345,7 @@ local function openidc_discover(url, ssl_verify)
       err = "accessing discovery url ("..url..") failed: "..error
       ngx.log(ngx.ERR, err)
     else
+      ngx.log(ngx.DEBUG, "Response data: "..res.body)
       json, err = openidc_parse_json_response(res)
       if json then
         openidc_cache_set("discovery", url, cjson.encode(json), 24 * 60 * 60)
@@ -394,6 +407,31 @@ function openidc.authenticate(opts, target_url)
     end
   end
 
+  -- if set check to make sure the discovery data includes the selected client auth method
+  if opts.token_endpoint_auth_method ~= nil then
+    for index, value in ipairs (opts.discovery.token_endpoint_auth_methods_supported) do
+      ngx.log(ngx.DEBUG, index.." => "..value)
+      if value == opts.token_endpoint_auth_method then
+        ngx.log(ngx.DEBUG, "configured for token_endpoint_auth_method="..opts.token_endpoint_auth_method..". Value found in token_endpoint_auth_methods_supported in metadata. OK to proceed.")
+        break
+      end
+    end
+    if err then
+      ngx.log(ngx.ERR, "configured for token_endpoint_auth_method="..opts.token_endpoint_auth_method..". Value NOT found in token_endpoint_auth_methods_supported in metadata. Unable to proceed.")
+      return nil, err, target_url
+    end
+  else
+    -- no configuration setting for option so select the first method specified by the OP
+      opts.token_endpoint_auth_method=opts.discovery.token_endpoint_auth_methods_supported[1]
+  end
+  -- NOTE: token_endpoint_auth_methods_supported is optional in OpenID Connect metadata
+  -- so it's possible for opts.token_endpoint_auth_method to still be nil here.
+  -- In that case we just default to basic
+  if opts.token_endpoint_auth_method == nil then
+    opts.token_endpoint_auth_method = "client_secret_basic"
+  end
+  ngx.log(ngx.DEBUG, "token_endpoint_auth_method set to "..opts.token_endpoint_auth_method)
+  
   -- see if this is a request to the redirect_uri i.e. an authorization response
   path = target_url:match("(.-)%?") or target_url
   if path == opts.redirect_uri_path then
@@ -478,7 +516,7 @@ function openidc.introspect(opts)
     end
 
     -- call the introspection endpoint
-    json, err = openidc_call_token_endpoint(opts.introspection_endpoint, body, opts.ssl_verify)
+    json, err = openidc_call_token_endpoint(opts, opts.introspection_endpoint, body)
 
     -- cache the results
     if json then
