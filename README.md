@@ -79,6 +79,7 @@ http {
              --iat_slack = 600,
              --redirect_uri_scheme = "https",
              --logout_path = "/logout",
+             --token_endpoint_auth_method = ["client_secret_basic"|"client_secret_post"],
              --ssl_verify = "no"
           }
 
