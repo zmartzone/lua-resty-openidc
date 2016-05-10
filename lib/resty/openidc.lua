@@ -479,8 +479,8 @@ function openidc.authenticate(opts, target_url)
     target_url
 end
 
--- main routine for OAuth 2.0 token introspection
-function openidc.introspect(opts)
+-- get an OAuth 2.0 bearer access token from the HTTP request
+local function openidc_get_bearer_access_token(opts) 
 
   local err = nil
 
@@ -507,7 +507,19 @@ function openidc.introspect(opts)
     ngx.log(ngx.ERR, err)
     return nil, err
   end
+  
+  return access_token, err
+end
 
+-- main routine for OAuth 2.0 token introspection
+function openidc.introspect(opts)
+
+  -- get the access token from the request
+  local access_token, err = openidc_get_bearer_access_token(opts)
+  if access_token == nil then
+    return nil, err
+  end
+  
   -- see if we've previously cached the introspection result for this access token
   local json = nil
   local v = openidc_cache_get("introspection", access_token)
@@ -544,6 +556,54 @@ function openidc.introspect(opts)
     json = cjson.decode(v)
   end
 
+  return json, err
+end
+
+-- main routine for OAuth 2.0 JWT token validation
+function openidc.bearer_jwt_verify(opts)
+
+  local err = nil
+  local json = nil
+
+  -- get the access token from the request
+  local access_token, err = openidc_get_bearer_access_token(opts)
+  if access_token == nil then
+    return nil, err
+  end
+
+  ngx.log(ngx.DEBUG, "access_token: ", access_token)
+
+  -- see if we've previously cached the validation result for this access token
+  local v = openidc_cache_get("introspection", access_token)
+  if not v then
+    
+    -- do the verification first time
+    local jwt = require "resty.jwt"
+    json = jwt:verify(opts.secret, access_token)
+
+    ngx.log(ngx.DEBUG, "jwt: ", cjson.encode(json))    
+    
+    -- cache the results
+    if json and json.valid == true and json.verified == true then
+      json = json.payload
+      openidc_cache_set("introspection", access_token, cjson.encode(json), json.exp - os.time())
+    else 
+      err = "invalid token: ".. json.reason
+    end
+    
+  else
+    -- decode from the cache
+    json = cjson.decode(v)
+  end
+
+  -- check the token expiry
+  if json then
+    if json.exp and json.exp < os.time() then
+      ngx.log(ngx.ERR, "token expired: json.exp=", json.exp, ", os.time()=", os.time())
+      err = "JWT expired"
+    end
+  end
+  
   return json, err
 end
 

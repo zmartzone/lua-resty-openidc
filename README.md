@@ -7,13 +7,18 @@ and the [OAuth 2.0](https://tools.ietf.org/html/rfc6749) Resource Server (RS) fu
 When used as an OpenID Connect Relying Party it authenticates users against an OpenID Connect
 Provider using [OpenID Connect Discovery](http://openid.net/specs/openid-connect-discovery-1_0.html)
 and the Basic Client Profile (i.e. the Authorization Code flow). When used as an OAuth 2.0
-Resource Server it can validate OAuth 2.0 Bearer Access Tokens against an Authorization Server.
+Resource Server it can validate OAuth 2.0 Bearer Access Tokens against an Authorization Server or, in
+case a JSON Web Token is used for an Access Token, verification can happen against a pre-configured secret/key .
 
 It maintains sessions for authenticated users by leveraging `lua-resty-session` thus offering
 a configurable choice between storing the session state in a client-side browser cookie or use
 in of the server-side storage mechanisms `shared-memory|memcache|redis`.
 
 It supports server-wide caching of resolved Discovery documents and validated Access Tokens.
+
+It can be used as a reverse proxy terminating OAuth/OpenID Connect in front of an origin server so that
+the origin server/services can be protected with the relevant standards without implementing those on
+the server itself.
 
 ## Dependencies
 
@@ -31,6 +36,12 @@ to install two extra pure-Lua dependencies that implement session management and
 - [`lua-resty-http`](https://github.com/pintsized/lua-resty-http)
 - [`lua-resty-session`](https://github.com/bungle/lua-resty-session)
 
+If you run as an OAuth 2.0 Resource Server and your access tokens are JWT bearer tokens and you want to
+verify those tokens locally (no external callouts required, see 2nd configuration example below), you need
+to install two more pure-Lua dependencies:
+
+- [`lua-resty-jwt`](https://github.com/SkyLothar/lua-resty-jwt)
+- [`lua-resty-hmac`](https://github.com/jkeys089/lua-resty-hmac)
 
 ## Installation
 
@@ -72,8 +83,8 @@ http {
              -- unless the scheme is overridden using opts.redirect_uri_scheme or an X-Forwarded-Proto header in the incoming request
              redirect_uri_path = "/redirect_uri",
              discovery = "https://accounts.google.com/.well-known/openid-configuration",
-             client_id = "<client_id",
-             client_secret = "<client_secret"
+             client_id = "<client_id>",
+             client_secret = "<client_secret>"
              --authorization_params = { hd="pingidentity.com" },
              --scope = "openid email profile",
              --iat_slack = 600,
@@ -110,6 +121,80 @@ http {
       ';
 
       proxy_pass http://localhost:80;
+    }
+  }
+}
+```
+
+## Sample Configuration for OAuth 2.0 JWT Token Validation
+
+Sample `nginx.conf` configuration for verifying Bearer JWT Access Tokens against a pre-configured secret/key.
+Once successfully verified, the NGINX server may function as a reverse proxy to an internal origin server.
+
+```
+events {
+  worker_connections 128;
+}
+
+http {
+
+  lua_package_path '~/lua/?.lua;;';
+
+  resolver 8.8.8.8;
+    
+  # cache for JWT verification results
+  lua_shared_dict introspection 10m;
+ 
+  server {
+    listen 8080;
+
+    location /api {
+
+      access_by_lua '
+ 
+          local opts = {
+            -- example of a shared secret for HS??? signature verification
+            --secret = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 
+            -- example of a public cert for RS??? signature verification
+            secret = [[-----BEGIN CERTIFICATE-----
+MIIC0DCCAbigAwIBAgIGAVSbMZs1MA0GCSqGSIb3DQEBCwUAMCkxCzAJBgNVBAYTAlVTMQwwCgYD
+VQQKEwNibGExDDAKBgNVBAMTA2JsYTAeFw0xNjA1MTAxNTAzMjBaFw0yNjA1MDgxNTAzMjBaMCkx
+CzAJBgNVBAYTAlVTMQwwCgYDVQQKEwNibGExDDAKBgNVBAMTA2JsYTCCASIwDQYJKoZIhvcNAQEB
+BQADggEPADCCAQoCggEBAIcLtHjX2GFxYv1033dvfohyCU6nsuR1qoDXfHTG3Mf/Yj4BfLHtMjJr
+nR3sgHItH3B6qZPnfErfsN0LP4uZ10/74CrWVqT5dy6ecXMqYtz/KNJ8rG0vY8vltc417AU4fie8
+gyeWv/Z6wHWUCf3NHRV8GfFgfuvywgUpHo8ujpUPFr+zrPr8butrzJPq1h3+r0f5P45tfWOdpjCT
+gsTzK6urUG0k3WkwdDYapL3wRCAw597nYfgKzzXuh9N0ZL3Uj+eJ6BgCzUZDLXABpMBZfk6hmmzp
+cAFV4nTf1AaAs/EOwVE0YgZBJiBrueMcteAIxKrKjEHgThU2Zs9gN9cSFicCAwEAATANBgkqhkiG
+9w0BAQsFAAOCAQEAQLU1A58TrSwrEccCIy0wxiGdCwQbaNMohzirc41zRMCXleJXbtsn1vv85J6A
+RmejeH5f/JbDqRRRArGMdLooGbqjWG/lwZT456Q6DXqF2plkBvh37kp/GjthGyR8ODJn5ekZwxuB
+OcTuruRhqYOIJjiYZSgK/P0zUw1cjLwUJ9ig/O6ozYmof83974fygA/wK3SgFNEoFlTkTpOvZhVW
+9kLfCVA/CRBfJNKnz5PWBBxd/3XSEuP/fcWqKGTy7zZso4MTB0NKgWO4duGTgMyZbM4onJPyA0CY
+lAc5Csj0o5Q+oEhPUAVBIF07m4rd0OvAVPOCQ2NJhQSL1oWASbf+fg==
+-----END CERTIFICATE-----]]
+          }
+
+          -- call bearer_jwt_verify for OAuth 2.0 JWT validation
+          local res, err = require("resty.openidc").bearer_jwt_verify(opts)
+
+           if err or not res then
+            ngx.status = 403
+            ngx.say(err and err or "no access_token provided")
+            ngx.exit(ngx.HTTP_FORBIDDEN)
+          end
+          
+          -- at this point res is a Lua table that represents the JSON
+          -- payload in the JWT token 
+          
+          --if res.scope ~= "edit" then
+          --  ngx.exit(ngx.HTTP_FORBIDDEN)
+          --end
+
+          --if res.client_id ~= "ro_client" then
+          --  ngx.exit(ngx.HTTP_FORBIDDEN)
+          --end          
+      ';
+
+       proxy_pass http://localhost:80;     
     }
   }
 }
