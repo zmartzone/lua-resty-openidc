@@ -201,23 +201,31 @@ local function openidc_parse_json_response(response)
 end
 
 -- make a call to the token endpoint
-local function openidc_call_token_endpoint(opts, endpoint, body)
+local function openidc_call_token_endpoint(opts, endpoint, body, auth)
 
-  ngx.log(ngx.DEBUG, "request body for token endpoint call: ", ngx.encode_args(body))
-
-  local requestHeaders = {
+  local headers = {
       ["Content-Type"] = "application/x-www-form-urlencoded"
   }
-  if opts.token_endpoint_auth_method == "client_secret_basic" then
-    requestHeaders.Authorization = "Basic "..ngx.encode_base64( opts.client_id..":"..opts.client_secret)
-    ngx.log(ngx.DEBUG,"Authorization header '"..requestHeaders.Authorization.."'")
+  
+  if auth then
+    if auth == "client_secret_basic" then
+      headers.Authorization = "Basic "..ngx.encode_base64( opts.client_id..":"..opts.client_secret)
+      ngx.log(ngx.DEBUG,"client_secret_basic: authorization header '"..headers.Authorization.."'")
+    end
+    if auth == "client_secret_post" then
+      body.client_id=opts.client_id
+      body.client_secret=opts.client_secret
+      ngx.log(ngx.DEBUG, "client_secret_post: client_id and client_secret being sent in POST body")
+    end
   end
+
+  ngx.log(ngx.DEBUG, "request body for token endpoint call: ", ngx.encode_args(body))
   
   local httpc = http.new()
   local res, err = httpc:request_uri(endpoint, {
     method = "POST",
     body = ngx.encode_args(body),
-    headers = requestHeaders,
+    headers = headers,
     ssl_verify = (opts.ssl_verify ~= "no")
   })
   if not res then
@@ -291,15 +299,9 @@ local function openidc_authorization_response(opts, session)
     redirect_uri=openidc_get_redirect_uri(opts),
     state = session.data.state
   }
-  -- if opts.token_endpoint_auth_method is set to client_secret_post we need to add client_id and _secret to the POST data
-  if opts.token_endpoint_auth_method == "client_secret_post" then
-    ngx.log(ngx.DEBUG, "client ID and secret being sent in POST body")
-    body.client_id=opts.client_id
-    body.client_secret=opts.client_secret
-  end  
 
   -- make the call to the token endpoint
-  local json, err = openidc_call_token_endpoint(opts, opts.discovery.token_endpoint, body)
+  local json, err = openidc_call_token_endpoint(opts, opts.discovery.token_endpoint, body, opts.token_endpoint_auth_method)
   if err then
     return nil, err, session.data.original_url
   end
@@ -391,6 +393,43 @@ local function openidc_logout(opts, session)
   ngx.exit(ngx.OK)
 end
 
+-- get the token endpoint authentication method
+local function openidc_get_token_auth_method(opts)
+  
+  result = nil
+  if opts.discovery.token_endpoint_auth_methods_supported ~= nil then
+    -- if set check to make sure the discovery data includes the selected client auth method
+    if opts.token_endpoint_auth_method ~= nil then
+      for index, value in ipairs (opts.discovery.token_endpoint_auth_methods_supported) do
+        ngx.log(ngx.DEBUG, index.." => "..value)
+        if value == opts.token_endpoint_auth_method then
+          ngx.log(ngx.DEBUG, "configured value for token_endpoint_auth_method ("..opts.token_endpoint_auth_method..") found in token_endpoint_auth_methods_supported in metadata")
+          result = opts.token_endpoint_auth_method
+          break
+        end
+      end
+      if result == nil then
+        ngx.log(ngx.ERR, "configured value for token_endpoint_auth_method ("..opts.token_endpoint_auth_method..") NOT found in token_endpoint_auth_methods_supported in metadata")
+        return nil
+      end
+    else
+      result = opts.discovery.token_endpoint_auth_methods_supported[1]
+      ngx.log(ngx.DEBUG, "no configuration setting for option so select the first method specified by the OP: "..result)
+    end
+  else
+    result = opts.token_endpoint_auth_method
+  end
+
+  -- set a sane default if auto-configuration failed
+  if result == nil then
+    result = "client_secret_basic"
+  end
+ 
+  ngx.log(ngx.DEBUG, "token_endpoint_auth_method result set to "..result)
+  
+  return result
+end
+
 -- main routine for OpenID Connect user authentication
 function openidc.authenticate(opts, target_url)
 
@@ -407,31 +446,9 @@ function openidc.authenticate(opts, target_url)
     end
   end
 
-  -- if set check to make sure the discovery data includes the selected client auth method
-  if opts.token_endpoint_auth_method ~= nil then
-    for index, value in ipairs (opts.discovery.token_endpoint_auth_methods_supported) do
-      ngx.log(ngx.DEBUG, index.." => "..value)
-      if value == opts.token_endpoint_auth_method then
-        ngx.log(ngx.DEBUG, "configured for token_endpoint_auth_method="..opts.token_endpoint_auth_method..". Value found in token_endpoint_auth_methods_supported in metadata. OK to proceed.")
-        break
-      end
-    end
-    if err then
-      ngx.log(ngx.ERR, "configured for token_endpoint_auth_method="..opts.token_endpoint_auth_method..". Value NOT found in token_endpoint_auth_methods_supported in metadata. Unable to proceed.")
-      return nil, err, target_url
-    end
-  else
-    -- no configuration setting for option so select the first method specified by the OP
-      opts.token_endpoint_auth_method=opts.discovery.token_endpoint_auth_methods_supported[1]
-  end
-  -- NOTE: token_endpoint_auth_methods_supported is optional in OpenID Connect metadata
-  -- so it's possible for opts.token_endpoint_auth_method to still be nil here.
-  -- In that case we just default to basic
-  if opts.token_endpoint_auth_method == nil then
-    opts.token_endpoint_auth_method = "client_secret_basic"
-  end
-  ngx.log(ngx.DEBUG, "token_endpoint_auth_method set to "..opts.token_endpoint_auth_method)
-  
+  -- set the authentication method for the token endpoint
+  opts.token_endpoint_auth_method = openidc_get_token_auth_method(opts)
+    
   -- see if this is a request to the redirect_uri i.e. an authorization response
   path = target_url:match("(.-)%?") or target_url
   if path == opts.redirect_uri_path then
@@ -516,7 +533,7 @@ function openidc.introspect(opts)
     end
 
     -- call the introspection endpoint
-    json, err = openidc_call_token_endpoint(opts, opts.introspection_endpoint, body)
+    json, err = openidc_call_token_endpoint(opts, opts.introspection_endpoint, body, nil)
 
     -- cache the results
     if json then
