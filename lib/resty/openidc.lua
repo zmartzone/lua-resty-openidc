@@ -92,6 +92,11 @@ local function openidc_validate_id_token(opts, id_token, nonce)
   end
  
   -- check issued-at timestamp
+  if not id_token.iat then
+    ngx.log(ngx.ERR, "no \"iat\" claim found in id_token")
+    return false
+  end
+  
   local slack=opts.iat_slack and opts.iat_slack or 120
   if id_token.iat < (os.time() - slack) then
     ngx.log(ngx.ERR, "token is not valid yet: id_token.iat=", id_token.iat, ", os.time()=", os.time())
@@ -440,6 +445,11 @@ function openidc.authenticate(opts, target_url)
   local target_url = target_url or ngx.var.request_uri
   
   if type(opts.discovery) == "string" then
+    --if session.data.discovery then
+    --  opts.discovery = session.data.discovery
+    --else
+    --  session.data.discovery = opts.discovery
+    --end
     opts.discovery, err = openidc_discover(opts.discovery, opts.ssl_verify)
     if err then
       return nil, err, target_url
