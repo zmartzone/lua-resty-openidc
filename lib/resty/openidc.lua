@@ -246,6 +246,10 @@ end
 
 -- make a call to the userinfo endpoint
 local function openidc_call_userinfo_endpoint(opts, access_token)
+  if not opts.discovery.userinfo_endpoint then
+    ngx.log(ngx.DEBUG, "no userinfo endpoint supplied")
+    return nil, nil
+  end
 
   local httpc = http.new()
   local res, err = httpc:request_uri(opts.discovery.userinfo_endpoint, {
