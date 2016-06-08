@@ -47,11 +47,18 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 @Author: Hans Zandbelt - hzandbelt@pingidentity.com
 --]]
 
-local cjson = require "cjson"
-local http  = require "resty.http"
+local require = require
+local cjson   = require "cjson"
+local http    = require "resty.http"
+local string  = string
+local ipairs  = ipairs
+local pairs   = pairs
+local type    = type
+local ngx     = ngx
+local os      = os
 
 local openidc = {
-  _VERSION = "1.0"
+  _VERSION = "1.1"
 }
 openidc.__index = openidc
 
@@ -67,8 +74,8 @@ end
 -- retrieve value from server-wide cache if available
 local function openidc_cache_get(type, key)
   local dict = ngx.shared[type]
-  local value = nil
-  local flags = nil
+  local value
+  local flags
   if dict then
     value, flags = dict:get(key)
     if value then ngx.log(ngx.DEBUG, "cache hit: type=", type, " key=", key) end
@@ -175,6 +182,7 @@ local function openidc_authorize(opts, session, target_url)
   end
 
   -- store state in the session
+  session:start()
   session.data.original_url = target_url
   session.data.state = state
   session.data.nonce = nonce
@@ -187,8 +195,8 @@ end
 -- parse the JSON result from a call to the OP
 local function openidc_parse_json_response(response)
 
-  local err = nil
-  local res = nil
+  local err
+  local res
 
   -- check the response from the OP
   if response.status ~= 200 then
@@ -272,7 +280,7 @@ end
 -- handle a "code" authorization response from the OP
 local function openidc_authorization_response(opts, session)
   local args = ngx.req.get_uri_args()
-  local err = nil
+  local err
 
   if not args.code or not args.state then
     err = "unhandled request to the redirect_uri: "..ngx.var.request_uri
@@ -318,17 +326,22 @@ local function openidc_authorization_response(opts, session)
   -- process the token endpoint response with the id_token and access_token
   local enc_hdr, enc_pay, enc_sign = string.match(json.id_token, '^(.+)%.(.+)%.(.+)$')
   local jwt = openidc_base64_url_decode(enc_pay)
-  session.data.id_token = cjson.decode(jwt)
-  session.data.access_token = json.access_token
+  local id_token = cjson.decode(jwt)
 
   -- validate the id_token contents
-  if openidc_validate_id_token(opts, session.data.id_token, session.data.nonce) == false then
+  if openidc_validate_id_token(opts, id_token, session.data.nonce) == false then
     err = "id_token validation failed"
     return nil, err, session.data.original_url
   end
 
   -- call the user info endpoint
-  session.data.user, err = openidc_call_userinfo_endpoint(opts, json.access_token)
+  -- TODO: should this error be checked?
+  local user, err = openidc_call_userinfo_endpoint(opts, json.access_token)
+
+  session:start()
+  session.data.user = user
+  session.data.id_token = id_token
+  session.data.access_token = json.access_token
 
   -- save the session with the obtained id_token
   session:save()
@@ -342,7 +355,7 @@ end
 local function openidc_discover(url, ssl_verify)
   ngx.log(ngx.DEBUG, "In openidc_discover - URL is "..url)
 	
-  local err = nil
+  local json, err
   local v = openidc_cache_get("discovery", url)
   if not v then
 
@@ -405,7 +418,7 @@ end
 -- get the token endpoint authentication method
 local function openidc_get_token_auth_method(opts)
   
-  result = nil
+  local result
   if opts.discovery.token_endpoint_auth_methods_supported ~= nil then
     -- if set check to make sure the discovery data includes the selected client auth method
     if opts.token_endpoint_auth_method ~= nil then
@@ -442,9 +455,9 @@ end
 -- main routine for OpenID Connect user authentication
 function openidc.authenticate(opts, target_url)
 
-  local err = nil
+  local err
 
-  local session = require("resty.session").start()
+  local session = require("resty.session").open()
 
   local target_url = target_url or ngx.var.request_uri
   
@@ -464,7 +477,7 @@ function openidc.authenticate(opts, target_url)
   opts.token_endpoint_auth_method = openidc_get_token_auth_method(opts)
     
   -- see if this is a request to the redirect_uri i.e. an authorization response
-  path = target_url:match("(.-)%?") or target_url
+  local path = target_url:match("(.-)%?") or target_url
   if path == opts.redirect_uri_path then
     return openidc_authorization_response(opts, session)
   end
@@ -496,7 +509,7 @@ end
 -- get an OAuth 2.0 bearer access token from the HTTP request
 local function openidc_get_bearer_access_token(opts) 
 
-  local err = nil
+  local err
 
   -- get the access token from the Authorization header
   local headers = ngx.req.get_headers()
@@ -535,7 +548,7 @@ function openidc.introspect(opts)
   end
   
   -- see if we've previously cached the introspection result for this access token
-  local json = nil
+  local json
   local v = openidc_cache_get("introspection", access_token)
   if not v then
 
@@ -576,8 +589,8 @@ end
 -- main routine for OAuth 2.0 JWT token validation
 function openidc.bearer_jwt_verify(opts)
 
-  local err = nil
-  local json = nil
+  local err
+  local json
 
   -- get the access token from the request
   local access_token, err = openidc_get_bearer_access_token(opts)
