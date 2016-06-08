@@ -334,12 +334,11 @@ local function openidc_authorization_response(opts, session)
     return nil, err, session.data.original_url
   end
 
+  -- call the user info endpoint
   -- TODO: should this error be checked?
   local user, err = openidc_call_userinfo_endpoint(opts, json.access_token)
 
   session:start()
-
-  -- call the user info endpoint
   session.data.user = user
   session.data.id_token = id_token
   session.data.access_token = json.access_token
