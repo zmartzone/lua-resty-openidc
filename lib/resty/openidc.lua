@@ -326,18 +326,23 @@ local function openidc_authorization_response(opts, session)
   -- process the token endpoint response with the id_token and access_token
   local enc_hdr, enc_pay, enc_sign = string.match(json.id_token, '^(.+)%.(.+)%.(.+)$')
   local jwt = openidc_base64_url_decode(enc_pay)
-  session:start()
-  session.data.id_token = cjson.decode(jwt)
-  session.data.access_token = json.access_token
+  local id_token = cjson.decode(jwt)
 
   -- validate the id_token contents
-  if openidc_validate_id_token(opts, session.data.id_token, session.data.nonce) == false then
+  if openidc_validate_id_token(opts, id_token, session.data.nonce) == false then
     err = "id_token validation failed"
     return nil, err, session.data.original_url
   end
 
+  -- TODO: should this error be checked?
+  local user, err = openidc_call_userinfo_endpoint(opts, json.access_token)
+
+  session:start()
+
   -- call the user info endpoint
-  session.data.user, err = openidc_call_userinfo_endpoint(opts, json.access_token)
+  session.data.user = user
+  session.data.id_token = id_token
+  session.data.access_token = json.access_token
 
   -- save the session with the obtained id_token
   session:save()
