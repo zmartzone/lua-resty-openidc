@@ -1,7 +1,8 @@
 package = "lua-resty-openidc"
-version = "1.3"
+version = "1.1"
 source = {
-    url = "https://github.com/pingidentity/lua-resty-openidc"
+    url = "git://github.com/pingidentity/lua-resty-openidc",
+    tag = "v1.1"
 }
 description = {
     summary = "A library for NGINX implementing the OpenID Connect Relying Party (RP) and the OAuth 2.0 Resource Server (RS) functionality",
