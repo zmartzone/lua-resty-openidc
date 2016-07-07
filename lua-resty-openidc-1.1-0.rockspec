@@ -1,5 +1,5 @@
 package = "lua-resty-openidc"
-version = "1.1"
+version = "1.1-0"
 source = {
     url = "git://github.com/pingidentity/lua-resty-openidc",
     tag = "v1.1"
@@ -30,6 +30,5 @@ dependencies = {
 build = {
     type = "builtin",
     openidc = "lib/resty/openidc.lua",
-
     "cp lib/resty/openidc.lua /usr/local/openresty/lualib/resty/"
 }
