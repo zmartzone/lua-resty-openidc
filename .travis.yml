@@ -17,7 +17,7 @@ before_install:
 
 install:
   - luarocks make $NAME-$VERSION.rockspec CFLAGS="-O2 -fPIC -fprofile-arcs" LIBFLAG="-shared"
-  - sudo luarocks install luasocket
+  - luarocks install luasocket
   - luarocks install lua-resty-http
   - luarocks install lua-resty-http
   - luarocks install lua-resty-session
