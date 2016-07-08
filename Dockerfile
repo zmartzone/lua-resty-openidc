@@ -1,4 +1,4 @@
-FROM ficusio/openresty
+FROM openresty/openresty:trusty
 
 MAINTAINER Asbjørn Ulsberg <asbjorn@ulsberg.no>
 RUN wget http://luarocks.org/releases/luarocks-2.3.0.tar.gz
