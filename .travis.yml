@@ -21,6 +21,7 @@ install:
 
 script:
   - luarocks pack $ROCKSPEC
+  - luarocks upload $ROCKSPEC --api-key=$API_KEY # The API key comes from an environment variable configured on https://travis-ci.org/
 
 notifications:
   email:
