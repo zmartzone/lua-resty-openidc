@@ -15,6 +15,7 @@ before_install:
   - source .travis/setenv_lua.sh
   - luarocks install Lua-cURL --server=https://luarocks.org/dev
   - luarocks install lunitx
+  - luarocks install JSON4Lua
 
 install:
   - luarocks make $ROCKSPEC CFLAGS="-O2 -fPIC -fprofile-arcs" LIBFLAG="-shared"
