@@ -18,12 +18,6 @@ before_install:
 
 install:
   - luarocks make $ROCKSPEC CFLAGS="-O2 -fPIC -fprofile-arcs" LIBFLAG="-shared"
-  - luarocks install luasocket
-  - luarocks install lua-resty-http
-  - luarocks install lua-resty-http
-  - luarocks install lua-resty-session
-  - luarocks install lua-resty-jwt
-  - luarocks install lua-resty-hmac
 
 script:
   - luarocks pack $ROCKSPEC
