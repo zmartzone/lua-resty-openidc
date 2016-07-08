@@ -29,6 +29,7 @@ dependencies = {
 }
 build = {
     type = "builtin",
-    openidc = "lib/resty/openidc.lua",
-    "cp lib/resty/openidc.lua /usr/local/openresty/lualib/resty/"
+    modules = {
+        openidc = "lib/resty/openidc.lua"
+    }
 }
