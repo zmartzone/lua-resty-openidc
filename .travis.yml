@@ -1,0 +1,33 @@
+language: c
+
+sudo: false
+
+env:
+  global:
+    - NAME=lua-resty-openidc
+    - VERSION=1.1-0
+    - LUAROCKS=2.3.0
+  matrix:
+    - LUA=lua5.1
+
+before_install:
+  - source .travis/setenv_lua.sh
+  - luarocks install Lua-cURL --server=https://luarocks.org/dev
+  - luarocks install lunitx
+
+install:
+  - luarocks make $NAME-$VERSION.rockspec CFLAGS="-O2 -fPIC -fprofile-arcs" LIBFLAG="-shared"
+  - sudo luarocks install luasocket
+  - luarocks install lua-resty-http
+  - luarocks install lua-resty-http
+  - luarocks install lua-resty-session
+  - luarocks install lua-resty-jwt
+  - luarocks install lua-resty-hmac
+
+script:
+  - luarocks pack lua-resty-openidc-1.1-0.rockspec
+
+notifications:
+  email:
+    on_success: change
+    on_failure: always
