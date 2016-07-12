@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/pingidentity/lua-resty-openidc.svg?branch=master)](https://travis-ci.org/pingidentity/lua-resty-openidc)
+
 # lua-resty-openidc
 
 **lua-resty-openidc** is a library for [NGINX](http://nginx.org/) implementing the
