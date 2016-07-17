@@ -41,9 +41,20 @@ script:
   # interface of lua-resty-openidc.
 
 after_success:
-  # The API key comes from an environment variable configured on
+  # The Lua Rocks API key comes from an environment variable configured on
   # https://travis-ci.org/
   - luarocks upload $ROCKSPEC --api-key=$API_KEY
+
+deploy:
+  provider: releases
+  # The GitHub OAuth Token comes from an environment variable configured on
+  # https://travis-ci.org/
+  api_key: $GITHUB_OAUTH_TOKEN
+  file: $ROCK
+  skip_cleanup: true
+  on:
+    # repo: asbjornu/lua-resty-openidc
+    tags: true
 
 notifications:
   email:
