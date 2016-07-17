@@ -32,11 +32,11 @@ install:
   # Append RUN command to install the copied rock:
   - echo "RUN /usr/local/openresty/luajit/bin/luarocks install ${ROCK}" >> Dockerfile
   - cat Dockerfile
-  - docker build -t lua-resty-openidc .
+  - docker build -t $NAME .
 
 script:
-  - docker run -d -p 127.0.0.1:80:80 --name lua-resty-openidc lua-resty-openidc
-  - docker ps | grep -q lua-resty-openidc
+  - docker run -d -p 127.0.0.1:80:80 --name $NAME $NAME
+  - docker ps | grep -q $NAME
   # TODO: Add some integration tests that excersice the OAuth and OpenID Connect
   # interface of lua-resty-openidc.
 
