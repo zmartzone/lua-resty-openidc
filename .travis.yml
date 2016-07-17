@@ -4,10 +4,7 @@ sudo: false
 
 env:
   global:
-    - VERSION=1.2.0-1
     - NAME=lua-resty-openidc
-    - ROCKSPEC=$NAME-$VERSION.rockspec
-    - ROCK=$NAME-$VERSION.src.rock
     - LUAROCKS=2.3.0
   matrix:
     - LUA=lua5.1
@@ -16,6 +13,9 @@ services:
     - docker
 
 before_install:
+  - VERSION=`git describe | grep -oP '[\d\.]+\-\d+'`
+  - ROCKSPEC=$NAME-$VERSION.rockspec
+  - ROCK=$NAME-$VERSION.src.rock
   - source .travis/setenv_lua.sh
   - luarocks install Lua-cURL --server=https://luarocks.org/dev
   - luarocks install lunitx
