@@ -7,6 +7,7 @@ env:
     - VERSION=1.2.0-1
     - NAME=lua-resty-openidc
     - ROCKSPEC=$NAME-$VERSION.rockspec
+    - ROCK=$NAME-$VERSION.src.rock
     - LUAROCKS=2.3.0
   matrix:
     - LUA=lua5.1
@@ -22,8 +23,15 @@ before_install:
 
 install:
   - luarocks make $ROCKSPEC CFLAGS="-O2 -fPIC -fprofile-arcs" LIBFLAG="-shared"
-  # TODO: We need to inject the current rock of lua-resty-openidc into the Docker container.
-  #       It will now just fetch the latest one from luarocks.org.
+  - luarocks pack $ROCKSPEC
+  # Remove the last line of the Dockerfile so we can build the Docker image with
+  # our freshly packed Lua rock:
+  - sed -i '$ d' Dockerfile
+  # Append COPY command to get the rock into the Docker container:
+  - echo "COPY ./${ROCK} /" >> Dockerfile
+  # Append RUN command to install the copied rock:
+  - echo "RUN /usr/local/openresty/luajit/bin/luarocks install ${ROCK}" >> Dockerfile
+  - cat Dockerfile
   - docker build -t lua-resty-openidc .
   - docker run -d -p 127.0.0.1:80:80 --name lua-resty-openidc lua-resty-openidc
 
@@ -33,7 +41,6 @@ script:
   # interface of lua-resty-openidc.
 
 after_success:
-  - luarocks pack $ROCKSPEC
   # The API key comes from an environment variable configured on
   # https://travis-ci.org/
   - luarocks upload $ROCKSPEC --api-key=$API_KEY
