@@ -21,6 +21,7 @@ before_install:
   - mv $NAME.rockspec $ROCKSPEC
   - sed -i -e "s/\${VERSION}/$VERSION/" $ROCKSPEC
   - sed -i -e "s/\${TAG}/$GIT_TAG/" $ROCKSPEC
+  - cat $ROCKSPEC
   - source .travis/setenv_lua.sh
   - luarocks install Lua-cURL --server=https://luarocks.org/dev
   - luarocks install lunitx
