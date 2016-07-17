@@ -40,11 +40,6 @@ script:
   # TODO: Add some integration tests that excersice the OAuth and OpenID Connect
   # interface of lua-resty-openidc.
 
-after_success:
-  # The Lua Rocks API key comes from an environment variable configured on
-  # https://travis-ci.org/
-  - luarocks upload $ROCKSPEC --api-key=$API_KEY
-
 deploy:
   provider: releases
   # The GitHub OAuth Token comes from an environment variable configured on
@@ -55,6 +50,11 @@ deploy:
   on:
     # repo: asbjornu/lua-resty-openidc
     tags: true
+
+after_deploy:
+  # The Lua Rocks API key comes from an environment variable configured on
+  # https://travis-ci.org/
+  - luarocks upload $ROCKSPEC --api-key=$API_KEY
 
 notifications:
   email:
