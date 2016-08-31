@@ -30,6 +30,6 @@ dependencies = {
 build = {
     type = "builtin",
     modules = {
-        openidc = "lib/resty/openidc.lua"
+        ["resty.openidc"] = "lib/resty/openidc.lua"
     }
 }
