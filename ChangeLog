@@ -1,0 +1,4 @@
+8/31/2016
+- add ChangeLog
+- change rockspec so it installs as resty.openidc; closes #20; thanks @dholth
+- release 1.2.1
