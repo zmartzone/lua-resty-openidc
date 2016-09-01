@@ -26,7 +26,7 @@ script:
 # The API key comes from an environment variable configured on https://travis-ci.org
 deploy:
   provider: script
-  script: if [ -n "$API_KEY" ]; then luarocks upload $ROCKSPEC --api-key=$API_KEY; fi
+  script: if [ -n "$API_KEY" ]; then luarocks upload $ROCKSPEC --api-key=$API_KEY || true; fi
 
 notifications:
   email:
