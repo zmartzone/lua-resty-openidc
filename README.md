@@ -47,7 +47,11 @@ to install two more pure-Lua dependencies:
 
 ## Installation
 
-Copy `openidc.lua` somewhere in your `lua_package_path` under a directory named `resty`.
+If you're using `luarocks` execute the following:
+
+     luarocks install lua-resty-openidc
+
+Otherwise copy `openidc.lua` somewhere in your `lua_package_path` under a directory named `resty`.
 If you are using [OpenResty](http://openresty.org/), the default location would be `/usr/local/openresty/lualib/resty`.
 
 

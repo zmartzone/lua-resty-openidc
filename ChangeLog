@@ -1,4 +1,8 @@
+10/12/2016
+- document that we can luarocks for installation
+- release 1.2.1-1
+
 8/31/2016
 - add ChangeLog
 - change rockspec so it installs as resty.openidc; closes #20; thanks @dholth
-- release 1.2.1
+- release 1.2.1-0
