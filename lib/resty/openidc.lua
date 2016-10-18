@@ -383,6 +383,76 @@ local function openidc_discover(url, ssl_verify)
   return json, err
 end
 
+local function openidc_jwks(url, ssl_verify)
+  ngx.log(ngx.DEBUG, "In openidc_jwks - URL is "..url)
+
+  local json, err
+  local v = openidc_cache_get("jwks", url)
+  if not v then
+
+    ngx.log(ngx.DEBUG, "JWKS data not in cache. Making call to jwks endpoint")
+    -- make the call to the jwks endpoint
+    local httpc = http.new()
+    local res, error = httpc:request_uri(url, {
+      ssl_verify = (ssl_verify ~= "no")
+    })
+    if not res then
+      err = "accessing jwks url ("..url..") failed: "..error
+      ngx.log(ngx.ERR, err)
+    else
+      ngx.log(ngx.DEBUG, "Response data: "..res.body)
+      json, err = openidc_parse_json_response(res)
+      if json then
+        openidc_cache_set("jwks", url, cjson.encode(json), 24 * 60 * 60)
+      end
+    end
+
+  else
+    json = cjson.decode(v)
+  end
+
+  return json, err
+end
+
+local function split_by_chunk(text, chunkSize)
+  local s = {}
+  for i=1, #text, chunkSize do
+    s[#s+1] = text:sub(i,i+chunkSize - 1)
+  end
+  return s
+end
+
+local function get_jwk (keys, kid)
+  for _, value in pairs(keys) do
+    if value.kid == kid then
+      return value
+    end
+  end
+
+  return nil
+end
+
+local function pem_from_jwk (opts, kid)
+  local cache_id = opts.discovery.jwks_uri .. '#' .. kid
+  local v = openidc_cache_get("jwks", cache_id)
+
+  if v then
+    return v
+  end
+
+  local jwks, err = openidc_jwks(opts.discovery.jwks_uri, opts.ssl_verify)
+  if err then
+    return nil, err
+  end
+
+  local x5c = get_jwk(jwks.keys, kid).x5c
+  -- TODO check x5c length
+  local chunks = split_by_chunk(ngx.encode_base64(openidc_base64_url_decode(x5c[1])), 64)
+  local pem = "-----BEGIN CERTIFICATE-----\n" .. table.concat(chunks, "\n") .. "\n-----END CERTIFICATE-----"
+  openidc_cache_set("jwks", cache_id, pem, 24 * 60 * 60)
+  return pem
+end
+
 local openidc_transparent_pixel = "\137\080\078\071\013\010\026\010\000\000\000\013\073\072\068\082" ..
                                   "\000\000\000\001\000\000\000\001\008\004\000\000\000\181\028\012" ..
                                   "\002\000\000\000\011\073\068\065\084\120\156\099\250\207\000\000" .. 
@@ -606,6 +676,25 @@ function openidc.bearer_jwt_verify(opts)
     
     -- do the verification first time
     local jwt = require "resty.jwt"
+
+    -- No secret given try getting it from the jwks endpoint
+    if not opts.secret and opts.discovery then
+      ngx.log(ngx.DEBUG, "bearer_jwt_verify using discovery.")
+      opts.discovery, err = openidc_discover(opts.discovery, opts.ssl_verify)
+      if err then
+        return nil, err
+      end
+
+      -- We decode the token twice, could be saved
+      local jwt_obj = jwt:load_jwt(access_token, nil)
+
+      opts.secret, err = pem_from_jwk(opts, jwt_obj.header.kid)
+
+      if opts.secret == nil then
+        return nil, err
+      end
+    end
+
     json = jwt:verify(opts.secret, access_token)
 
     ngx.log(ngx.DEBUG, "jwt: ", cjson.encode(json))    
