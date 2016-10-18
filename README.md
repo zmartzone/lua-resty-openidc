@@ -206,6 +206,66 @@ lAc5Csj0o5Q+oEhPUAVBIF07m4rd0OvAVPOCQ2NJhQSL1oWASbf+fg==
 }
 ```
 
+## Sample Configuration for OAuth 2.0 JWT Token Validation
+
+Sample `nginx.conf` configuration for verifying Bearer JWT Access Tokens against a OpenID Connect Discovery endpoint.
+Once successfully verified, the NGINX server may function as a reverse proxy to an internal origin server.
+
+```
+events {
+  worker_connections 128;
+}
+
+http {
+
+  lua_package_path '~/lua/?.lua;;';
+
+  resolver 8.8.8.8;
+  
+  # cache for JWT verification results
+  lua_shared_dict introspection 10m;
+  # cache for jwks metadata documents
+  lua_shared_dict discovery 1m;
+ 
+  server {
+    listen 8080;
+
+    location /api {
+
+      access_by_lua '
+ 
+          local opts = {
+            -- The jwks endpoint must provide a x5c entry 
+            -- discovery = "https://accounts.google.com/.well-known/openid-configuration", 
+          }
+
+          -- call bearer_jwt_verify for OAuth 2.0 JWT validation
+          local res, err = require("resty.openidc").bearer_jwt_verify(opts)
+
+           if err or not res then
+            ngx.status = 403
+            ngx.say(err and err or "no access_token provided")
+            ngx.exit(ngx.HTTP_FORBIDDEN)
+          end
+          
+          -- at this point res is a Lua table that represents the JSON
+          -- payload in the JWT token 
+          
+          --if res.scope ~= "edit" then
+          --  ngx.exit(ngx.HTTP_FORBIDDEN)
+          --end
+
+          --if res.client_id ~= "ro_client" then
+          --  ngx.exit(ngx.HTTP_FORBIDDEN)
+          --end          
+      ';
+
+       proxy_pass http://localhost:80;     
+    }
+  }
+}
+```
+
 ## Sample Configuration for PingFederate OAuth 2.0
 
 Sample `nginx.conf` configuration for validating Bearer Access Tokens against a PingFederate OAuth 2.0 Authorization Server.
