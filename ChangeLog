@@ -1,6 +1,13 @@
+11/18/2016
+- make the compact serialized form of the id_token available in the session data in enc_id_token; #closes #28
+- release 1.2.3
+
+11/17/2016
+- validate discovery url against issuer field; closes #25
+- release 1.2.2
+
 10/12/2016
 - document that we can luarocks for installation
-- release 1.2.1-1
 
 8/31/2016
 - add ChangeLog
