@@ -341,6 +341,7 @@ local function openidc_authorization_response(opts, session)
   session:start()
   session.data.user = user
   session.data.id_token = id_token
+  session.data.enc_id_token = json.id_token
   session.data.access_token = json.access_token
 
   -- save the session with the obtained id_token
