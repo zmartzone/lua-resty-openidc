@@ -4,7 +4,7 @@ sudo: false
 
 env:
   global:
-    - VERSION=1.2.3-0
+    - VERSION=1.2.3-1
     - NAME=lua-resty-openidc
     - ROCKSPEC=$NAME-$VERSION.rockspec
     - LUAROCKS=2.3.0
@@ -13,20 +13,19 @@ env:
 
 before_install:
   - source .travis/setenv_lua.sh
+
+install:
   - luarocks install Lua-cURL --server=https://luarocks.org/dev
   - luarocks install lunitx
   - luarocks install JSON4Lua
 
-install:
-  - luarocks make $ROCKSPEC CFLAGS="-O2 -fPIC -fprofile-arcs" LIBFLAG="-shared"
-
 script:
-  - luarocks pack $ROCKSPEC
+  - luarocks build $ROCKSPEC CFLAGS="-O2 -fPIC -fprofile-arcs" LIBFLAG="-shared"
 
 # The API key comes from an environment variable configured on https://travis-ci.org
 deploy:
   provider: script
-  script: if [ -n "$API_KEY" ]; then luarocks upload $ROCKSPEC --api-key=$API_KEY || true; fi
+  script: .travis/upload.sh
 
 notifications:
   email:
