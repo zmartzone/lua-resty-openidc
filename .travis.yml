@@ -20,7 +20,7 @@ install:
   - luarocks install JSON4Lua
 
 script:
-  - luarocks build $ROCKSPEC CFLAGS="-O2 -fPIC -fprofile-arcs" LIBFLAG="-shared"
+  - luarocks make $ROCKSPEC CFLAGS="-O2 -fPIC -fprofile-arcs" LIBFLAG="-shared"
 
 # The API key comes from an environment variable configured on https://travis-ci.org
 after_success:
