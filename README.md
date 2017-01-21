@@ -270,6 +270,11 @@ http {
 }
 ```
 
+## Support
+
+See the Wiki pages with Frequently Asked Questions at:  
+  https://github.com/pingidentity/lua-resty-openidc/wiki   
+
 ## Disclaimer
 
 *This software is open sourced by Ping Identity but not supported commercially
