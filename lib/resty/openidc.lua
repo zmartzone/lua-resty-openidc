@@ -17,7 +17,7 @@ specific language governing permissions and limitations
 under the License.
 
 ***************************************************************************
-Copyright (C) 2015-2016 Ping Identity Corporation
+Copyright (C) 2015-2017 Ping Identity Corporation
 All rights reserved.
 
 For further information please contact:
@@ -58,7 +58,7 @@ local ngx     = ngx
 local os      = os
 
 local openidc = {
-  _VERSION = "1.2.1"
+  _VERSION = "1.2.3"
 }
 openidc.__index = openidc
 
