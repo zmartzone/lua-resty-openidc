@@ -118,7 +118,7 @@ http {
           --  ngx.exit(ngx.HTTP_FORBIDDEN)
           --end
 
-          --if res.user.email ~= "hzandbelt@pingidentity.com" then
+          --if res.user.email ~= "hans.zandbelt@zmartzone.eu" then
           --  ngx.exit(ngx.HTTP_FORBIDDEN)
           --end
 
@@ -273,11 +273,16 @@ http {
 ## Support
 
 See the Wiki pages with Frequently Asked Questions at:  
-  https://github.com/pingidentity/lua-resty-openidc/wiki   
+  https://github.com/pingidentity/lua-resty-openidc/wiki  
+For commercial support and consultancy you can contact:  
+  [info@zmartzone.eu](mailto:info@zmartzone.eu)  
 
-## Disclaimer
+Any questions/issues should go to issues tracker or the primary author
+[hans.zandbelt@zmartzone.eu](mailto:hans.zandbelt@zmartzone.eu)
+
+Disclaimer
+----------
 
 *This software is open sourced by Ping Identity but not supported commercially
-as such. Any questions/issues should go to the Github issues
-tracker or the author [hzandbelt@pingidentity.com](mailto:hzandbelt@pingidentity.com)
-directly See also the DISCLAIMER file in this directory.*
+by Ping Identity, see also the DISCLAIMER file in this directory. For commercial support
+you can contact [ZmartZone IAM](https://www.zmartzone.eu) as described above.*
