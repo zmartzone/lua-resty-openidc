@@ -657,18 +657,9 @@ function openidc.introspect(opts)
 end
 
 -- main routine for OAuth 2.0 JWT token validation
-function openidc.bearer_jwt_verify(opts)
-
+function openidc.jwt_verify(access_token, opts)
   local err
   local json
-
-  -- get the access token from the request
-  local access_token, err = openidc_get_bearer_access_token(opts)
-  if access_token == nil then
-    return nil, err
-  end
-
-  ngx.log(ngx.DEBUG, "access_token: ", access_token)
 
   -- see if we've previously cached the validation result for this access token
   local v = openidc_cache_get("introspection", access_token)
@@ -721,6 +712,21 @@ function openidc.bearer_jwt_verify(opts)
   end
   
   return json, err
+end
+
+function openidc.bearer_jwt_verify(opts)
+  local err
+  local json
+
+  -- get the access token from the request
+  local access_token, err = openidc_get_bearer_access_token(opts)
+  if access_token == nil then
+    return nil, err
+  end
+
+  ngx.log(ngx.DEBUG, "access_token: ", access_token)
+
+  return openidc.jwt_verify(access_token, opts)
 end
 
 return openidc
