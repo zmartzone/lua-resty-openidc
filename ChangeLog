@@ -1,4 +1,7 @@
 02/09/2017
+- change rockspec so all newer dependencies/Lua versions are allowed instead of a single static version
+
+02/09/2017
 - merge $24; thanks @hanikesn :
   - feature JWT validation through discovery
   - allow user-mode verification of tokens via separate function
