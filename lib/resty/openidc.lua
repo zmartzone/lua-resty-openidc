@@ -679,6 +679,10 @@ function openidc.jwt_verify(access_token, opts)
       -- We decode the token twice, could be saved
       local jwt_obj = jwt:load_jwt(access_token, nil)
 
+      if not jwt_obj.valid then
+        return nil, "invalid jwt"
+      end
+
       opts.secret, err = pem_from_jwk(opts, jwt_obj.header.kid)
 
       if opts.secret == nil then
