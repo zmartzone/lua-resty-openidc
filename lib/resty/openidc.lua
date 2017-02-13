@@ -654,7 +654,12 @@ function openidc.introspect(opts)
 
     -- cache the results
     if json then
-      openidc_cache_set("introspection", access_token, cjson.encode(json), json.expires_in)
+      local expiry_claim = opts.expiry_claim or "expires_in"
+      local ttl = json[expiry_claim]
+      if expiry_claim ~= "exp" then --https://tools.ietf.org/html/rfc7662#section-2.2
+        ttl = ttl - os.time()
+      end
+      openidc_cache_set("introspection", access_token, cjson.encode(json), ttl)
     end
 
   else

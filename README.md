@@ -302,7 +302,11 @@ http {
              },
              client_id="rs_client",
              client_secret="2Federate",
-             ssl_verify = "no"
+             ssl_verify = "no",
+
+             -- Defaults to "expires_in" - Controls the TTL of the introspection cache
+             -- https://tools.ietf.org/html/rfc7662#section-2.2
+             -- expiry_claim = "exp"
           }
 
           -- call introspect for OAuth 2.0 Bearer Access Token validation
