@@ -336,10 +336,10 @@ http {
 
 ## Support
 
-See the Wiki pages with Frequently Asked Questions at:
-  https://github.com/pingidentity/lua-resty-openidc/wiki
-For commercial support and consultancy you can contact:
-  [info@zmartzone.eu](mailto:info@zmartzone.eu)
+See the Wiki pages with Frequently Asked Questions at:  
+  https://github.com/pingidentity/lua-resty-openidc/wiki  
+For commercial support and consultancy you can contact:  
+  [info@zmartzone.eu](mailto:info@zmartzone.eu)  
 
 Any questions/issues should go to issues tracker or the primary author
 [hans.zandbelt@zmartzone.eu](mailto:hans.zandbelt@zmartzone.eu)
