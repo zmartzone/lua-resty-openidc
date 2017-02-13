@@ -69,13 +69,13 @@ http {
   lua_package_path '~/lua/?.lua;;';
 
   resolver 8.8.8.8;
-  
+
   lua_ssl_trusted_certificate /opt/local/etc/openssl/cert.pem;
   lua_ssl_verify_depth 5;
-  
+
   # cache for discovery metadata documents
   lua_shared_dict discovery 1m;
- 
+
   server {
     listen 8080;
 
@@ -102,18 +102,18 @@ http {
 
           -- call authenticate for OpenID Connect user authentication
           local res, err = require("resty.openidc").authenticate(opts)
-          
+
           if err then
             ngx.status = 500
             ngx.say(err)
             ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
           end
-         
+
           -- at this point res is a Lua table with 3 keys:
           --   id_token    : a Lua table with the claims from the id_token (required)
           --   access_token: the access token (optional)
           --   user        : a Lua table with the claims returned from the user info endpoint (optional)
-          
+
           --if res.id_token.hd ~= "pingidentity.com" then
           --  ngx.exit(ngx.HTTP_FORBIDDEN)
           --end
@@ -123,7 +123,7 @@ http {
           --end
 
           -- set headers with user info (overwriting any existing!)
-          ngx.req.set_header("X-USER", res.id_token.sub)                    
+          ngx.req.set_header("X-USER", res.id_token.sub)
       ';
 
       proxy_pass http://localhost:80;
@@ -147,20 +147,20 @@ http {
   lua_package_path '~/lua/?.lua;;';
 
   resolver 8.8.8.8;
-    
+
   # cache for JWT verification results
   lua_shared_dict introspection 10m;
- 
+
   server {
     listen 8080;
 
     location /api {
 
       access_by_lua '
- 
+
           local opts = {
             -- example of a shared secret for HS??? signature verification
-            --secret = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 
+            --secret = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             -- example of a public cert for RS??? signature verification
             secret = [[-----BEGIN CERTIFICATE-----
 MIIC0DCCAbigAwIBAgIGAVSbMZs1MA0GCSqGSIb3DQEBCwUAMCkxCzAJBgNVBAYTAlVTMQwwCgYD
@@ -187,20 +187,20 @@ lAc5Csj0o5Q+oEhPUAVBIF07m4rd0OvAVPOCQ2NJhQSL1oWASbf+fg==
             ngx.say(err and err or "no access_token provided")
             ngx.exit(ngx.HTTP_FORBIDDEN)
           end
-          
+
           -- at this point res is a Lua table that represents the JSON
-          -- payload in the JWT token 
-          
+          -- payload in the JWT token
+
           --if res.scope ~= "edit" then
           --  ngx.exit(ngx.HTTP_FORBIDDEN)
           --end
 
           --if res.client_id ~= "ro_client" then
           --  ngx.exit(ngx.HTTP_FORBIDDEN)
-          --end          
+          --end
       ';
 
-       proxy_pass http://localhost:80;     
+       proxy_pass http://localhost:80;
     }
   }
 }
@@ -221,22 +221,22 @@ http {
   lua_package_path '~/lua/?.lua;;';
 
   resolver 8.8.8.8;
-  
+
   # cache for JWT verification results
   lua_shared_dict introspection 10m;
   # cache for jwks metadata documents
   lua_shared_dict discovery 1m;
- 
+
   server {
     listen 8080;
 
     location /api {
 
       access_by_lua '
- 
+
           local opts = {
-            -- The jwks endpoint must provide a x5c entry 
-            -- discovery = "https://accounts.google.com/.well-known/openid-configuration", 
+            -- The jwks endpoint must provide a x5c entry
+            -- discovery = "https://accounts.google.com/.well-known/openid-configuration",
           }
 
           -- call bearer_jwt_verify for OAuth 2.0 JWT validation
@@ -247,20 +247,20 @@ http {
             ngx.say(err and err or "no access_token provided")
             ngx.exit(ngx.HTTP_FORBIDDEN)
           end
-          
+
           -- at this point res is a Lua table that represents the JSON
-          -- payload in the JWT token 
-          
+          -- payload in the JWT token
+
           --if res.scope ~= "edit" then
           --  ngx.exit(ngx.HTTP_FORBIDDEN)
           --end
 
           --if res.client_id ~= "ro_client" then
           --  ngx.exit(ngx.HTTP_FORBIDDEN)
-          --end          
+          --end
       ';
 
-       proxy_pass http://localhost:80;     
+       proxy_pass http://localhost:80;
     }
   }
 }
@@ -280,20 +280,20 @@ http {
   lua_package_path '~/lua/?.lua;;';
 
   resolver 8.8.8.8;
-  
+
   lua_ssl_trusted_certificate /opt/local/etc/openssl/cert.pem;
   lua_ssl_verify_depth 5;
-  
+
   # cache for validation results
   lua_shared_dict introspection 10m;
- 
+
   server {
     listen 8080;
 
     location /api {
 
       access_by_lua '
- 
+
           local opts = {
              introspection_endpoint="https://localhost:9031/as/token.oauth2",
              introspection_token_param_name="token",
@@ -302,12 +302,16 @@ http {
              },
              client_id="rs_client",
              client_secret="2Federate",
-             ssl_verify = "no"
+             ssl_verify = "no",
+
+             -- Defaults to "expires_in" - Controls the TTL of the introspection cache
+             -- https://tools.ietf.org/html/rfc7662#section-2.2
+             -- expiry_claim = "exp"
           }
 
           -- call introspect for OAuth 2.0 Bearer Access Token validation
           local res, err = require("resty.openidc").introspect(opts)
-          
+
           if err then
             ngx.status = 403
             ngx.say(err)
@@ -323,7 +327,7 @@ http {
 
           --if res.client_id ~= "ro_client" then
           --  ngx.exit(ngx.HTTP_FORBIDDEN)
-          --end          
+          --end
       ';
     }
   }
@@ -332,10 +336,10 @@ http {
 
 ## Support
 
-See the Wiki pages with Frequently Asked Questions at:  
-  https://github.com/pingidentity/lua-resty-openidc/wiki  
-For commercial support and consultancy you can contact:  
-  [info@zmartzone.eu](mailto:info@zmartzone.eu)  
+See the Wiki pages with Frequently Asked Questions at:
+  https://github.com/pingidentity/lua-resty-openidc/wiki
+For commercial support and consultancy you can contact:
+  [info@zmartzone.eu](mailto:info@zmartzone.eu)
 
 Any questions/issues should go to issues tracker or the primary author
 [hans.zandbelt@zmartzone.eu](mailto:hans.zandbelt@zmartzone.eu)
