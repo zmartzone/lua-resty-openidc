@@ -55,7 +55,6 @@ local ipairs  = ipairs
 local pairs   = pairs
 local type    = type
 local ngx     = ngx
-local os      = os
 
 local openidc = {
   _VERSION = "1.3.0"
@@ -105,14 +104,14 @@ local function openidc_validate_id_token(opts, id_token, nonce)
   end
 
   local slack=opts.iat_slack and opts.iat_slack or 120
-  if id_token.iat < (os.time() - slack) then
-    ngx.log(ngx.ERR, "token is not valid yet: id_token.iat=", id_token.iat, ", os.time()=", os.time())
+  if id_token.iat < (ngx.time() - slack) then
+    ngx.log(ngx.ERR, "token is not valid yet: id_token.iat=", id_token.iat, ", ngx.time()=", ngx.time())
     return false
   end
 
   -- check expiry timestamp
-  if id_token.exp < os.time() then
-    ngx.log(ngx.ERR, "token expired: id_token.exp=", id_token.exp, ", os.time()=", os.time())
+  if id_token.exp < ngx.time() then
+    ngx.log(ngx.ERR, "token expired: id_token.exp=", id_token.exp, ", ngx.time()=", ngx.time())
     return false
   end
 
@@ -657,7 +656,7 @@ function openidc.introspect(opts)
       local expiry_claim = opts.expiry_claim or "expires_in"
       local ttl = json[expiry_claim]
       if expiry_claim ~= "exp" then --https://tools.ietf.org/html/rfc7662#section-2.2
-        ttl = ttl - os.time()
+        ttl = ttl - ngx.time()
       end
       openidc_cache_set("introspection", access_token, cjson.encode(json), ttl)
     end
@@ -710,7 +709,7 @@ function openidc.jwt_verify(access_token, opts)
     -- cache the results
     if json and json.valid == true and json.verified == true then
       json = json.payload
-      openidc_cache_set("introspection", access_token, cjson.encode(json), json.exp - os.time())
+      openidc_cache_set("introspection", access_token, cjson.encode(json), json.exp - ngx.time())
     else
       err = "invalid token: ".. json.reason
     end
@@ -722,8 +721,8 @@ function openidc.jwt_verify(access_token, opts)
 
   -- check the token expiry
   if json then
-    if json.exp and json.exp < os.time() then
-      ngx.log(ngx.ERR, "token expired: json.exp=", json.exp, ", os.time()=", os.time())
+    if json.exp and json.exp < ngx.time() then
+      ngx.log(ngx.ERR, "token expired: json.exp=", json.exp, ", ngx.time()=", ngx.time())
       err = "JWT expired"
     end
   end
