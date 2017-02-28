@@ -1,3 +1,6 @@
+02/28/2017
+- add dist.ini for OpenResty OPM; should address #38
+
 02/13/2017
 - support RFC 7662 for token introspection: use exp for TTL cache control closes #35; thanks @iperdomo
 - add @iperdomo to AUTHORS
