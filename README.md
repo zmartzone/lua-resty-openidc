@@ -76,6 +76,10 @@ http {
   # cache for discovery metadata documents
   lua_shared_dict discovery 1m;
 
+  # NB: if you have "lua_code_cache off;", use:
+  # set $session_secret xxxxxxxxxxxxxxxxxxx;
+  # see: https://github.com/bungle/lua-resty-session#notes-about-turning-lua-code-cache-off
+  
   server {
     listen 8080;
 
