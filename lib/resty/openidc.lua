@@ -57,7 +57,7 @@ local type    = type
 local ngx     = ngx
 
 local openidc = {
-  _VERSION = "1.3.0"
+  _VERSION = "1.3.1"
 }
 openidc.__index = openidc
 
@@ -556,6 +556,11 @@ function openidc.authenticate(opts, target_url)
   -- see if this is a request to the redirect_uri i.e. an authorization response
   local path = target_url:match("(.-)%?") or target_url
   if path == opts.redirect_uri_path then
+    if not session.present then
+      err = "request to the redirect_uri_path but there's no session state found"
+      ngx.log(ngx.ERR, err)
+      return nil, err, target_url
+    end
     return openidc_authorization_response(opts, session)
   end
 
@@ -565,7 +570,7 @@ function openidc.authenticate(opts, target_url)
   end
 
   -- if we have no id_token then redirect to the OP for authentication
-  if not session.data.id_token then
+  if not session.present or not session.data.id_token then
     return openidc_authorize(opts, session, target_url)
   end
 
