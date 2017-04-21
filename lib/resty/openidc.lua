@@ -172,7 +172,8 @@ local function openidc_authorize(opts, session, target_url)
     scope=opts.scope and opts.scope or "openid email profile",
     redirect_uri=openidc_get_redirect_uri(opts),
     state=state,
-    nonce=nonce
+    nonce=nonce,
+    prompt=opts.prompt and opts.prompt or ""
   }
 
   -- merge any provided extra parameters
@@ -185,6 +186,7 @@ local function openidc_authorize(opts, session, target_url)
   session.data.original_url = target_url
   session.data.state = state
   session.data.nonce = nonce
+  session.data.last_authenticated = ngx.time()
   session:save()
 
   -- redirect to the /authorization endpoint
@@ -575,6 +577,14 @@ function openidc.authenticate(opts, target_url)
   if not session.present or not session.data.id_token then
     return openidc_authorize(opts, session, target_url), session
   end
+
+  -- silently reauthenticate if necessary (mainly used for session refresh/getting updated id_token data)
+  reauth_delay = opts.refresh_session_interval and opts.refresh_session_interval or 900
+  if session.data.last_authenticated == nil or (session.data.last_authenticated+reauth_delay) < ngx.time() then
+    opts.prompt = "none"
+    return openidc_authorize(opts, session, target_url), session
+  end
+
 
   -- log id_token contents
   ngx.log(ngx.DEBUG, "id_token=", cjson.encode(session.data.id_token))
