@@ -481,6 +481,8 @@ local function openidc_logout(opts, session)
     ngx.print(openidc_transparent_pixel)
     ngx.exit(ngx.OK)
     return
+  elseif opts.redirect_after_logout_uri then
+    return ngx.redirect(opts.redirect_after_logout_uri)
   elseif opts.discovery.end_session_endpoint then
     return ngx.redirect(opts.discovery.end_session_endpoint)
   elseif opts.discovery.ping_end_session_endpoint then
