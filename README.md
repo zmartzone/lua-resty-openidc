@@ -97,9 +97,12 @@ http {
              client_secret = "<client_secret>"
              --authorization_params = { hd="pingidentity.com" },
              --scope = "openid email profile",
+             -- Refresh the user's id_token after 900 seconds without requiring re-authentication
+             --refresh_session_interval = 900,
              --iat_slack = 600,
              --redirect_uri_scheme = "https",
              --logout_path = "/logout",
+             --redirect_after_logout_uri = "/",
              --token_endpoint_auth_method = ["client_secret_basic"|"client_secret_post"],
              --ssl_verify = "no"
           }
