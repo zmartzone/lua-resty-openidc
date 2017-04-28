@@ -579,12 +579,12 @@ function openidc.authenticate(opts, target_url)
   end
 
   -- silently reauthenticate if necessary (mainly used for session refresh/getting updated id_token data)
-  reauth_delay = opts.refresh_session_interval and opts.refresh_session_interval or 900
-  if session.data.last_authenticated == nil or (session.data.last_authenticated+reauth_delay) < ngx.time() then
-    opts.prompt = "none"
-    return openidc_authorize(opts, session, target_url), session
+  if opts.refresh_session_interval ~= nil then
+    if session.data.last_authenticated == nil or (session.data.last_authenticated+opts.refresh_session_interval) < ngx.time() then
+      opts.prompt = "none"
+      return openidc_authorize(opts, session, target_url), session
+    end
   end
-
 
   -- log id_token contents
   ngx.log(ngx.DEBUG, "id_token=", cjson.encode(session.data.id_token))
