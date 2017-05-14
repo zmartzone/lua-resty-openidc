@@ -278,6 +278,11 @@ local function openidc_call_userinfo_endpoint(opts, access_token)
   return openidc_parse_json_response(res)
 end
 
+-- computes access_token expires_in value (in seconds)
+local function openidc_access_token_expires_in(opts, expires_in)
+  return (expires_in or opts.access_token_expires_in or 3600) - 1 - (opts.access_token_expires_leeway or 0)
+end
+
 -- handle a "code" authorization response from the OP
 local function openidc_authorization_response(opts, session)
   local args = ngx.req.get_uri_args()
@@ -318,6 +323,7 @@ local function openidc_authorization_response(opts, session)
     state = session.data.state
   }
 
+  local current_time = os.time()
   -- make the call to the token endpoint
   local json, err = openidc_call_token_endpoint(opts, opts.discovery.token_endpoint, body, opts.token_endpoint_auth_method)
   if err then
@@ -344,6 +350,11 @@ local function openidc_authorization_response(opts, session)
   session.data.id_token = id_token
   session.data.enc_id_token = json.id_token
   session.data.access_token = json.access_token
+  session.data.access_token_expiration = current_time
+          + openidc_access_token_expires_in(opts, json.expires_in)
+  if json.refresh_token ~= nil then
+    session.data.refresh_token = json.refresh_token
+  end
 
   -- save the session with the obtained id_token
   session:save()
@@ -533,6 +544,50 @@ local function openidc_get_token_auth_method(opts)
   return result
 end
 
+-- returns a valid access_token (eventually refreshing the token)
+local function openidc_access_token(opts, session)
+
+  local err
+
+  if session.data.access_token == nil then
+    return nil, err
+  end
+  local current_time = os.time()
+  if current_time < session.data.access_token_expiration then
+    return session.data.access_token, err
+  end
+  if session.data.refresh_token == nil then
+    return nil, err
+  end
+
+  ngx.log(ngx.DEBUG, "refreshing expired access_token: ", session.data.access_token, " with: ", session.data.refresh_token)
+  -- assemble the parameters to the token endpoint
+  local body = {
+    grant_type="refresh_token",
+    refresh_token=session.data.refresh_token,
+    scope=opts.scope and opts.scope or "openid email profile"
+  }
+
+  local json, err = openidc_call_token_endpoint(opts, opts.discovery.token_endpoint, body, opts.token_endpoint_auth_method)
+  if err then
+    return nil, err
+  end
+  ngx.log(ngx.DEBUG, "access_token refreshed: ", json.access_token, " updated refresh_token: ", json.refresh_token)
+
+  session:start()
+  session.data.access_token = json.access_token
+  session.data.access_token_expiration = current_time + openidc_access_token_expires_in(opts, json.expires_in)
+  if json.refresh_token ~= nil then
+    session.data.refresh_token = json.refresh_token
+  end
+
+  -- save the session with the new access_token and optionally the new refresh_token
+  session:save()
+
+  return session.data.access_token, err
+
+end
+
 -- main routine for OpenID Connect user authentication
 function openidc.authenticate(opts, target_url)
 
@@ -541,6 +596,8 @@ function openidc.authenticate(opts, target_url)
   local session = require("resty.session").open()
 
   local target_url = target_url or ngx.var.request_uri
+
+  local access_token
 
   if type(opts.discovery) == "string" then
     --if session.data.discovery then
@@ -586,6 +643,12 @@ function openidc.authenticate(opts, target_url)
     end
   end
 
+  -- refresh access_token if necessary
+  access_token, err = openidc_access_token(opts, session)
+  if err then
+    return nil, err, target_url, session
+  end
+
   -- log id_token contents
   ngx.log(ngx.DEBUG, "id_token=", cjson.encode(session.data.id_token))
 
@@ -593,12 +656,21 @@ function openidc.authenticate(opts, target_url)
   return
     {
       id_token=session.data.id_token,
-      access_token=session.data.access_token,
+      access_token=access_token,
       user=session.data.user
     },
     err,
     target_url,
     session
+end
+
+-- get a valid access_token (eventually refreshing the token), or nil if there's no valid access_token
+function openidc.access_token(opts)
+
+  local session = require("resty.session").open()
+
+  return openidc_access_token(opts, session)
+
 end
 
 -- get an OAuth 2.0 bearer access token from the HTTP request
