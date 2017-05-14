@@ -105,6 +105,14 @@ http {
              --redirect_after_logout_uri = "/",
              --token_endpoint_auth_method = ["client_secret_basic"|"client_secret_post"],
              --ssl_verify = "no"
+             --access_token_expires_in = 3600
+             -- Default lifetime in seconds of the access_token if no expires_in attribute is present in the token 
+                endpoint response.
+                This plugin will silently renew the access_token once it's expired if refreshToken scope is present.
+             --access_token_expires_leeway = 0
+                Expiration leeway for access_token renewal.
+                If this is set, renewal will happen access_token_expires_leeway seconds before the token expiration.
+                This avoids errors in case the access_token just expires when arriving to the OAuth Resoource Server.
           }
 
           -- call authenticate for OpenID Connect user authentication
