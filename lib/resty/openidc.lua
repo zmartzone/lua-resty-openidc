@@ -323,7 +323,7 @@ local function openidc_authorization_response(opts, session)
     state = session.data.state
   }
 
-  local current_time = os.time()
+  local current_time = ngx.time()
   -- make the call to the token endpoint
   local json, err = openidc_call_token_endpoint(opts, opts.discovery.token_endpoint, body, opts.token_endpoint_auth_method)
   if err then
@@ -552,7 +552,7 @@ local function openidc_access_token(opts, session)
   if session.data.access_token == nil then
     return nil, err
   end
-  local current_time = os.time()
+  local current_time = ngx.time()
   if current_time < session.data.access_token_expiration then
     return session.data.access_token, err
   end
