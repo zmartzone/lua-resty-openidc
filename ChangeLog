@@ -1,3 +1,6 @@
+05/18/2017
+- add unauth_action "pass" option to .authenticate(); closes #53; thanks @dholth
+
 05/14/2017
 - renew access token on expiration with refresh token grant; thanks @gonzalad
 - use ngx.time instead of os.time, everywhere now
