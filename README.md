@@ -147,6 +147,13 @@ http {
 }
 ```
 
+## Check authentication only
+
+```
+-- check session, but do not redirect to auth if not already logged in
+local res, err = require("resty.openidc").authenticate(opts, nil, "pass")
+```
+
 ## Sample Configuration for OAuth 2.0 JWT Token Validation
 
 Sample `nginx.conf` configuration for verifying Bearer JWT Access Tokens against a pre-configured secret/key.
