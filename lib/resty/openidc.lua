@@ -589,7 +589,7 @@ local function openidc_access_token(opts, session)
 end
 
 -- main routine for OpenID Connect user authentication
-function openidc.authenticate(opts, target_url)
+function openidc.authenticate(opts, target_url, unauth_action)
 
   local err
 
@@ -632,6 +632,13 @@ function openidc.authenticate(opts, target_url)
 
   -- if we have no id_token then redirect to the OP for authentication
   if not session.present or not session.data.id_token then
+    if unauth_action == "pass" then
+      return
+        nil,
+        err,
+        target_url,
+        session
+    end
     return openidc_authorize(opts, session, target_url), session
   end
 
