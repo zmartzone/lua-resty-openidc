@@ -1,3 +1,6 @@
+05/23/2017
+- add support for passing session options to resty.session; closes #56; thanks @gene1wood
+
 05/18/2017
 - add unauth_action "pass" option to .authenticate(); closes #53; thanks @dholth
 
