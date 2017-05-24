@@ -589,11 +589,11 @@ local function openidc_access_token(opts, session)
 end
 
 -- main routine for OpenID Connect user authentication
-function openidc.authenticate(opts, target_url, unauth_action)
+function openidc.authenticate(opts, target_url, unauth_action, session_opts)
 
   local err
 
-  local session = require("resty.session").open()
+  local session = require("resty.session").open(session_opts)
 
   local target_url = target_url or ngx.var.request_uri
 
@@ -672,9 +672,9 @@ function openidc.authenticate(opts, target_url, unauth_action)
 end
 
 -- get a valid access_token (eventually refreshing the token), or nil if there's no valid access_token
-function openidc.access_token(opts)
+function openidc.access_token(opts, session_opts)
 
-  local session = require("resty.session").open()
+  local session = require("resty.session").open(session_opts)
 
   return openidc_access_token(opts, session)
 
