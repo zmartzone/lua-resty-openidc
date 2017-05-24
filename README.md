@@ -3,7 +3,7 @@
 # lua-resty-openidc
 
 **lua-resty-openidc** is a library for [NGINX](http://nginx.org/) implementing the
-[OpenID Connect] (http://openid.net/specs/openid-connect-core-1_0.html) Relying Party (RP)
+[OpenID Connect](http://openid.net/specs/openid-connect-core-1_0.html) Relying Party (RP)
 and the [OAuth 2.0](https://tools.ietf.org/html/rfc6749) Resource Server (RS) functionality.
 
 When used as an OpenID Connect Relying Party it authenticates users against an OpenID Connect
