@@ -780,9 +780,11 @@ function openidc.jwt_verify(access_token, opts)
     -- No secret given try getting it from the jwks endpoint
     if not opts.secret and opts.discovery then
       ngx.log(ngx.DEBUG, "bearer_jwt_verify using discovery.")
-      opts.discovery, err = openidc_discover(opts.discovery, opts.ssl_verify)
-      if err then
-        return nil, err
+      if type(opts.discovery) == "string" then
+        opts.discovery, err = openidc_discover(opts.discovery, opts.ssl_verify)
+        if err then
+          return nil, err
+        end
       end
 
       -- We decode the token twice, could be saved
