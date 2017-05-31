@@ -57,7 +57,7 @@ local type    = type
 local ngx     = ngx
 
 local openidc = {
-  _VERSION = "1.3.1"
+  _VERSION = "1.3.2"
 }
 openidc.__index = openidc
 
