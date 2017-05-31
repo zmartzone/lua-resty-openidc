@@ -766,7 +766,8 @@ function openidc.introspect(opts)
 end
 
 -- main routine for OAuth 2.0 JWT token validation
-function openidc.jwt_verify(access_token, opts)
+-- optional args are claim specs, see jwt-validators in resty.jwt
+function openidc.jwt_verify(access_token, opts, ...)
   local err
   local json
 
@@ -799,7 +800,7 @@ function openidc.jwt_verify(access_token, opts)
       end
     end
 
-    json = jwt:verify(opts.secret, access_token)
+    json = jwt:verify(opts.secret, access_token, ...)
 
     ngx.log(ngx.DEBUG, "jwt: ", cjson.encode(json))
 
@@ -827,7 +828,7 @@ function openidc.jwt_verify(access_token, opts)
   return json, err
 end
 
-function openidc.bearer_jwt_verify(opts)
+function openidc.bearer_jwt_verify(opts, ...)
   local err
   local json
 
@@ -839,7 +840,7 @@ function openidc.bearer_jwt_verify(opts)
 
   ngx.log(ngx.DEBUG, "access_token: ", access_token)
 
-  return openidc.jwt_verify(access_token, opts)
+  return openidc.jwt_verify(access_token, opts, ...)
 end
 
 return openidc
