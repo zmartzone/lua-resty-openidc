@@ -1,3 +1,7 @@
+05/31/2017
+- allow optional claim specs when verifying JWT access tokens; thanks @bodewig
+- return the raw bearer token from `openidc.bearer_jwt_verify`; thanks @bodewig
+
 05/23/2017
 - add support for passing session options to resty.session; closes #56; thanks @gene1wood
 
