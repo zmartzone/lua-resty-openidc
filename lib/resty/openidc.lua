@@ -828,7 +828,6 @@ function openidc.jwt_verify(access_token, opts)
 end
 
 function openidc.bearer_jwt_verify(opts)
-  local err
   local json
 
   -- get the access token from the request
@@ -839,7 +838,8 @@ function openidc.bearer_jwt_verify(opts)
 
   ngx.log(ngx.DEBUG, "access_token: ", access_token)
 
-  return openidc.jwt_verify(access_token, opts)
+  json, err = openidc.jwt_verify(access_token, opts)
+  return json, err, access_token
 end
 
 return openidc
