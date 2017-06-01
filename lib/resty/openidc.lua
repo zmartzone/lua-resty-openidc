@@ -642,7 +642,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
   end
 
   -- if we have no id_token then redirect to the OP for authentication
-  if not session.present or not session.data.id_token then
+  if not session.present or not session.data.id_token or opts.force_reauthorize then
     if unauth_action == "pass" then
       return
         nil,
