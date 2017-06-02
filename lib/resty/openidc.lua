@@ -561,6 +561,17 @@ local function openidc_access_token(opts, session)
   end
 
   ngx.log(ngx.DEBUG, "refreshing expired access_token: ", session.data.access_token, " with: ", session.data.refresh_token)
+
+  -- retrieve token endpoint URL from discovery endpoint if necessary
+  if type(opts.discovery) == "string" then
+    opts.discovery, err = openidc_discover(opts.discovery, opts.ssl_verify)
+    if err then
+      return nil, err
+    end
+  end
+
+  -- set the authentication method for the token endpoint
+  opts.token_endpoint_auth_method = openidc_get_token_auth_method(opts)
   -- assemble the parameters to the token endpoint
   local body = {
     grant_type="refresh_token",
@@ -631,7 +642,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
   end
 
   -- if we have no id_token then redirect to the OP for authentication
-  if not session.present or not session.data.id_token then
+  if not session.present or not session.data.id_token or opts.force_reauthorize then
     if unauth_action == "pass" then
       return
         nil,

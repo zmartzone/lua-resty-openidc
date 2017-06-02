@@ -113,6 +113,8 @@ http {
                 Expiration leeway for access_token renewal.
                 If this is set, renewal will happen access_token_expires_leeway seconds before the token expiration.
                 This avoids errors in case the access_token just expires when arriving to the OAuth Resoource Server.
+             --force_reauthorize = false
+             -- when force_reauthorize is set to true the authorization flow will be executed even if a token has been cached already
           }
 
           -- call authenticate for OpenID Connect user authentication
