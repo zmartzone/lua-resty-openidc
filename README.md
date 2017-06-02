@@ -137,8 +137,14 @@ http {
           --  ngx.exit(ngx.HTTP_FORBIDDEN)
           --end
 
-          -- set headers with user info (overwriting any existing!)
-          ngx.req.set_header("X-USER", res.id_token.sub)
+          -- set headers with user info: this will overwrite any existing headers but we'll
+          -- also need to scrub it in case no value is provided, to avoid any headers passed
+          -- in by the User-Agent to be interpreted as secure headers set by lua-resty-openidc
+          if res.id_token.sub
+            ngx.req.set_header("X-USER", res.id_token.sub)
+          else
+            ngx.req.clear_header("X-USER")
+          end
       ';
 
       proxy_pass http://localhost:80;
