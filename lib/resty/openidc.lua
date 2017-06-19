@@ -157,6 +157,7 @@ local function openidc_base64_url_encode(input)
 end
 
 -- send the browser of to the OP's authorization endpoint
+-- returns nil
 local function openidc_authorize(opts, session, target_url)
   local resty_random = require "resty.random"
   local resty_string = require "resty.string"
@@ -284,6 +285,7 @@ local function openidc_access_token_expires_in(opts, expires_in)
 end
 
 -- handle a "code" authorization response from the OP
+-- returns err, original URL, session
 local function openidc_authorization_response(opts, session)
   local args = ngx.req.get_uri_args()
   local err
@@ -291,28 +293,28 @@ local function openidc_authorization_response(opts, session)
   if not args.code or not args.state then
     err = "unhandled request to the redirect_uri: "..ngx.var.request_uri
     ngx.log(ngx.ERR, err)
-    return nil, err, session.data.original_url, session
+    return err, session.data.original_url, session
   end
 
   -- check that the state returned in the response against the session; prevents CSRF
   if args.state ~= session.data.state then
     err = "state from argument: "..(args.state and args.state or "nil").." does not match state restored from session: "..(session.data.state and session.data.state or "nil")
     ngx.log(ngx.ERR, err)
-    return nil, err, session.data.original_url, session
+    return err, session.data.original_url, session
   end
 
   -- check the iss if returned from the OP
   if args.iss and args.iss ~= opts.discovery.issuer then
     err = "iss from argument: "..args.iss.." does not match expected issuer: "..opts.discovery.issuer
     ngx.log(ngx.ERR, err)
-    return nil, err, session.data.original_url, session
+    return err, session.data.original_url, session
   end
 
   -- check the client_id if returned from the OP
   if args.client_id and args.client_id ~= opts.client_id then
     err = "client_id from argument: "..args.client_id.." does not match expected client_id: "..opts.client_id
     ngx.log(ngx.ERR, err)
-    return nil, err, session.data.original_url, session
+    return err, session.data.original_url, session
   end
 
   -- assemble the parameters to the token endpoint
@@ -327,7 +329,7 @@ local function openidc_authorization_response(opts, session)
   -- make the call to the token endpoint
   local json, err = openidc_call_token_endpoint(opts, opts.discovery.token_endpoint, body, opts.token_endpoint_auth_method)
   if err then
-    return nil, err, session.data.original_url, session
+    return err, session.data.original_url, session
   end
 
   -- process the token endpoint response with the id_token and access_token
@@ -338,7 +340,7 @@ local function openidc_authorization_response(opts, session)
   -- validate the id_token contents
   if openidc_validate_id_token(opts, id_token, session.data.nonce) == false then
     err = "id_token validation failed"
-    return nil, err, session.data.original_url, session
+    return err, session.data.original_url, session
   end
 
   -- call the user info endpoint
@@ -360,7 +362,8 @@ local function openidc_authorization_response(opts, session)
   session:save()
 
   -- redirect to the URL that was accessed originally
-  return ngx.redirect(session.data.original_url), session
+  ngx.redirect(session.data.original_url)
+  return nil, session.data.original_url, session
 
 end
 
@@ -600,6 +603,7 @@ local function openidc_access_token(opts, session)
 end
 
 -- main routine for OpenID Connect user authentication
+-- returns { id_token,access_token, user }, err, target_url, session
 function openidc.authenticate(opts, target_url, unauth_action, session_opts)
 
   local err
@@ -633,31 +637,37 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
       ngx.log(ngx.ERR, err)
       return nil, err, target_url, session
     end
-    return openidc_authorization_response(opts, session), session
+    local auth_response, err = openidc_authorization_response(opts, session)
+    if err then
+      return nil, err, target_url, session
+    end
+    return nil, nil, target_url, session
   end
 
   -- see if this is a request to logout
   if path == (opts.logout_path and opts.logout_path or "/logout") then
-    return openidc_logout(opts, session), session
+    openidc_logout(opts, session)
+    return nil, nil, target_url, session
   end
 
   -- if we have no id_token then redirect to the OP for authentication
   if not session.present or not session.data.id_token or opts.force_reauthorize then
     if unauth_action == "pass" then
       return
-        nil,
         err,
         target_url,
         session
     end
-    return openidc_authorize(opts, session, target_url), session
+    openidc_authorize(opts, session, target_url)
+    return nil, nil, target_url, session
   end
 
   -- silently reauthenticate if necessary (mainly used for session refresh/getting updated id_token data)
   if opts.refresh_session_interval ~= nil then
     if session.data.last_authenticated == nil or (session.data.last_authenticated+opts.refresh_session_interval) < ngx.time() then
       opts.prompt = "none"
-      return openidc_authorize(opts, session, target_url), session
+      openidc_authorize(opts, session, target_url)
+      return nil, nil, target_url, session
     end
   end
 
