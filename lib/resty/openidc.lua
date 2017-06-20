@@ -362,9 +362,7 @@ local function openidc_authorization_response(opts, session)
   session:save()
 
   -- redirect to the URL that was accessed originally
-  ngx.redirect(session.data.original_url)
-  return nil, session.data.original_url, session
-
+  return ngx.redirect(session.data.original_url)
 end
 
 -- get the Discovery metadata from the specified URL
@@ -637,11 +635,8 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
       ngx.log(ngx.ERR, err)
       return nil, err, target_url, session
     end
-    local auth_response, err = openidc_authorization_response(opts, session)
-    if err then
-      return nil, err, target_url, session
-    end
-    return nil, nil, target_url, session
+    local err = openidc_authorization_response(opts, session)
+    return nil, err, target_url, session
   end
 
   -- see if this is a request to logout
