@@ -284,6 +284,7 @@ local function openidc_access_token_expires_in(opts, expires_in)
 end
 
 -- handle a "code" authorization response from the OP
+-- returns auth_response, err, original_url
 local function openidc_authorization_response(opts, session)
   local args = ngx.req.get_uri_args()
   local err
@@ -291,28 +292,28 @@ local function openidc_authorization_response(opts, session)
   if not args.code or not args.state then
     err = "unhandled request to the redirect_uri: "..ngx.var.request_uri
     ngx.log(ngx.ERR, err)
-    return nil, err, session.data.original_url, session
+    return nil, err, session.data.original_url
   end
 
   -- check that the state returned in the response against the session; prevents CSRF
   if args.state ~= session.data.state then
     err = "state from argument: "..(args.state and args.state or "nil").." does not match state restored from session: "..(session.data.state and session.data.state or "nil")
     ngx.log(ngx.ERR, err)
-    return nil, err, session.data.original_url, session
+    return nil, err, session.data.original_url
   end
 
   -- check the iss if returned from the OP
   if args.iss and args.iss ~= opts.discovery.issuer then
     err = "iss from argument: "..args.iss.." does not match expected issuer: "..opts.discovery.issuer
     ngx.log(ngx.ERR, err)
-    return nil, err, session.data.original_url, session
+    return nil, err, session.data.original_url
   end
 
   -- check the client_id if returned from the OP
   if args.client_id and args.client_id ~= opts.client_id then
     err = "client_id from argument: "..args.client_id.." does not match expected client_id: "..opts.client_id
     ngx.log(ngx.ERR, err)
-    return nil, err, session.data.original_url, session
+    return nil, err, session.data.original_url
   end
 
   -- assemble the parameters to the token endpoint
@@ -326,7 +327,7 @@ local function openidc_authorization_response(opts, session)
   -- make the call to the token endpoint
   local json, err = openidc_call_token_endpoint(opts, opts.discovery.token_endpoint, body, opts.token_endpoint_auth_method)
   if err then
-    return nil, err, session.data.original_url, session
+    return nil, err, session.data.original_url
   end
 
   -- process the token endpoint response with the id_token and access_token
@@ -337,7 +338,7 @@ local function openidc_authorization_response(opts, session)
   -- validate the id_token contents
   if openidc_validate_id_token(opts, id_token, session.data.nonce) == false then
     err = "id_token validation failed"
-    return nil, err, session.data.original_url, session
+    return nil, err, session.data.original_url
   end
 
   -- call the user info endpoint
@@ -346,12 +347,12 @@ local function openidc_authorization_response(opts, session)
 
   local access_token_expiration = ngx.time()
           + openidc_access_token_expires_in(opts, json.expires_in)
-  return nil, {user=user,
+  return {user=user,
     id_token=id_token,
     enc_id_token= json.id_token,
     access_token=json.access_token,
     refresh_token=json.refresh_token,
-    access_token_expiration=access_token_expiration}, session.data.original_url, session
+    access_token_expiration=access_token_expiration}, nil, session.data.original_url
 end
 
 -- get the Discovery metadata from the specified URL
@@ -639,7 +640,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
       return nil, err, target_url, session
     end
     local auth_response
-    err, auth_response = openidc_authorization_response(opts, session)
+    auth_response, err = openidc_authorization_response(opts, session)
     if not err then
       openidc_store_session(opts, auth_response, session)
       -- redirect to the URL that was accessed originally
