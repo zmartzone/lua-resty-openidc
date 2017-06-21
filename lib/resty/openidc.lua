@@ -323,7 +323,6 @@ local function openidc_authorization_response(opts, session)
     state = session.data.state
   }
 
-  local current_time = ngx.time()
   -- make the call to the token endpoint
   local json, err = openidc_call_token_endpoint(opts, opts.discovery.token_endpoint, body, opts.token_endpoint_auth_method)
   if err then
@@ -345,23 +344,14 @@ local function openidc_authorization_response(opts, session)
   -- TODO: should this error be checked?
   local user, err = openidc_call_userinfo_endpoint(opts, json.access_token)
 
-  session:start()
-  session.data.user = user
-  session.data.id_token = id_token
-  session.data.enc_id_token = json.id_token
-  session.data.access_token = json.access_token
-  session.data.access_token_expiration = current_time
+  local access_token_expiration = ngx.time()
           + openidc_access_token_expires_in(opts, json.expires_in)
-  if json.refresh_token ~= nil then
-    session.data.refresh_token = json.refresh_token
-  end
-
-  -- save the session with the obtained id_token
-  session:save()
-
-  -- redirect to the URL that was accessed originally
-  return ngx.redirect(session.data.original_url), session
-
+  return nil, {user=user,
+    id_token=id_token,
+    enc_id_token= json.id_token,
+    access_token=json.access_token,
+    refresh_token=json.refresh_token,
+    access_token_expiration=access_token_expiration}, session.data.original_url, session
 end
 
 -- get the Discovery metadata from the specified URL
@@ -585,18 +575,33 @@ local function openidc_access_token(opts, session)
   end
   ngx.log(ngx.DEBUG, "access_token refreshed: ", json.access_token, " updated refresh_token: ", json.refresh_token)
 
+  local access_token_expiration = current_time + openidc_access_token_expires_in(opts, json.expires_in)
+
+  return {access_token = json.access_token,
+access_token_expiration = access_token_expiration,
+refresh_token = json.refresh_token}, err
+
+end
+
+local function openidc_store_session(opts, auth_response, session)
+  local current_time = ngx.time()
   session:start()
-  session.data.access_token = json.access_token
-  session.data.access_token_expiration = current_time + openidc_access_token_expires_in(opts, json.expires_in)
-  if json.refresh_token ~= nil then
-    session.data.refresh_token = json.refresh_token
+  -- save these three values in any case, as they are needed
+  session.data.access_token_expiration = auth_response.access_token_expiration or session.data.access_token_expiration
+  session.data.id_token = auth_response.id_token or session.data.id_token
+  session.data.access_token = auth_response.access_token or session.data.access_token
+  -- now add the remaining values to the cookie, if wished
+  if not opts.session_whitelist_vars or opts.session_user then
+    session.data.user = auth_response.user or session.data.user
   end
-
-  -- save the session with the new access_token and optionally the new refresh_token
+  if not opts.session_whitelist_vars or opts.session_enc_id_token then
+    session.data.enc_id_token = auth_response.id_token or session.data.enc_id_token
+  end
+  if not opts.session_whitelist_vars or opts.session_refresh_token then
+    session.data.refresh_token = auth_response.refresh_token or session.data.refresh_token
+  end
+  -- save the session
   session:save()
-
-  return session.data.access_token, err
-
 end
 
 -- main routine for OpenID Connect user authentication
@@ -633,7 +638,14 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
       ngx.log(ngx.ERR, err)
       return nil, err, target_url, session
     end
-    return openidc_authorization_response(opts, session), session
+    local auth_response
+    err, auth_response = openidc_authorization_response(opts, session)
+    if not err then
+      openidc_store_session(opts, auth_response, session)
+      -- redirect to the URL that was accessed originally
+      return ngx.redirect(session.data.original_url)
+    end
+    return nil, err, target_url, session
   end
 
   -- see if this is a request to logout
@@ -643,6 +655,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
 
   -- if we have no id_token then redirect to the OP for authentication
   if not session.present or not session.data.id_token or opts.force_reauthorize then
+    ngx.log(ngx.ERR,"Could not find id_token, authorizing")
     if unauth_action == "pass" then
       return
         nil,
@@ -662,11 +675,12 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
   end
 
   -- refresh access_token if necessary
-  access_token, err = openidc_access_token(opts, session)
+  local auth_response
+  auth_response, err = openidc_access_token(opts, session)
+  openidc_store_session(opts, auth_response,session)
   if err then
     return nil, err, target_url, session
   end
-
   -- log id_token contents
   ngx.log(ngx.DEBUG, "id_token=", cjson.encode(session.data.id_token))
 
@@ -686,8 +700,11 @@ end
 function openidc.access_token(opts, session_opts)
 
   local session = require("resty.session").open(session_opts)
-
-  return openidc_access_token(opts, session)
+  local auth_response, err = openidc_access_token(opts, session)
+  if not err then
+    openidc_store_session(opts, auth_response, session)
+  end
+  return auth_response, err
 
 end
 
