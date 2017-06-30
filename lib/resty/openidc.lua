@@ -769,7 +769,7 @@ function openidc.introspect(opts)
         end
         openidc_cache_set("introspection", access_token, cjson.encode(json), ttl)
       else
-        err = "token is invaild"
+        err = "invalid token"
       end
     end
 
