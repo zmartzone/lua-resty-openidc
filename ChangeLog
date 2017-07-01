@@ -1,3 +1,10 @@
+07/01/2017
+- fix `openidc_call_token_endpoint` when token validation fails; thanks @dereknex
+
+06/01/2017
+- make sure openidc_discover is called before refreshing the access token; thanks @gonzalad
+- add `force_reauthorize` option that forces the auth flow to be executed; thanks @bodewig
+
 05/31/2017
 - allow optional claim specs when verifying JWT access tokens; thanks @bodewig
 - return the raw bearer token from `openidc.bearer_jwt_verify`; thanks @bodewig
