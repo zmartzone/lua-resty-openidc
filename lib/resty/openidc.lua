@@ -481,6 +481,7 @@ local openidc_transparent_pixel = "\137\080\078\071\013\010\026\010\000\000\000\
 
 -- handle logout
 local function openidc_logout(opts, session)
+  local session_token = session.data.enc_id_token
   session:destroy()
   local headers = ngx.req.get_headers()
   local header =  headers['Accept']
@@ -495,7 +496,7 @@ local function openidc_logout(opts, session)
     ngx.exit(ngx.OK)
     return
   elseif opts.redirect_after_logout_uri then
-    return ngx.redirect(opts.redirect_after_logout_uri)
+    return ngx.redirect(opts.redirect_after_logout_uri.."&id_token_hint="..session_token)
   elseif opts.discovery.end_session_endpoint then
     return ngx.redirect(opts.discovery.end_session_endpoint)
   elseif opts.discovery.ping_end_session_endpoint then
