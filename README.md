@@ -103,6 +103,7 @@ http {
              --redirect_uri_scheme = "https",
              --logout_path = "/logout",
              --redirect_after_logout_uri = "/",
+             --redirect_after_logout_with_id_token_hint = true,
              --token_endpoint_auth_method = ["client_secret_basic"|"client_secret_post"],
              --ssl_verify = "no"
              --access_token_expires_in = 3600
