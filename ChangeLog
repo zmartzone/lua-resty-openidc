@@ -1,3 +1,6 @@
+07/03/2017
+- adding option to add id_token_hint to op logout request; thanks @pgp44
+
 07/01/2017
 - fix `openidc_call_token_endpoint` when token validation fails; thanks @dereknex
 
