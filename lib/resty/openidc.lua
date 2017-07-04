@@ -837,9 +837,10 @@ function openidc.jwt_verify(access_token, opts, ...)
     json = cjson.decode(v)
   end
 
+  local slack=opts.iat_slack and opts.iat_slack or 120
   -- check the token expiry
   if json then
-    if json.exp and json.exp < ngx.time() then
+    if json.exp and json.exp + slack < ngx.time() then
       ngx.log(ngx.ERR, "token expired: json.exp=", json.exp, ", ngx.time()=", ngx.time())
       err = "JWT expired"
     end
