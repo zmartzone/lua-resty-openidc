@@ -1,4 +1,7 @@
 08/01/2017
+- return HTTP 400 when Host header is not set; closes #68
+
+08/01/2017
 - apply iat_slack also to openidc.jwt_verify; thanks @nielsole
 - properly deal with ngx.redirect's return value; thanks @bodewig
 - fix access token cache ttl; closes #76

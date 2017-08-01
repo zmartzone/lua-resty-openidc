@@ -136,7 +136,11 @@ end
 -- assemble the redirect_uri
 local function openidc_get_redirect_uri(opts)
   local scheme = opts.redirect_uri_scheme or ngx.req.get_headers()['X-Forwarded-Proto'] or ngx.var.scheme
-  return scheme.."://"..ngx.var.http_host..opts.redirect_uri_path
+  if not ngx.var.http_host then
+    -- possibly HTTP 1.0 and no Host header
+    ngx.exit(ngx.HTTP_BAD_REQUEST)
+  end
+  return scheme.."://"..ngx.var.http_host ..opts.redirect_uri_path
 end
 
 -- perform base64url decoding
