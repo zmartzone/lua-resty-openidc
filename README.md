@@ -3,8 +3,8 @@
 # lua-resty-openidc
 
 **lua-resty-openidc** is a library for [NGINX](http://nginx.org/) implementing the
-[OpenID Connect](http://openid.net/specs/openid-connect-core-1_0.html) Relying Party (RP)
-and the [OAuth 2.0](https://tools.ietf.org/html/rfc6749) Resource Server (RS) functionality.
+[OpenID Connect](http://openid.net/specs/openid-connect-core-1_0.html) **Relying Party (RP)**
+and/or the [OAuth 2.0](https://tools.ietf.org/html/rfc6749) **Resource Server (RS)** functionality.
 
 When used as an OpenID Connect Relying Party it authenticates users against an OpenID Connect
 Provider using [OpenID Connect Discovery](http://openid.net/specs/openid-connect-discovery-1_0.html)
@@ -140,14 +140,9 @@ http {
           --  ngx.exit(ngx.HTTP_FORBIDDEN)
           --end
 
-          -- set headers with user info: this will overwrite any existing headers but we'll
-          -- also need to scrub it in case no value is provided, to avoid any headers passed
-          -- in by the User-Agent to be interpreted as secure headers set by lua-resty-openidc
-          if res.id_token.sub
-            ngx.req.set_header("X-USER", res.id_token.sub)
-          else
-            ngx.req.clear_header("X-USER")
-          end
+          -- set headers with user info: this will overwrite any existing headers
+          -- but also scrub(!) them in case no value is provided in the token
+          ngx.req.set_header("X-USER", res.id_token.sub)
       ';
 
       proxy_pass http://localhost:80;
@@ -190,9 +185,11 @@ http {
       access_by_lua '
 
           local opts = {
-            -- example of a shared secret for HS??? signature verification
+
+            -- 1. example of a shared secret for HS??? signature verification
             --secret = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            -- example of a public cert for RS??? signature verification
+
+            -- 2. another example of a public cert for RS??? signature verification
             secret = [[-----BEGIN CERTIFICATE-----
 MIIC0DCCAbigAwIBAgIGAVSbMZs1MA0GCSqGSIb3DQEBCwUAMCkxCzAJBgNVBAYTAlVTMQwwCgYD
 VQQKEwNibGExDDAKBgNVBAMTA2JsYTAeFw0xNjA1MTAxNTAzMjBaFw0yNjA1MDgxNTAzMjBaMCkx
@@ -207,66 +204,10 @@ RmejeH5f/JbDqRRRArGMdLooGbqjWG/lwZT456Q6DXqF2plkBvh37kp/GjthGyR8ODJn5ekZwxuB
 OcTuruRhqYOIJjiYZSgK/P0zUw1cjLwUJ9ig/O6ozYmof83974fygA/wK3SgFNEoFlTkTpOvZhVW
 9kLfCVA/CRBfJNKnz5PWBBxd/3XSEuP/fcWqKGTy7zZso4MTB0NKgWO4duGTgMyZbM4onJPyA0CY
 lAc5Csj0o5Q+oEhPUAVBIF07m4rd0OvAVPOCQ2NJhQSL1oWASbf+fg==
------END CERTIFICATE-----]]
-          }
+-----END CERTIFICATE-----]],
 
-          -- call bearer_jwt_verify for OAuth 2.0 JWT validation
-          local res, err = require("resty.openidc").bearer_jwt_verify(opts)
-
-           if err or not res then
-            ngx.status = 403
-            ngx.say(err and err or "no access_token provided")
-            ngx.exit(ngx.HTTP_FORBIDDEN)
-          end
-
-          -- at this point res is a Lua table that represents the JSON
-          -- payload in the JWT token
-
-          --if res.scope ~= "edit" then
-          --  ngx.exit(ngx.HTTP_FORBIDDEN)
-          --end
-
-          --if res.client_id ~= "ro_client" then
-          --  ngx.exit(ngx.HTTP_FORBIDDEN)
-          --end
-      ';
-
-       proxy_pass http://localhost:80;
-    }
-  }
-}
-```
-
-## Sample Configuration for OAuth 2.0 JWT Token Validation
-
-Sample `nginx.conf` configuration for verifying Bearer JWT Access Tokens against a OpenID Connect Discovery endpoint.
-Once successfully verified, the NGINX server may function as a reverse proxy to an internal origin server.
-
-```
-events {
-  worker_connections 128;
-}
-
-http {
-
-  lua_package_path '~/lua/?.lua;;';
-
-  resolver 8.8.8.8;
-
-  # cache for JWT verification results
-  lua_shared_dict introspection 10m;
-  # cache for jwks metadata documents
-  lua_shared_dict discovery 1m;
-
-  server {
-    listen 8080;
-
-    location /api {
-
-      access_by_lua '
-
-          local opts = {
-            -- The jwks endpoint must provide a x5c entry
+            -- 3. alternatively one can point to a so-called Discovery document that
+            -- contains "jwks_uri" entry; the jwks endpoint must provide a x5c entry
             -- discovery = "https://accounts.google.com/.well-known/openid-configuration",
           }
 
