@@ -360,7 +360,8 @@ local function openidc_authorization_response(opts, session)
   session:save()
 
   -- redirect to the URL that was accessed originally
-  return ngx.redirect(session.data.original_url), session
+  ngx.redirect(session.data.original_url)
+  return nil, nil, session.data.original_url, session
 
 end
 
@@ -636,12 +637,13 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
       ngx.log(ngx.ERR, err)
       return nil, err, target_url, session
     end
-    return openidc_authorization_response(opts, session), session
+    return openidc_authorization_response(opts, session)
   end
 
   -- see if this is a request to logout
   if path == (opts.logout_path and opts.logout_path or "/logout") then
-    return openidc_logout(opts, session), session
+    openidc_logout(opts, session)
+    return nil, nil, target_url, session
   end
 
   -- if we have no id_token then redirect to the OP for authentication
@@ -653,14 +655,16 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
         target_url,
         session
     end
-    return openidc_authorize(opts, session, target_url), session
+    openidc_authorize(opts, session, target_url)
+    return nil, nil, target_url, session
   end
 
   -- silently reauthenticate if necessary (mainly used for session refresh/getting updated id_token data)
   if opts.refresh_session_interval ~= nil then
     if session.data.last_authenticated == nil or (session.data.last_authenticated+opts.refresh_session_interval) < ngx.time() then
       opts.prompt = "none"
-      return openidc_authorize(opts, session, target_url), session
+      openidc_authorize(opts, session, target_url)
+      return nil, nil, target_url, session
     end
   end
 
