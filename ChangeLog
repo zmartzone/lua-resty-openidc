@@ -1,3 +1,10 @@
+08/01/2017
+- apply iat_slack also to openidc.jwt_verify; thanks @nielsole
+- properly deal with ngx.redirect's return value; thanks @bodewig
+- fix access token cache ttl; closes #76
+- support RFC7662-style token introspection by default
+- release 1.4.0
+
 07/03/2017
 - adding option to add id_token_hint to op logout request; thanks @pgp44
 

@@ -326,11 +326,7 @@ http {
       access_by_lua '
 
           local opts = {
-             introspection_endpoint="https://localhost:9031/as/token.oauth2",
-             introspection_token_param_name="token",
-             introspection_params = {
-				grant_type="urn:pingidentity.com:oauth2:grant_type:validate_bearer",
-             },
+             introspection_endpoint="https://localhost:9031/as/introspect.oauth2",
              client_id="rs_client",
              client_secret="2Federate",
              ssl_verify = "no",

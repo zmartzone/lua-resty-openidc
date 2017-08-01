@@ -57,7 +57,7 @@ local type    = type
 local ngx     = ngx
 
 local openidc = {
-  _VERSION = "1.3.2"
+  _VERSION = "1.4.0"
 }
 openidc.__index = openidc
 
@@ -367,13 +367,13 @@ end
 
 -- get the Discovery metadata from the specified URL
 local function openidc_discover(url, ssl_verify)
-  ngx.log(ngx.DEBUG, "In openidc_discover - URL is "..url)
+  ngx.log(ngx.DEBUG, "openidc_discover: URL is: "..url)
 
   local json, err
   local v = openidc_cache_get("discovery", url)
   if not v then
 
-    ngx.log(ngx.DEBUG, "Discovery data not in cache. Making call to discovery endpoint")
+    ngx.log(ngx.DEBUG, "discovery data not in cache, making call to discovery endpoint")
     -- make the call to the discovery endpoint
     local httpc = http.new()
     local res, error = httpc:request_uri(url, {
@@ -383,7 +383,7 @@ local function openidc_discover(url, ssl_verify)
       err = "accessing discovery url ("..url..") failed: "..error
       ngx.log(ngx.ERR, err)
     else
-      ngx.log(ngx.DEBUG, "Response data: "..res.body)
+      ngx.log(ngx.DEBUG, "response data: "..res.body)
       json, err = openidc_parse_json_response(res)
       if json then
         if string.sub(url, 1, string.len(json['issuer'])) == json['issuer'] then
@@ -405,7 +405,7 @@ local function openidc_discover(url, ssl_verify)
 end
 
 local function openidc_jwks(url, ssl_verify)
-  ngx.log(ngx.DEBUG, "In openidc_jwks - URL is "..url)
+  ngx.log(ngx.DEBUG, "openidc_jwks: URL is: "..url)
 
   local json, err
   local v = openidc_cache_get("jwks", url)
@@ -421,7 +421,7 @@ local function openidc_jwks(url, ssl_verify)
       err = "accessing jwks url ("..url..") failed: "..error
       ngx.log(ngx.ERR, err)
     else
-      ngx.log(ngx.DEBUG, "Response data: "..res.body)
+      ngx.log(ngx.DEBUG, "response data: "..res.body)
       json, err = openidc_parse_json_response(res)
       if json then
         openidc_cache_set("jwks", url, cjson.encode(json), 24 * 60 * 60)
@@ -745,7 +745,7 @@ function openidc.introspect(opts)
   if not v then
 
     -- assemble the parameters to the introspection (token) endpoint
-    local token_param_name = opts.introspection_token_param_name and opts.introspection_token_param_name or "access_token"
+    local token_param_name = opts.introspection_token_param_name and opts.introspection_token_param_name or "token"
 
     local body = {}
 
@@ -768,12 +768,13 @@ function openidc.introspect(opts)
     
     -- cache the results
     if json then
-      if json.active then
-        local expiry_claim = opts.expiry_claim or "expires_in"
-        local ttl = json[expiry_claim]
-        if expiry_claim ~= "exp" then --https://tools.ietf.org/html/rfc7662#section-2.2
+      local expiry_claim = opts.introspection_expiry_claim or "exp"
+      if json.active or json[expiry_claim] then
+        local ttl = json[expiry_claim]        
+        if expiry_claim == "exp" then --https://tools.ietf.org/html/rfc7662#section-2.2
           ttl = ttl - ngx.time()
         end
+        ngx.log(ngx.DEBUG, "cache token ttl: "..ttl)
         openidc_cache_set("introspection", access_token, cjson.encode(json), ttl)
       else
         err = "invalid token"
