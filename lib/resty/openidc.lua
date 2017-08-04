@@ -61,6 +61,15 @@ local openidc = {
 }
 openidc.__index = openidc
 
+local function check_feature(opts, feature)
+  -- We don't have a whitelist of features to enable
+  if not opts.features_enabled then
+    return true
+  end
+
+  return opts.features_enabled[feature]
+end
+
 -- set value in server-wide cache if available
 local function openidc_cache_set(type, key, value, exp)
   local dict = ngx.shared[type]
@@ -345,24 +354,34 @@ local function openidc_authorization_response(opts, session)
     return nil, err, session.data.original_url, session
   end
 
-  -- call the user info endpoint
-  -- TODO: should this error be checked?
-  local user, err = openidc_call_userinfo_endpoint(opts, json.access_token)
-
   session:start()
   -- mark this sessions as authenticated
   session.data.authenticated = true
   -- clear state and nonce to protect against potential misuse
   session.data.nonce = nil
   session.data.state = nil
-  session.data.user = user
-  session.data.id_token = id_token
-  session.data.enc_id_token = json.id_token
-  session.data.access_token = json.access_token
-  session.data.access_token_expiration = current_time
-          + openidc_access_token_expires_in(opts, json.expires_in)
-  if json.refresh_token ~= nil then
-    session.data.refresh_token = json.refresh_token
+  if check_feature(opts, 'id_token') then
+    session.data.id_token = id_token
+  end
+
+  if check_feature(opts, 'user') then
+    -- call the user info endpoint
+    -- TODO: should this error be checked?
+    local user, err = openidc_call_userinfo_endpoint(opts, json.access_token)
+    session.data.user = user
+  end
+
+  if check_feature(opts, 'enc_id_token') then
+    session.data.enc_id_token = json.id_token
+  end
+
+  if check_feature(opts, 'access_token') then
+    session.data.access_token = json.access_token
+    session.data.access_token_expiration = current_time
+            + openidc_access_token_expires_in(opts, json.expires_in)
+    if json.refresh_token ~= nil then
+      session.data.refresh_token = json.refresh_token
+    end
   end
 
   -- save the session with the obtained id_token
@@ -657,7 +676,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
 
   -- if we are not authenticated then redirect to the OP for authentication
   -- the presence of the id_token is check for backwards compatibility
-  if not session.present or not (session.data.id_token or session.data.authenticated) or opts.force_reauthorize then
+  if not session.present or not (session.data.id_token or session.data.authenticated) or session.data.authenticated) or opts.force_reauthorize then
     if unauth_action == "pass" then
       return
         nil,
@@ -678,14 +697,18 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
     end
   end
 
-  -- refresh access_token if necessary
-  access_token, err = openidc_access_token(opts, session)
-  if err then
-    return nil, err, target_url, session
+  if check_feature(opts, 'access_token') then
+    -- refresh access_token if necessary
+    access_token, err = openidc_access_token(opts, session)
+    if err then
+      return nil, err, target_url, session
+    end
   end
 
-  -- log id_token contents
-  ngx.log(ngx.DEBUG, "id_token=", cjson.encode(session.data.id_token))
+  if check_feature(opts, 'id_token') then
+    -- log id_token contents
+    ngx.log(ngx.DEBUG, "id_token=", cjson.encode(session.data.id_token))
+  end
 
   -- return the id_token to the caller Lua script for access control purposes
   return
