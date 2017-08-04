@@ -350,6 +350,11 @@ local function openidc_authorization_response(opts, session)
   local user, err = openidc_call_userinfo_endpoint(opts, json.access_token)
 
   session:start()
+  -- mark this sessions as authenticated
+  session.data.authenticated = true
+  -- clear state and nonce to protect against potential misuse
+  session.data.nonce = nil
+  session.data.state = nil
   session.data.user = user
   session.data.id_token = id_token
   session.data.enc_id_token = json.id_token
@@ -650,8 +655,9 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
     return nil, nil, target_url, session
   end
 
-  -- if we have no id_token then redirect to the OP for authentication
-  if not session.present or not session.data.id_token or opts.force_reauthorize then
+  -- if we are not authenticated then redirect to the OP for authentication
+  -- the presence of the id_token is check for backwards compatibility
+  if not session.present or not (session.data.id_token or session.data.authenticated) or opts.force_reauthorize then
     if unauth_action == "pass" then
       return
         nil,
