@@ -180,6 +180,10 @@ local function openidc_authorize(opts, session, target_url)
     prompt=opts.prompt and opts.prompt or ""
   }
 
+  if opts.display then
+    params.display = opts.display  
+  end
+
   -- merge any provided extra parameters
   if opts.authorization_params then
     for k,v in pairs(opts.authorization_params) do params[k] = v end
