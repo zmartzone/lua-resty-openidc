@@ -108,10 +108,10 @@ http {
              --ssl_verify = "no"
              --access_token_expires_in = 3600
              -- Default lifetime in seconds of the access_token if no expires_in attribute is present in the token endpoint response. 
-             -- This plugin will silently renew the access_token once its expired if refreshToken scope is present.
+             -- This plugin will silently renew the access_token once it is expired if refreshToken scope is present.
 
              --access_token_expires_leeway = 0
-             --  Expiration leeway for access_token renewal. If this is set, renewal will happen access_token_expires_leeway seconds before the token expiration. This avoids errors in case the access_token just expires when arriving to the OAuth Resoource Server.
+             --  Expiration leeway for access_token renewal. If this is set, renewal will happen access_token_expires_leeway seconds before the token expiration. This avoids errors in case the access_token just expires when arriving to the OAuth Resource Server.
 
              --force_reauthorize = false
              -- When force_reauthorize is set to true the authorization flow will be executed even if a token has been cached already
