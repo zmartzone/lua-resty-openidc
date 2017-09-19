@@ -70,7 +70,7 @@ http {
 
   resolver 8.8.8.8;
 
-  lua_ssl_trusted_certificate /opt/local/etc/openssl/cert.pem;
+  lua_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
   lua_ssl_verify_depth 5;
 
   # cache for discovery metadata documents
@@ -79,7 +79,7 @@ http {
   # NB: if you have "lua_code_cache off;", use:
   # set $session_secret xxxxxxxxxxxxxxxxxxx;
   # see: https://github.com/bungle/lua-resty-session#notes-about-turning-lua-code-cache-off
-  
+
   server {
     listen 8080;
 
@@ -97,7 +97,7 @@ http {
              client_secret = "<client_secret>"
              --authorization_params = { hd="pingidentity.com" },
              --scope = "openid email profile",
-             -- Refresh the user's id_token after 900 seconds without requiring re-authentication
+             -- Refresh the users id_token after 900 seconds without requiring re-authentication
              --refresh_session_interval = 900,
              --iat_slack = 600,
              --redirect_uri_scheme = "https",
@@ -107,15 +107,14 @@ http {
              --token_endpoint_auth_method = ["client_secret_basic"|"client_secret_post"],
              --ssl_verify = "no"
              --access_token_expires_in = 3600
-             -- Default lifetime in seconds of the access_token if no expires_in attribute is present in the token 
-                endpoint response.
-                This plugin will silently renew the access_token once it's expired if refreshToken scope is present.
+             -- Default lifetime in seconds of the access_token if no expires_in attribute is present in the token endpoint response. 
+             -- This plugin will silently renew the access_token once it is expired if refreshToken scope is present.
+
              --access_token_expires_leeway = 0
-                Expiration leeway for access_token renewal.
-                If this is set, renewal will happen access_token_expires_leeway seconds before the token expiration.
-                This avoids errors in case the access_token just expires when arriving to the OAuth Resoource Server.
+             --  Expiration leeway for access_token renewal. If this is set, renewal will happen access_token_expires_leeway seconds before the token expiration. This avoids errors in case the access_token just expires when arriving to the OAuth Resource Server.
+
              --force_reauthorize = false
-             -- when force_reauthorize is set to true the authorization flow will be executed even if a token has been cached already
+             -- When force_reauthorize is set to true the authorization flow will be executed even if a token has been cached already
           }
 
           -- call authenticate for OpenID Connect user authentication
