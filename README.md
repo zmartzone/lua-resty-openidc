@@ -85,7 +85,7 @@ http {
 
     location / {
 
-      access_by_lua '
+      access_by_lua_block {
 
           local opts = {
              -- the full redirect URI must be protected by this script and becomes:
@@ -142,7 +142,7 @@ http {
           -- set headers with user info: this will overwrite any existing headers
           -- but also scrub(!) them in case no value is provided in the token
           ngx.req.set_header("X-USER", res.id_token.sub)
-      ';
+      }
 
       proxy_pass http://localhost:80;
     }
