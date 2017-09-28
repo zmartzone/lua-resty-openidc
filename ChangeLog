@@ -1,3 +1,9 @@
+09/19/2017
+- fix sample configs/spelling in README.md; thanks @kamilzabielski
+
+08/29/2017
+- add support for the display request parameter; thanks @JoshBarr
+
 08/01/2017
 - return HTTP 400 when Host header is not set; closes #68
 

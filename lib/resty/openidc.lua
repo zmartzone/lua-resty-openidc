@@ -186,8 +186,15 @@ local function openidc_authorize(opts, session, target_url)
     redirect_uri=openidc_get_redirect_uri(opts),
     state=state,
     nonce=nonce,
-    prompt=opts.prompt and opts.prompt or ""
   }
+
+  if opts.prompt then
+    params.prompt = opts.prompt  
+  end
+
+  if opts.display then
+    params.display = opts.display  
+  end
 
   -- merge any provided extra parameters
   if opts.authorization_params then
