@@ -61,13 +61,13 @@ local openidc = {
 }
 openidc.__index = openidc
 
-local function check_feature(opts, feature)
+local function store_in_session(opts, feature)
   -- We don't have a whitelist of features to enable
-  if not opts.features_enabled then
+  if not opts.session_contents then
     return true
   end
 
-  return opts.features_enabled[feature]
+  return opts.session_contents[feature]
 end
 
 -- set value in server-wide cache if available
@@ -360,22 +360,22 @@ local function openidc_authorization_response(opts, session)
   -- clear state and nonce to protect against potential misuse
   session.data.nonce = nil
   session.data.state = nil
-  if check_feature(opts, 'id_token') then
+  if store_in_session(opts, 'id_token') then
     session.data.id_token = id_token
   end
 
-  if check_feature(opts, 'user') then
+  if store_in_session(opts, 'user') then
     -- call the user info endpoint
     -- TODO: should this error be checked?
     local user, err = openidc_call_userinfo_endpoint(opts, json.access_token)
     session.data.user = user
   end
 
-  if check_feature(opts, 'enc_id_token') then
+  if store_in_session(opts, 'enc_id_token') then
     session.data.enc_id_token = json.id_token
   end
 
-  if check_feature(opts, 'access_token') then
+  if store_in_session(opts, 'access_token') then
     session.data.access_token = json.access_token
     session.data.access_token_expiration = current_time
             + openidc_access_token_expires_in(opts, json.expires_in)
@@ -697,7 +697,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
     end
   end
 
-  if check_feature(opts, 'access_token') then
+  if store_in_session(opts, 'access_token') then
     -- refresh access_token if necessary
     access_token, err = openidc_access_token(opts, session)
     if err then
@@ -705,7 +705,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
     end
   end
 
-  if check_feature(opts, 'id_token') then
+  if store_in_session(opts, 'id_token') then
     -- log id_token contents
     ngx.log(ngx.DEBUG, "id_token=", cjson.encode(session.data.id_token))
   end
