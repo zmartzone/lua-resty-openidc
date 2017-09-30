@@ -115,6 +115,11 @@ http {
 
              --force_reauthorize = false
              -- When force_reauthorize is set to true the authorization flow will be executed even if a token has been cached already
+             --session_contents = {id_token=true}
+             -- Whitelist of session content to enable. This can be used to reduce the session size.
+             -- When not set everything will be included in the session.
+             -- Available are: 
+             -- id_token, enc_id_token, user, access_token (includes refresh token)
           }
 
           -- call authenticate for OpenID Connect user authentication
