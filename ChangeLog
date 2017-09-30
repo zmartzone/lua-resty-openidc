@@ -1,3 +1,7 @@
+09/30/2017
+- add `session_contents` option to configure which information/tokens get stored
+  in the session in order to minimize the size of the session data; thanks @hanikesn
+
 09/19/2017
 - fix sample configs/spelling in README.md; thanks @kamilzabielski
 
