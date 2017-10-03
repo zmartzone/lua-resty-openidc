@@ -1,6 +1,7 @@
 10/03/2017
 - ignore any configured token_endpoint_auth_method that the library doesn't support (and log an error) and
   fall back to the first token_endpoint_auth_methods_supported the library can use; thanks @bodewig
+- release 1.4.1
 
 09/30/2017
 - add `session_contents` option to configure which information/tokens get stored
