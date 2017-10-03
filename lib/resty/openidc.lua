@@ -56,6 +56,11 @@ local pairs   = pairs
 local type    = type
 local ngx     = ngx
 
+local supported_token_auth_methods = {
+   client_secret_basic = true,
+   client_secret_post = true
+}
+
 local openidc = {
   _VERSION = "1.4.0"
 }
@@ -549,6 +554,11 @@ end
 -- get the token endpoint authentication method
 local function openidc_get_token_auth_method(opts)
 
+  if opts.token_endpoint_auth_method ~= nil and not supported_token_auth_methods[opts.token_endpoint_auth_method] then
+    ngx.log(ngx.ERR, "configured value for token_endpoint_auth_method ("..opts.token_endpoint_auth_method..") is not supported, ignoring it")
+    opts.token_endpoint_auth_method = nil
+  end
+
   local result
   if opts.discovery.token_endpoint_auth_methods_supported ~= nil then
     -- if set check to make sure the discovery data includes the selected client auth method
@@ -566,8 +576,14 @@ local function openidc_get_token_auth_method(opts)
         return nil
       end
     else
-      result = opts.discovery.token_endpoint_auth_methods_supported[1]
-      ngx.log(ngx.DEBUG, "no configuration setting for option so select the first method specified by the OP: "..result)
+      for index, value in ipairs (opts.discovery.token_endpoint_auth_methods_supported) do
+        ngx.log(ngx.DEBUG, index.." => "..value)
+        if supported_token_auth_methods[value] then
+          result = value
+          ngx.log(ngx.DEBUG, "no configuration setting for option so select the first supported method specified by the OP: "..result)
+          break
+        end
+      end
     end
   else
     result = opts.token_endpoint_auth_method
