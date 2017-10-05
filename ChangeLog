@@ -1,3 +1,10 @@
+10/05/2017
+- changes to cater for automated certification testing
+  - check that sub is always present in the id_token
+  - check that sub returned from the userinfo endpoint matches sub in the id_token
+  - allow for id_tokens with alg set to "none" and no signature part
+  - add more logs
+
 10/03/2017
 - ignore any configured token_endpoint_auth_method that the library doesn't support (and log an error) and
   fall back to the first token_endpoint_auth_methods_supported the library can use; thanks @bodewig

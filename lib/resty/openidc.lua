@@ -101,13 +101,19 @@ local function openidc_validate_id_token(opts, id_token, nonce)
 
   -- check issuer
   if opts.discovery.issuer ~= id_token.iss then
-    ngx.log(ngx.ERR, "issuer \"", id_token.iss, " in id_token is not equal to the issuer from the discovery document \"", opts.discovery.issuer, "\"")
+    ngx.log(ngx.ERR, "issuer \"", id_token.iss, "\" in id_token is not equal to the issuer from the discovery document \"", opts.discovery.issuer, "\"")
     return false
   end
 
+  -- check sub
+  if not id_token.sub then
+    ngx.log(ngx.ERR, "no \"sub\" claim found in id_token")
+    return false
+  end
+  
   -- check nonce
   if nonce and nonce ~= id_token.nonce then
-    ngx.log(ngx.ERR, "nonce \"", id_token.nonce, " in id_token is not equal to the nonce that was sent in the request \"", nonce, "\"")
+    ngx.log(ngx.ERR, "nonce \"", id_token.nonce, "\" in id_token is not equal to the nonce that was sent in the request \"", nonce, "\"")
     return false
   end
 
@@ -285,11 +291,15 @@ local function openidc_call_userinfo_endpoint(opts, access_token)
     return nil, nil
   end
 
+  local headers = {
+      ["Authorization"] = "Bearer "..access_token,
+  }
+      
+  ngx.log(ngx.DEBUG,"authorization header '"..headers.Authorization.."'")
+
   local httpc = http.new()
   local res, err = httpc:request_uri(opts.discovery.userinfo_endpoint, {
-    headers = {
-      ["Authorization"] = "Bearer "..access_token,
-    }
+    headers = headers
   })
   if not res then
     err = "accessing userinfo endpoint ("..opts.discovery.userinfo_endpoint..") failed: "..err
@@ -356,15 +366,19 @@ local function openidc_authorization_response(opts, session)
   end
 
   -- process the token endpoint response with the id_token and access_token
-  local enc_hdr, enc_pay, enc_sign = string.match(json.id_token, '^(.+)%.(.+)%.(.+)$')
+  local enc_hdr, enc_pay, enc_sign = string.match(json.id_token, '^(.+)%.(.+)%.(.*)$')
   local jwt = openidc_base64_url_decode(enc_pay)
   local id_token = cjson.decode(jwt)
 
   -- validate the id_token contents
   if openidc_validate_id_token(opts, id_token, session.data.nonce) == false then
     err = "id_token validation failed"
+    ngx.log(ngx.ERR, err)
     return nil, err, session.data.original_url, session
   end
+
+  ngx.log(ngx.DEBUG, "id_token header: ", openidc_base64_url_decode(enc_hdr))
+  ngx.log(ngx.DEBUG, "id_token payload: ", jwt)
 
   session:start()
   -- mark this sessions as authenticated
@@ -380,7 +394,15 @@ local function openidc_authorization_response(opts, session)
     -- call the user info endpoint
     -- TODO: should this error be checked?
     local user, err = openidc_call_userinfo_endpoint(opts, json.access_token)
-    session.data.user = user
+    
+    if user then
+      if id_token.sub ~= user.sub then
+        err = "\"sub\" claim in id_token (\"" .. (id_token.sub or "null") .. "\") is not equal to the \"sub\" claim returned from the userinfo endpoint (\"" .. (user.sub or "null") .. "\")"
+        ngx.log(ngx.ERR, err)
+      else
+        session.data.user = user
+	    end
+	  end
   end
 
   if store_in_session(opts, 'enc_id_token') then
@@ -430,10 +452,12 @@ local function openidc_discover(url, ssl_verify)
           openidc_cache_set("discovery", url, cjson.encode(json), 24 * 60 * 60)
         else
           err = "issuer field in Discovery data does not match URL"
+          ngx.log(ngx.ERR, err)
           json = nil
         end
       else
         err = "could not decode JSON from Discovery data"
+        ngx.log(ngx.ERR, err)
       end
     end
 
