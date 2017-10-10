@@ -6,7 +6,6 @@ ADD lib/resty/openidc.lua /usr/local/openresty/lualib/resty/openidc.lua
 RUN ["luarocks", "install", "lua-resty-session"]
 RUN ["luarocks", "install", "lua-resty-http"]
 RUN ["luarocks", "install", "lua-resty-jwt"]
-RUN ["luarocks", "install", "lua-resty-jwt"]
 
 # install test dependencies
 RUN ["luarocks", "install", "busted"]
