@@ -53,7 +53,7 @@ http {
               local oidc = require "resty.openidc"
               local res, err, target, session = oidc.authenticate(opts)
               if err then
-                ngx.status = 500
+                ngx.status = 401
                 ngx.say(err)
                 ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
               end

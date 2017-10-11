@@ -20,7 +20,7 @@ describe("when a redirect is received", function()
           url = "http://localhost/default/redirect_uri?code=foo&state" .. state,
     })
     it("should be rejected", function()
-       assert.are.equals(500, redirStatus)
+       assert.are.equals(401, redirStatus)
     end)
     it("will log an error message", function()
       assert.error_log_contains("but there's no session state found")
