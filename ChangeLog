@@ -1,3 +1,6 @@
+10/11/2017
+- add testbed / unit tests; thanks @bodewig
+
 10/05/2017
 - check that sub is always present in the id_token
 - check that sub returned from the userinfo endpoint matches sub in the id_token
