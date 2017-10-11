@@ -7,8 +7,9 @@ local DEFAULT_OIDC_CONFIG = {
    redirect_uri_path = "/default/redirect_uri",
    discovery = {
       authorization_endpoint = "http://localhost/authorize",
-      token_endpoint = "http://localhost/token",
-      token_endpoint_auth_methods_supported = { "client_secret_post" }
+      token_endpoint = "http://127.0.0.1/token",
+      token_endpoint_auth_methods_supported = { "client_secret_post" },
+      issuer = "https://localhost/",
    },
    client_id = "client_id",
    client_secret = "client_secret",
@@ -16,7 +17,15 @@ local DEFAULT_OIDC_CONFIG = {
    redirect_uri_scheme = 'http',
 }
 
-local DEFAULT_CONFIG_TEMPLATE = [[
+local DEFAULT_ID_TOKEN = {
+  sub = "subject",
+  iss = "https://localhost/",
+  aud = "client_id",
+  iat = os.time(),
+  exp = os.time() + 3600,
+}
+
+local DEFAULT_CONFIG_TEMPLATE = [=[
 worker_processes  1;
 pid       /tmp/server/logs/nginx.pid;
 error_log /tmp/server/logs/error.log debug;
@@ -62,9 +71,32 @@ http {
             proxy_pass http://localhost:80;
         }
 
+        location /token {
+            content_by_lua_block {
+                ngx.req.read_body()
+                ngx.log(ngx.ERR, "Received token request: " .. ngx.req.get_body_data())
+                ngx.header.content_type = 'application/json;charset=UTF-8'
+                local id_token = ID_TOKEN
+                local nonce_file = assert(io.open("/tmp/nonce", "r"))
+                id_token.nonce = nonce_file:read("*all")
+                assert(nonce_file:close())
+                local jwt_content = {
+                  header = { typ = "JWT", alg = "HS256"},
+                  payload = id_token
+                }
+                local jwt = require "resty.jwt"
+                local jwt_token = jwt:sign("lua-resty-jwt", jwt_content)
+                ngx.say([[{
+  "access_token":"a_token",
+  "expires_in":3600,
+  "refresh_token":"r_token",
+  "id_token": "]] .. jwt_token .. [["
+}]])
+            }
+        }
     }
 }
-]]
+]=]
 
 -- must double percents for Lua regexes
 function test_support.urlescape_for_regex(s)
@@ -85,8 +117,9 @@ end
 local function write_config(out, custom_config)
   custom_config = custom_config or {}
   local oidc_config = merge(merge({}, DEFAULT_OIDC_CONFIG), custom_config["oidc_opts"] or {})
-  local config = DEFAULT_CONFIG_TEMPLATE:gsub("OIDC_CONFIG",
-                                              serpent.block(oidc_config, {comment = false }))
+  local config = DEFAULT_CONFIG_TEMPLATE
+     :gsub("OIDC_CONFIG", serpent.block(oidc_config, {comment = false }))
+     :gsub("ID_TOKEN", serpent.block(DEFAULT_ID_TOKEN, {comment = false }))
   out:write(config)
 end
 
@@ -133,6 +166,12 @@ function test_support.stop_server()
      kill(pid, 9)
      os.execute("sleep 0.5")
   end
+end
+
+function test_support.register_nonce(nonce)
+  local nonce_file = assert(io.open("/tmp/nonce", "w"))
+  nonce_file:write(nonce)
+  assert(nonce_file:close())
 end
 
 local a = require 'luassert'
