@@ -4,7 +4,7 @@ local serpent = require("serpent")
 local test_support = {}
 
 local DEFAULT_OIDC_CONFIG = {
-   redirect_uri_path = "/redirect_uri",
+   redirect_uri_path = "/default/redirect_uri",
    discovery = {
       authorization_endpoint = "http://localhost/authorize",
       token_endpoint = "http://localhost/token",
