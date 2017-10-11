@@ -11,11 +11,7 @@ RUN ["luarocks", "install", "lua-resty-jwt"]
 RUN ["luarocks", "install", "busted"]
 RUN ["luarocks", "install", "LuaSocket"]
 
-ADD tests/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
-
 # mount tests
 ADD tests/spec /spec
 
-CMD openresty && busted -C spec .
-
-
+CMD busted -C spec -o plainTerminal .

@@ -3,6 +3,8 @@ local test_support = require("test_support")
 require 'busted.runner'()
 
 describe("when accessing the protected resource without token", function()
+  test_support.start_server()
+  teardown(test_support.stop_server)
   local _, status, headers = http.request({
     url = "http://localhost/default/t",
     redirect = false
@@ -36,6 +38,8 @@ describe("when accessing the protected resource without token", function()
 end)
 
 describe("when accessing the custom protected resource without token", function()
+  pending("need to add support for custom config")
+--[[
   local _, status, headers = http.request({
     url = "http://localhost/custom/t",
     redirect = false
@@ -43,4 +47,5 @@ describe("when accessing the custom protected resource without token", function(
   it("uses the configured scope", function()
     assert.truthy(string.match(headers["location"], ".*scope=my%-scope.*"))
   end)
+]]
 end)

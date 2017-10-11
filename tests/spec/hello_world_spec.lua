@@ -1,7 +1,10 @@
 local http = require("socket.http")
+local test_support = require("test_support")
 require 'busted.runner'()
 
 describe("when invoking the hello, world endpoint", function()
+  test_support.start_server()
+  teardown(test_support.stop_server)
   local body = http.request("http://localhost/t")
   it("should return hello, world", function()
     assert.are.equals("hello, world!\n", body)
