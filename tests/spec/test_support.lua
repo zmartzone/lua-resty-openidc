@@ -4,11 +4,12 @@ local serpent = require("serpent")
 local test_support = {}
 
 local DEFAULT_OIDC_CONFIG = {
-   redirect_uri_path = "/redirect_uri",
+   redirect_uri_path = "/default/redirect_uri",
    discovery = {
       authorization_endpoint = "http://localhost/authorize",
-      token_endpoint = "http://localhost/token",
-      token_endpoint_auth_methods_supported = { "client_secret_post" }
+      token_endpoint = "http://127.0.0.1/token",
+      token_endpoint_auth_methods_supported = { "client_secret_post" },
+      issuer = "https://localhost/",
    },
    client_id = "client_id",
    client_secret = "client_secret",
@@ -16,7 +17,15 @@ local DEFAULT_OIDC_CONFIG = {
    redirect_uri_scheme = 'http',
 }
 
-local DEFAULT_CONFIG_TEMPLATE = [[
+local DEFAULT_ID_TOKEN = {
+  sub = "subject",
+  iss = "https://localhost/",
+  aud = "client_id",
+  iat = os.time(),
+  exp = os.time() + 3600,
+}
+
+local DEFAULT_CONFIG_TEMPLATE = [=[
 worker_processes  1;
 pid       /tmp/server/logs/nginx.pid;
 error_log /tmp/server/logs/error.log debug;
@@ -53,7 +62,7 @@ http {
               local oidc = require "resty.openidc"
               local res, err, target, session = oidc.authenticate(opts)
               if err then
-                ngx.status = 500
+                ngx.status = 401
                 ngx.say(err)
                 ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
               end
@@ -62,9 +71,32 @@ http {
             proxy_pass http://localhost:80;
         }
 
+        location /token {
+            content_by_lua_block {
+                ngx.req.read_body()
+                ngx.log(ngx.ERR, "Received token request: " .. ngx.req.get_body_data())
+                ngx.header.content_type = 'application/json;charset=UTF-8'
+                local id_token = ID_TOKEN
+                local nonce_file = assert(io.open("/tmp/nonce", "r"))
+                id_token.nonce = nonce_file:read("*all")
+                assert(nonce_file:close())
+                local jwt_content = {
+                  header = { typ = "JWT", alg = "HS256"},
+                  payload = id_token
+                }
+                local jwt = require "resty.jwt"
+                local jwt_token = jwt:sign("lua-resty-jwt", jwt_content)
+                ngx.say([[{
+  "access_token":"a_token",
+  "expires_in":3600,
+  "refresh_token":"r_token",
+  "id_token": "]] .. jwt_token .. [["
+}]])
+            }
+        }
     }
 }
-]]
+]=]
 
 -- must double percents for Lua regexes
 function test_support.urlescape_for_regex(s)
@@ -85,8 +117,9 @@ end
 local function write_config(out, custom_config)
   custom_config = custom_config or {}
   local oidc_config = merge(merge({}, DEFAULT_OIDC_CONFIG), custom_config["oidc_opts"] or {})
-  local config = DEFAULT_CONFIG_TEMPLATE:gsub("OIDC_CONFIG",
-                                              serpent.block(oidc_config, {comment = false }))
+  local config = DEFAULT_CONFIG_TEMPLATE
+     :gsub("OIDC_CONFIG", serpent.block(oidc_config, {comment = false }))
+     :gsub("ID_TOKEN", serpent.block(DEFAULT_ID_TOKEN, {comment = false }))
   out:write(config)
 end
 
@@ -120,7 +153,7 @@ function test_support.stop_server()
   local sleep = 0.1
   for a = 1, 5
   do
-     if is_running(pid) then
+    if is_running(pid) then
       kill(pid)
       os.execute("sleep " .. sleep)
       sleep = sleep * 2
@@ -134,5 +167,27 @@ function test_support.stop_server()
      os.execute("sleep 0.5")
   end
 end
+
+function test_support.register_nonce(nonce)
+  local nonce_file = assert(io.open("/tmp/nonce", "w"))
+  nonce_file:write(nonce)
+  assert(nonce_file:close())
+end
+
+local a = require 'luassert'
+local say = require("say")
+
+local function error_log_contains(state, args)
+  local error_log = assert(io.open("/tmp/server/logs/error.log", "r"))
+  local log = error_log:read("*all")
+  assert(error_log:close())
+  return log:find(args[1]) and true or false
+end
+
+say:set("assertion.error_log_contains.positive", "Expected error log to contain: %s")
+say:set("assertion.error_log_contains.negative", "Expected error log not to contain: %s")
+a:register("assertion", "error_log_contains", error_log_contains,
+           "assertion.error_log_contains.positive",
+           "assertion.error_log_contains.negative")
 
 return test_support
