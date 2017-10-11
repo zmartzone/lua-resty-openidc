@@ -106,7 +106,7 @@ local function kill(pid, signal)
   else
     signal = "-" .. signal .. " "
   end
-  return os.execute("kill " .. signal .. pid)
+  return os.execute("/bin/kill " .. signal .. pid)
 end
 
 local function is_running(pid)
