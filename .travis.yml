@@ -1,6 +1,9 @@
 language: c
 
-sudo: false
+sudo: required
+
+services:
+  - docker
 
 env:
   global:
@@ -12,6 +15,7 @@ env:
     - LUA=lua5.1
 
 before_install:
+  - docker build -f tests/Dockerfile . -t lua-resty-openidc/test
   - source .travis/setenv_lua.sh
 
 install:
@@ -21,6 +25,7 @@ install:
 
 script:
   - luarocks make --pack-binary-rock $ROCKSPEC CFLAGS="-O2 -fPIC -fprofile-arcs" LIBFLAG="-shared"
+  - docker run -it --rm lua-resty-openidc/test:latest
 
 # The API key comes from an environment variable configured on https://travis-ci.org
 after_success:
