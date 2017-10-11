@@ -135,4 +135,20 @@ function test_support.stop_server()
   end
 end
 
+local a = require 'luassert'
+local say = require("say")
+
+local function error_log_contains(state, args)
+  local error_log = assert(io.open("/tmp/server/logs/error.log", "r"))
+  local log = error_log:read("*all")
+  assert(error_log:close())
+  return log:find(args[1]) and true or false
+end
+
+say:set("assertion.error_log_contains.positive", "Expected error log to contain: %s")
+say:set("assertion.error_log_contains.negative", "Expected error log not to contain: %s")
+a:register("assertion", "error_log_contains", error_log_contains,
+           "assertion.error_log_contains.positive",
+           "assertion.error_log_contains.negative")
+
 return test_support
