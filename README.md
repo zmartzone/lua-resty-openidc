@@ -306,6 +306,18 @@ http {
 }
 ```
 
+## Running Tests
+
+We've created a dockerized setup for the test in order to simplify the
+installation of dependencies.
+
+In order to run the tests perform
+
+```shell
+$ docker build -f tests/Dockerfile . -t lua-resty-openidc/test
+$ docker run -it --rm lua-resty-openidc/test:latest
+```
+
 ## Support
 
 See the Wiki pages with Frequently Asked Questions at:  
