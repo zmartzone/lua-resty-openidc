@@ -120,7 +120,7 @@ function test_support.stop_server()
   local sleep = 0.1
   for a = 1, 5
   do
-     if is_running(pid) then
+    if is_running(pid) then
       kill(pid)
       os.execute("sleep " .. sleep)
       sleep = sleep * 2
