@@ -16,6 +16,6 @@ ADD tests/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 # mount tests
 ADD tests/spec /spec
 
-CMD openresty && busted
+CMD openresty && busted -C spec .
 
 
