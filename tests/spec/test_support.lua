@@ -1,6 +1,20 @@
 local url = require("socket.url")
+local serpent = require("serpent")
 
 local test_support = {}
+
+local DEFAULT_OIDC_CONFIG = {
+   redirect_uri_path = "/redirect_uri",
+   discovery = {
+      authorization_endpoint = "http://localhost/authorize",
+      token_endpoint = "http://localhost/token",
+      token_endpoint_auth_methods_supported = { "client_secret_post" }
+   },
+   client_id = "client_id",
+   client_secret = "client_secret",
+   ssl_verify = "no",
+   redirect_uri_scheme = 'http',
+}
 
 local DEFAULT_CONFIG_TEMPLATE = [[
 worker_processes  1;
@@ -35,18 +49,7 @@ http {
 
         location /default {
             access_by_lua_block {
-              local opts = {
-                redirect_uri_path = "/redirect_uri",
-                discovery = {
-                  authorization_endpoint = "http://localhost/authorize",
-                  token_endpoint = "http://localhost/token",
-                  token_endpoint_auth_methods_supported = { "client_secret_post" }
-                },
-                client_id = "client_id",
-                client_secret = "client_secret",
-                ssl_verify = "no",
-                redirect_uri_scheme = 'http',
-              }
+              local opts = OIDC_CONFIG
               local oidc = require "resty.openidc"
               local res, err, target, session = oidc.authenticate(opts)
               if err then
@@ -68,16 +71,31 @@ function test_support.urlescape_for_regex(s)
   return url.escape(s):gsub("%%", "%%%%")
 end
 
-local function write_config(out)
-  out:write(DEFAULT_CONFIG_TEMPLATE)
+local function merge(t1, t2)
+  for k, v in pairs(t2) do
+    if (type(v) == "table") and (type(t1[k] or false) == "table") then
+      merge(t1[k], t2[k])
+    else
+      t1[k] = v
+    end
+  end
+  return t1
 end
 
-function test_support.start_server()
+local function write_config(out, custom_config)
+  custom_config = custom_config or {}
+  local oidc_config = merge(merge({}, DEFAULT_OIDC_CONFIG), custom_config["oidc_opts"] or {})
+  local config = DEFAULT_CONFIG_TEMPLATE:gsub("OIDC_CONFIG",
+                                              serpent.block(oidc_config, {comment = false }))
+  out:write(config)
+end
+
+function test_support.start_server(custom_config)
   assert(os.execute("rm -rf /tmp/server"), "failed to remove old server dir")
   assert(os.execute("mkdir -p /tmp/server/conf"), "failed to create server dir")
   assert(os.execute("mkdir -p /tmp/server/logs"), "failed to create log dir")
   local out = assert(io.open("/tmp/server/conf/nginx.conf", "w"))
-  write_config(out)
+  write_config(out, custom_config)
   assert(out:close())
   assert(os.execute("openresty -c /tmp/server/conf/nginx.conf > /dev/null"), "failed to start nginx")
 end
