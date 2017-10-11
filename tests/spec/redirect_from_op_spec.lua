@@ -7,6 +7,15 @@ local function grab_state(headers)
   return string.match(headers.location, ".*state=([^&]+).*")
 end
 
+local function extract_cookies(headers)
+   local pair = headers["set-cookie"]
+   local semi = pair:find(";")
+   if semi then
+      pair = pair:sub(1, semi - 1)
+   end
+   return pair
+end
+
 describe("when a redirect is received", function()
   test_support.start_server()
   teardown(test_support.stop_server)
@@ -15,15 +24,52 @@ describe("when a redirect is received", function()
     redirect = false
   })
   local state = grab_state(headers)
+  local cookie_header = extract_cookies(headers)
   describe("without an active user session", function()
     local _, redirStatus = http.request({
-          url = "http://localhost/default/redirect_uri?code=foo&state" .. state,
+          url = "http://localhost/default/redirect_uri?code=foo&state=" .. state,
     })
     it("should be rejected", function()
        assert.are.equals(401, redirStatus)
     end)
     it("will log an error message", function()
       assert.error_log_contains("but there's no session state found")
+    end)
+  end)
+  describe("with bad state", function()
+    local _, redirStatus = http.request({
+          url = "http://localhost/default/redirect_uri?code=foo&state=X" .. state,
+          headers = { cookie = cookie_header }
+    })
+    it("should be rejected", function()
+       assert.are.equals(401, redirStatus)
+    end)
+    it("will log an error message", function()
+      assert.error_log_contains("does not match state restored from session")
+    end)
+  end)
+  describe("without state", function()
+    local _, redirStatus = http.request({
+          url = "http://localhost/default/redirect_uri?code=foo",
+          headers = { cookie = cookie_header }
+    })
+    it("should be rejected", function()
+       assert.are.equals(401, redirStatus)
+    end)
+    it("will log an error message", function()
+      assert.error_log_contains("unhandled request to the redirect_uri")
+    end)
+  end)
+  describe("without code", function()
+    local _, redirStatus = http.request({
+          url = "http://localhost/default/redirect_uri?state=" .. state,
+          headers = { cookie = cookie_header }
+    })
+    it("should be rejected", function()
+       assert.are.equals(401, redirStatus)
+    end)
+    it("will log an error message", function()
+      assert.error_log_contains("unhandled request to the redirect_uri")
     end)
   end)
 end)
