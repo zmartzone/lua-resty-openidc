@@ -121,9 +121,10 @@ end
 local function write_config(out, custom_config)
   custom_config = custom_config or {}
   local oidc_config = merge(merge({}, DEFAULT_OIDC_CONFIG), custom_config["oidc_opts"] or {})
+  local id_token = merge(merge({}, DEFAULT_ID_TOKEN), custom_config["id_token"] or {})
   local config = DEFAULT_CONFIG_TEMPLATE
      :gsub("OIDC_CONFIG", serpent.block(oidc_config, {comment = false }))
-     :gsub("ID_TOKEN", serpent.block(DEFAULT_ID_TOKEN, {comment = false }))
+     :gsub("ID_TOKEN", serpent.block(id_token, {comment = false }))
   out:write(config)
 end
 
@@ -202,6 +203,7 @@ function test_support.extract_cookies(headers)
 end
 
 -- performs the full authorization grant flow
+-- returns the state parameter and the http status of the code response
 function test_support.login()
   local _, _, headers = http.request({
     url = "http://localhost/default/t",
@@ -209,12 +211,12 @@ function test_support.login()
   })
   local state = test_support.grab(headers, 'state')
   test_support.register_nonce(headers)
-  http.request({
+  _, status, _ = http.request({
         url = "http://localhost/default/redirect_uri?code=foo&state=" .. state,
         headers = { cookie = test_support.extract_cookies(headers) },
         redirect = false
   })
-  return state
+  return state, status
 end
 
 local a = require 'luassert'
