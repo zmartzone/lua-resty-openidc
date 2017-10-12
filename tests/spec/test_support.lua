@@ -1,3 +1,4 @@
+local http = require("socket.http")
 local url = require("socket.url")
 local serpent = require("serpent")
 
@@ -75,6 +76,8 @@ http {
             content_by_lua_block {
                 ngx.req.read_body()
                 ngx.log(ngx.ERR, "Received token request: " .. ngx.req.get_body_data())
+                local auth = ngx.req.get_headers()["Authorization"]
+                ngx.log(ngx.ERR, "token authorization header: " .. (auth and auth or ""))
                 ngx.header.content_type = 'application/json;charset=UTF-8'
                 local id_token = ID_TOKEN
                 local nonce_file = assert(io.open("/tmp/nonce", "r"))
@@ -198,15 +201,35 @@ function test_support.extract_cookies(headers)
    return pair
 end
 
+-- performs the full authorization grant flow
+function test_support.login()
+  local _, _, headers = http.request({
+    url = "http://localhost/default/t",
+    redirect = false
+  })
+  local state = test_support.grab(headers, 'state')
+  test_support.register_nonce(headers)
+  http.request({
+        url = "http://localhost/default/redirect_uri?code=foo&state=" .. state,
+        headers = { cookie = test_support.extract_cookies(headers) },
+        redirect = false
+  })
+  return state
+end
 
 local a = require 'luassert'
 local say = require("say")
 
 local function error_log_contains(state, args)
+  local case_insensitive = args[2] and true or false
   local error_log = assert(io.open("/tmp/server/logs/error.log", "r"))
   local log = error_log:read("*all")
   assert(error_log:close())
-  return log:find(args[1]) and true or false
+  if case_insensitive then
+    return log:lower():find(args[1]:lower()) and true or false
+  else
+    return log:find(args[1]) and true or false
+  end
 end
 
 say:set("assertion.error_log_contains.positive", "Expected error log to contain: %s")
