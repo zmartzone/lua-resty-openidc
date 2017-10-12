@@ -97,11 +97,11 @@ describe("when the id_token obtained from the token endpoint contains a very old
     assert.are.equals(401, status)
   end)
   it("an error message has been logged", function()
-    assert.error_log_contains("token is not valid yet")
+    assert.error_log_contains("token has been issued too long ago")
   end)
 end)
 
-describe("when the id_token obtained from the token endpoint contains a very old iat claim but slack is big enough #slack",
+describe("when the id_token obtained from the token endpoint contains a very old iat claim but slack is big enough",
          function()
   test_support.start_server({
     id_token = { iat = os.time() - 3600 },
@@ -127,6 +127,34 @@ describe("when the id_token obtained from the token endpoint has expired",
   end)
   it("an error message has been logged", function()
     assert.error_log_contains("token expired")
+  end)
+end)
+
+describe("when the id_token obtained from the token endpoint seems to have expired but slack is big enough",
+         function()
+  test_support.start_server({
+    id_token = { exp = os.time() - 300 },
+    oidc_opts = { iat_slack = 400 }
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login succeeds", function()
+    assert.are.equals(302, status)
+  end)
+end)
+
+describe("when the id_token obtained from the token endpoint doesn't contain an aud claim",
+         function()
+  test_support.start_server({
+    remove_id_token_claims = { "aud" }
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login has failed", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error message has been logged", function()
+    assert.error_log_contains("no \"aud\" claim found in id_token")
   end)
 end)
 
