@@ -98,7 +98,8 @@ http {
 }
 ]=]
 
--- must double percents for Lua regexes
+-- URL escapes s and doubles the percent signs so the result can be
+-- used as a pattern
 function test_support.urlescape_for_regex(s)
   return url.escape(s):gsub("%%", "%%%%")
 end
@@ -123,6 +124,9 @@ local function write_config(out, custom_config)
   out:write(config)
 end
 
+-- starts a server instance with some customizations of the configuration.
+-- expects custom_config to be a table with:
+-- - oidc_opts is a table containing options that are accepted by oidc.authenticate
 function test_support.start_server(custom_config)
   assert(os.execute("rm -rf /tmp/server"), "failed to remove old server dir")
   assert(os.execute("mkdir -p /tmp/server/conf"), "failed to create server dir")
@@ -146,6 +150,7 @@ local function is_running(pid)
   return kill(pid, 0)
 end
 
+-- tries hard to stop the server started by test_support.start_server
 function test_support.stop_server()
   local pid_file = assert(io.open("/tmp/server/logs/nginx.pid", "r"))
   local pid = pid_file:read("*all")
@@ -168,11 +173,31 @@ function test_support.stop_server()
   end
 end
 
-function test_support.register_nonce(nonce)
+-- grabs a URI parameter value out of the location header of a response
+function test_support.grab(headers, param)
+  return string.match(headers.location, ".*" .. param .. "=([^&]+).*")
+end
+
+-- makes the nonce used with the authorization request available to
+-- the token endpoint mock
+function test_support.register_nonce(headers)
+  local nonce = test_support.grab(headers, 'nonce')
   local nonce_file = assert(io.open("/tmp/nonce", "w"))
   nonce_file:write(nonce)
   assert(nonce_file:close())
 end
+
+-- returns a Cookie header value based on all cookies requested via
+-- Set-Cookie inside headers
+function test_support.extract_cookies(headers)
+   local pair = headers["set-cookie"]
+   local semi = pair:find(";")
+   if semi then
+      pair = pair:sub(1, semi - 1)
+   end
+   return pair
+end
+
 
 local a = require 'luassert'
 local say = require("say")

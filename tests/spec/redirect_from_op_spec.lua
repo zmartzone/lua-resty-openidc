@@ -1,24 +1,6 @@
 local http = require("socket.http")
 local test_support = require("test_support")
-local url = require("socket.url")
 require 'busted.runner'()
-
-local function grab_state(headers)
-  return string.match(headers.location, ".*state=([^&]+).*")
-end
-
-local function grab_nonce(headers)
-  return string.match(headers.location, ".*nonce=([^&]+).*")
-end
-
-local function extract_cookies(headers)
-   local pair = headers["set-cookie"]
-   local semi = pair:find(";")
-   if semi then
-      pair = pair:sub(1, semi - 1)
-   end
-   return pair
-end
 
 describe("when a redirect is received", function()
   test_support.start_server()
@@ -27,9 +9,9 @@ describe("when a redirect is received", function()
     url = "http://localhost/default/t",
     redirect = false
   })
-  local state = grab_state(headers)
-  test_support.register_nonce(grab_nonce(headers))
-  local cookie_header = extract_cookies(headers)
+  local state = test_support.grab(headers, 'state')
+  test_support.register_nonce(headers)
+  local cookie_header = test_support.extract_cookies(headers)
   describe("without an active user session", function()
     local _, redirStatus = http.request({
           url = "http://localhost/default/redirect_uri?code=foo&state=" .. state,
