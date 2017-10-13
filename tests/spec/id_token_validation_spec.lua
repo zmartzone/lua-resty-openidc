@@ -4,10 +4,8 @@ require 'busted.runner'()
 
 describe("when the id_token obtained from the token endpoint doesn't contain an iss claim",
          function()
-  pending("need to add support for removing claims")
-  --[[
   test_support.start_server({
-    id_token = { iss = nil }
+    remove_id_token_claims = { "iss" }
   })
   teardown(test_support.stop_server)
   local _, status = test_support.login()
@@ -17,7 +15,6 @@ describe("when the id_token obtained from the token endpoint doesn't contain an 
   it("an error message has been logged", function()
     assert.error_log_contains("in id_token is not equal to the issuer from the discovery document")
   end)
-  ]]
 end)
 
 describe("when the id_token obtained from the token endpoint contains a bad iss claim",
@@ -38,9 +35,8 @@ end)
 describe("when the id_token obtained from the token endpoint doesn't contain a sub claim",
          function()
   pending("need to add support for removing claims")
-  --[[
   test_support.start_server({
-    id_token = { iss = nil }
+    remove_id_token_claims = { "sub" }
   })
   teardown(test_support.stop_server)
   local _, status = test_support.login()
@@ -50,7 +46,6 @@ describe("when the id_token obtained from the token endpoint doesn't contain a s
   it("an error message has been logged", function()
     assert.error_log_contains("no \"sub\" claim found in id_token")
   end)
-  ]]
 end)
 
 describe("when the id_token obtained from the token endpoint contains a bad nonce claim",
@@ -78,10 +73,8 @@ end)
 
 describe("when the id_token obtained from the token endpoint doesn't contain an iat claim",
          function()
-  pending("need to add support for removing claims")
-  --[[
   test_support.start_server({
-    id_token = { iss = nil }
+    remove_id_token_claims = { "iat" }
   })
   teardown(test_support.stop_server)
   local _, status = test_support.login()
@@ -91,7 +84,6 @@ describe("when the id_token obtained from the token endpoint doesn't contain an 
   it("an error message has been logged", function()
     assert.error_log_contains("no \"iat\" claim found in id_token")
   end)
-  ]]
 end)
 
 describe("when the id_token obtained from the token endpoint contains a very old iat claim",

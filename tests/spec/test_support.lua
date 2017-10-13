@@ -122,6 +122,9 @@ local function write_config(out, custom_config)
   custom_config = custom_config or {}
   local oidc_config = merge(merge({}, DEFAULT_OIDC_CONFIG), custom_config["oidc_opts"] or {})
   local id_token = merge(merge({}, DEFAULT_ID_TOKEN), custom_config["id_token"] or {})
+  for _, k in ipairs(custom_config["remove_id_token_claims"] or {}) do
+    id_token[k] = nil
+  end
   local config = DEFAULT_CONFIG_TEMPLATE
      :gsub("OIDC_CONFIG", serpent.block(oidc_config, {comment = false }))
      :gsub("ID_TOKEN", serpent.block(id_token, {comment = false }))
@@ -131,6 +134,8 @@ end
 -- starts a server instance with some customizations of the configuration.
 -- expects custom_config to be a table with:
 -- - oidc_opts is a table containing options that are accepted by oidc.authenticate
+-- - id_token is a table containing id_token claims
+-- - remove_id_token_claims is an array of claims to remove from the id_token
 function test_support.start_server(custom_config)
   assert(os.execute("rm -rf /tmp/server"), "failed to remove old server dir")
   assert(os.execute("mkdir -p /tmp/server/conf"), "failed to create server dir")
