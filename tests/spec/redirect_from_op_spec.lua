@@ -1,5 +1,6 @@
 local http = require("socket.http")
 local test_support = require("test_support")
+local ltn12 = require("ltn12")
 require 'busted.runner'()
 
 describe("when a redirect is received", function()
@@ -69,5 +70,24 @@ describe("when a redirect is received", function()
        assert.are.equals(302, redirStatus)
        assert.are.equals("/default/t", h.location)
     end)
+  end)
+end)
+
+describe("when the full login has been performed and the initial link is called", function()
+  test_support.start_server()
+  teardown(test_support.stop_server)
+  local _, _, cookies = test_support.login()
+  local content_table = {}
+  local _, status, _ = http.request({
+    url = "http://localhost/default/t",
+    redirect = false,
+    headers = { cookie = cookies },
+    sink = ltn12.sink.table(content_table)
+  })
+  it("no redirect occurs", function()
+    assert.are.equals(200, status)
+  end)
+  it("the response is hello, world!", function()
+    assert.are.equals("hello, world!\n", table.concat(content_table))
   end)
 end)

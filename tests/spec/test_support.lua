@@ -194,7 +194,7 @@ end
 -- returns a Cookie header value based on all cookies requested via
 -- Set-Cookie inside headers
 function test_support.extract_cookies(headers)
-   local pair = headers["set-cookie"]
+   local pair = headers["set-cookie"] or ''
    local semi = pair:find(";")
    if semi then
       pair = pair:sub(1, semi - 1)
@@ -203,7 +203,8 @@ function test_support.extract_cookies(headers)
 end
 
 -- performs the full authorization grant flow
--- returns the state parameter and the http status of the code response
+-- returns the state parameter, the http status of the code response
+-- and the cookies set by the last response
 function test_support.login()
   local _, _, headers = http.request({
     url = "http://localhost/default/t",
@@ -211,12 +212,12 @@ function test_support.login()
   })
   local state = test_support.grab(headers, 'state')
   test_support.register_nonce(headers)
-  _, status, _ = http.request({
+  _, status, redir_h = http.request({
         url = "http://localhost/default/redirect_uri?code=foo&state=" .. state,
         headers = { cookie = test_support.extract_cookies(headers) },
         redirect = false
   })
-  return state, status
+  return state, status, test_support.extract_cookies(redir_h)
 end
 
 local a = require 'luassert'
