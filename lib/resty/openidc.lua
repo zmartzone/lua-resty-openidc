@@ -125,17 +125,27 @@ local function openidc_validate_id_token(opts, id_token, nonce)
 
   local slack=opts.iat_slack and opts.iat_slack or 120
   if id_token.iat < (ngx.time() - slack) then
-    ngx.log(ngx.ERR, "token is not valid yet: id_token.iat=", id_token.iat, ", ngx.time()=", ngx.time())
+    ngx.log(ngx.ERR, "token has been issued too long ago: id_token.iat=", id_token.iat, ", ngx.time()=", ngx.time())
     return false
   end
 
   -- check expiry timestamp
-  if id_token.exp < ngx.time() then
+  if not id_token.exp then
+    ngx.log(ngx.ERR, "no \"exp\" claim found in id_token")
+    return false
+  end
+
+  if (id_token.exp + slack) < ngx.time() then
     ngx.log(ngx.ERR, "token expired: id_token.exp=", id_token.exp, ", ngx.time()=", ngx.time())
     return false
   end
 
   -- check audience (array or string)
+  if not id_token.aud then
+    ngx.log(ngx.ERR, "no \"aud\" claim found in id_token")
+    return false
+  end
+
   if (type(id_token.aud) == "table") then
     for key, value in pairs(id_token.aud) do
       if value == opts.client_id then
