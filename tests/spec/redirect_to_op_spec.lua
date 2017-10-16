@@ -17,7 +17,7 @@ describe("when accessing the protected resource without token", function()
     assert.truthy(string.match(headers["location"], ".*response_type=code.*"))
   end)
   it("uses the configured redirect uri", function()
-    local redir_escaped = test_support.urlescape_for_regex("http://localhost/redirect_uri")
+    local redir_escaped = test_support.urlescape_for_regex("http://localhost/default/redirect_uri")
     -- lower as url.escape uses %2f for a slash, openidc uses %2F
     assert.truthy(string.match(string.lower(headers["location"]),
                                ".*redirect_uri=" .. string.lower(redir_escaped) .. ".*"))
