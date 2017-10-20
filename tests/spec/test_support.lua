@@ -7,10 +7,10 @@ local test_support = {}
 local DEFAULT_OIDC_CONFIG = {
    redirect_uri_path = "/default/redirect_uri",
    discovery = {
-      authorization_endpoint = "http://localhost/authorize",
+      authorization_endpoint = "http://127.0.0.1/authorize",
       token_endpoint = "http://127.0.0.1/token",
       token_endpoint_auth_methods_supported = { "client_secret_post" },
-      issuer = "https://localhost/",
+      issuer = "http://127.0.0.1/",
    },
    client_id = "client_id",
    client_secret = "client_secret",
@@ -20,7 +20,7 @@ local DEFAULT_OIDC_CONFIG = {
 
 local DEFAULT_ID_TOKEN = {
   sub = "subject",
-  iss = "https://localhost/",
+  iss = "http://127.0.0.1/",
   aud = "client_id",
   iat = os.time(),
   exp = os.time() + 3600,
@@ -212,13 +212,13 @@ end
 -- and the cookies set by the last response
 function test_support.login()
   local _, _, headers = http.request({
-    url = "http://localhost/default/t",
+    url = "http://127.0.0.1/default/t",
     redirect = false
   })
   local state = test_support.grab(headers, 'state')
   test_support.register_nonce(headers)
   _, status, redir_h = http.request({
-        url = "http://localhost/default/redirect_uri?code=foo&state=" .. state,
+        url = "http://127.0.0.1/default/redirect_uri?code=foo&state=" .. state,
         headers = { cookie = test_support.extract_cookies(headers) },
         redirect = false
   })
