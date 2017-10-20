@@ -7,10 +7,10 @@ local test_support = {}
 local DEFAULT_OIDC_CONFIG = {
    redirect_uri_path = "/default/redirect_uri",
    discovery = {
-      authorization_endpoint = "http://localhost/authorize",
+      authorization_endpoint = "http://127.0.0.1/authorize",
       token_endpoint = "http://127.0.0.1/token",
       token_endpoint_auth_methods_supported = { "client_secret_post" },
-      issuer = "https://localhost/",
+      issuer = "http://127.0.0.1/",
    },
    client_id = "client_id",
    client_secret = "client_secret",
@@ -20,13 +20,37 @@ local DEFAULT_OIDC_CONFIG = {
 
 local DEFAULT_ID_TOKEN = {
   sub = "subject",
-  iss = "https://localhost/",
+  iss = "http://127.0.0.1/",
   aud = "client_id",
   iat = os.time(),
   exp = os.time() + 3600,
 }
 
-local DEFAULT_CONFIG_TEMPLATE = [=[
+local DEFAULT_ACCESS_TOKEN = {
+  exp = os.time() + 3600,
+}
+
+local DEFAULT_JWT_SIGNATURE_ALG = "RS256"
+
+function test_support.load(file_name)
+  local file = assert(io.open(file_name, "r"))
+  local content = file:read("*all")
+  assert(file:close())
+  return content;
+end
+
+function test_support.trim(s)
+  return s:gsub("^%s*(.-)%s*$", "%1")
+end
+
+local DEFAULT_JWT_VERIFY_SECRET = test_support.load("/spec/private_rsa_key.pem")
+
+local DEFAULT_JWK = test_support.load("/spec/rsa_key_jwk_with_x5c.json")
+
+local DEFAULT_VERIFY_OPTS = {
+}
+
+local DEFAULT_CONFIG_TEMPLATE = [[
 worker_processes  1;
 pid       /tmp/server/logs/nginx.pid;
 error_log /tmp/server/logs/error.log debug;
@@ -52,6 +76,28 @@ http {
         #listen     443 ssl;
         #ssl_certificate     certificate-chain.crt;
         #ssl_certificate_key private.key;
+
+        location /jwt {
+            content_by_lua_block {
+                local jwt_content = {
+                  header = { typ = "JWT", alg = "JWT_SIGNATURE_ALG", kid = "abcd" },
+                  payload = ACCESS_TOKEN
+                }
+                local secret = [=[
+JWT_VERIFY_SECRET]=]
+                local jwt = require "resty.jwt"
+                local jwt_token = jwt:sign(secret, jwt_content)
+                ngx.header.content_type = 'text/plain'
+                ngx.say(jwt_token)
+            }
+        }
+
+        location /jwk {
+            content_by_lua_block {
+                ngx.header.content_type = 'application/json;charset=UTF-8'
+                ngx.say([=[JWK]=])
+            }
+        }
 
         location /t {
             echo "hello, world!";
@@ -89,22 +135,36 @@ http {
                 }
                 local jwt = require "resty.jwt"
                 local jwt_token = jwt:sign("lua-resty-jwt", jwt_content)
-                ngx.say([[{
+                ngx.say([=[{
   "access_token":"a_token",
   "expires_in":3600,
   "refresh_token":"r_token",
-  "id_token": "]] .. jwt_token .. [["
-}]])
+  "id_token": "]=] .. jwt_token .. [=["
+}]=])
             }
         }
+
+        location /verify_bearer_token {
+            content_by_lua_block {
+                local json, err, token = oidc.bearer_jwt_verify(VERIFY_OPTS)
+                if err then
+                  ngx.status = 401
+                  ngx.log(ngx.ERR, "Invalid token: " .. err)
+                else
+                  ngx.status = 204
+                  ngx.log(ngx.ERR, "Valid token: " .. (require "cjson").encode(json))
+                end
+            }
+        }
+
     }
 }
-]=]
+]]
 
 -- URL escapes s and doubles the percent signs so the result can be
 -- used as a pattern
 function test_support.urlescape_for_regex(s)
-  return url.escape(s):gsub("%%", "%%%%")
+  return url.escape(s):gsub("%%", "%%%%"):gsub("%%%%2e", "%%%.")
 end
 
 local function merge(t1, t2)
@@ -122,12 +182,19 @@ local function write_config(out, custom_config)
   custom_config = custom_config or {}
   local oidc_config = merge(merge({}, DEFAULT_OIDC_CONFIG), custom_config["oidc_opts"] or {})
   local id_token = merge(merge({}, DEFAULT_ID_TOKEN), custom_config["id_token"] or {})
+  local verify_opts = merge(merge({}, DEFAULT_VERIFY_OPTS), custom_config["verify_opts"] or {})
+  local access_token = merge(merge({}, DEFAULT_ACCESS_TOKEN), custom_config["access_token"] or {})
   for _, k in ipairs(custom_config["remove_id_token_claims"] or {}) do
     id_token[k] = nil
   end
   local config = DEFAULT_CONFIG_TEMPLATE
-     :gsub("OIDC_CONFIG", serpent.block(oidc_config, {comment = false }))
-     :gsub("ID_TOKEN", serpent.block(id_token, {comment = false }))
+    :gsub("OIDC_CONFIG", serpent.block(oidc_config, {comment = false }))
+    :gsub("ID_TOKEN", serpent.block(id_token, {comment = false }))
+    :gsub("ACCESS_TOKEN", serpent.block(access_token, {comment = false }))
+    :gsub("JWT_SIGNATURE_ALG", custom_config["jwt_signature_alg"] or DEFAULT_JWT_SIGNATURE_ALG)
+    :gsub("JWT_VERIFY_SECRET", custom_config["jwt_verify_secret"] or DEFAULT_JWT_VERIFY_SECRET)
+    :gsub("VERIFY_OPTS", serpent.block(verify_opts, {comment = false }))
+    :gsub("JWK", custom_config["jwk"] or DEFAULT_JWK)
   out:write(config)
 end
 
@@ -136,6 +203,11 @@ end
 -- - oidc_opts is a table containing options that are accepted by oidc.authenticate
 -- - id_token is a table containing id_token claims
 -- - remove_id_token_claims is an array of claims to remove from the id_token
+-- - verify_opts is a table containing options that are accepted by oidc.bearer_jwt_verify
+-- - jwt_signature_alg algorithm to use for signing JWTs
+-- - jwt_verify_secret the secret to use when verifying the secret
+-- - access_token is a table containing claims for the access token provided by /jwt
+-- - jwk the JWK keystore to provide
 function test_support.start_server(custom_config)
   assert(os.execute("rm -rf /tmp/server"), "failed to remove old server dir")
   assert(os.execute("mkdir -p /tmp/server/conf"), "failed to create server dir")
@@ -161,9 +233,7 @@ end
 
 -- tries hard to stop the server started by test_support.start_server
 function test_support.stop_server()
-  local pid_file = assert(io.open("/tmp/server/logs/nginx.pid", "r"))
-  local pid = pid_file:read("*all")
-  assert(pid_file:close())
+  local pid = test_support.load("/tmp/server/logs/nginx.pid")
   local sleep = 0.1
   for a = 1, 5
   do
@@ -212,13 +282,13 @@ end
 -- and the cookies set by the last response
 function test_support.login()
   local _, _, headers = http.request({
-    url = "http://localhost/default/t",
+    url = "http://127.0.0.1/default/t",
     redirect = false
   })
   local state = test_support.grab(headers, 'state')
   test_support.register_nonce(headers)
   _, status, redir_h = http.request({
-        url = "http://localhost/default/redirect_uri?code=foo&state=" .. state,
+        url = "http://127.0.0.1/default/redirect_uri?code=foo&state=" .. state,
         headers = { cookie = test_support.extract_cookies(headers) },
         redirect = false
   })
@@ -230,9 +300,7 @@ local say = require("say")
 
 local function error_log_contains(state, args)
   local case_insensitive = args[2] and true or false
-  local error_log = assert(io.open("/tmp/server/logs/error.log", "r"))
-  local log = error_log:read("*all")
-  assert(error_log:close())
+  local log = test_support.load("/tmp/server/logs/error.log")
   if case_insensitive then
     return log:lower():find(args[1]:lower()) and true or false
   else

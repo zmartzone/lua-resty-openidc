@@ -6,18 +6,18 @@ describe("when accessing the protected resource without token", function()
   test_support.start_server()
   teardown(test_support.stop_server)
   local _, status, headers = http.request({
-    url = "http://localhost/default/t",
+    url = "http://127.0.0.1/default/t",
     redirect = false
   })
   it("redirects to the authorization endpoint", function()
     assert.are.equals(302, status)
-    assert.truthy(string.match(headers["location"], "http://localhost/authorize%?.*client_id=client_id.*"))
+    assert.truthy(string.match(headers["location"], "http://127.0.0.1/authorize%?.*client_id=client_id.*"))
   end)
   it("requests the authorization code grant flow", function()
     assert.truthy(string.match(headers["location"], ".*response_type=code.*"))
   end)
   it("uses the configured redirect uri", function()
-    local redir_escaped = test_support.urlescape_for_regex("http://localhost/default/redirect_uri")
+    local redir_escaped = test_support.urlescape_for_regex("http://127.0.0.1/default/redirect_uri")
     -- lower as url.escape uses %2f for a slash, openidc uses %2F
     assert.truthy(string.match(string.lower(headers["location"]),
                                ".*redirect_uri=" .. string.lower(redir_escaped) .. ".*"))
@@ -41,7 +41,7 @@ describe("when accessing the custom protected resource without token", function(
   test_support.start_server({oidc_opts = {scope = "my-scope"}})
   teardown(test_support.stop_server)
   local _, status, headers = http.request({
-    url = "http://localhost/default/t",
+    url = "http://127.0.0.1/default/t",
     redirect = false
   })
   it("uses the configured scope", function()
