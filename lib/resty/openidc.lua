@@ -518,17 +518,25 @@ local function split_by_chunk(text, chunkSize)
 end
 
 local function get_jwk (keys, kid)
+  if kid == nil then
+    if #keys == 1 then
+      ngx.log(ngx.DEBUG, "returning only key of JWKS for keyid-less JWT")
+      return keys[1], nil
+    else
+      return nil, "JWT doesn't specify kid but the keystore contains multiple keys"
+    end
+  end
   for _, value in pairs(keys) do
     if value.kid == kid then
-      return value
+      return value, nil
     end
   end
 
-  return nil
+  return nil, "key with id " .. kid .. " not found"
 end
 
 local function pem_from_jwk (opts, kid)
-  local cache_id = opts.discovery.jwks_uri .. '#' .. kid
+  local cache_id = opts.discovery.jwks_uri .. '#' .. (kid or '')
   local v = openidc_cache_get("jwks", cache_id)
 
   if v then
@@ -540,7 +548,12 @@ local function pem_from_jwk (opts, kid)
     return nil, err
   end
 
-  local x5c = get_jwk(jwks.keys, kid).x5c
+  local jwk
+  jwk, err = get_jwk(jwks.keys, kid)
+  if err then
+    return nil, err
+  end
+  local x5c = jwk.x5c
   -- TODO check x5c length
   local chunks = split_by_chunk(ngx.encode_base64(openidc_base64_url_decode(x5c[1])), 64)
   local pem = "-----BEGIN CERTIFICATE-----\n" .. table.concat(chunks, "\n") .. "\n-----END CERTIFICATE-----"

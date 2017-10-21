@@ -30,7 +30,10 @@ local DEFAULT_ACCESS_TOKEN = {
   exp = os.time() + 3600,
 }
 
-local DEFAULT_JWT_SIGNATURE_ALG = "RS256"
+local DEFAULT_ACCESS_TOKEN_HEADER = {
+  typ = "JWT",
+  alg = "RS256",
+}
 
 function test_support.load(file_name)
   local file = assert(io.open(file_name, "r"))
@@ -80,7 +83,7 @@ http {
         location /jwt {
             content_by_lua_block {
                 local jwt_content = {
-                  header = { typ = "JWT", alg = "JWT_SIGNATURE_ALG", kid = "abcd" },
+                  header = ACCESS_TOKEN_HEADER,
                   payload = ACCESS_TOKEN
                 }
                 local secret = [=[
@@ -184,14 +187,16 @@ local function write_config(out, custom_config)
   local id_token = merge(merge({}, DEFAULT_ID_TOKEN), custom_config["id_token"] or {})
   local verify_opts = merge(merge({}, DEFAULT_VERIFY_OPTS), custom_config["verify_opts"] or {})
   local access_token = merge(merge({}, DEFAULT_ACCESS_TOKEN), custom_config["access_token"] or {})
+  local access_token_header = merge(merge({}, DEFAULT_ACCESS_TOKEN_HEADER),
+                                    custom_config["access_token_header"] or {})
   for _, k in ipairs(custom_config["remove_id_token_claims"] or {}) do
     id_token[k] = nil
   end
   local config = DEFAULT_CONFIG_TEMPLATE
     :gsub("OIDC_CONFIG", serpent.block(oidc_config, {comment = false }))
     :gsub("ID_TOKEN", serpent.block(id_token, {comment = false }))
+    :gsub("ACCESS_TOKEN_HEADER", serpent.block(access_token_header, {comment = false }))
     :gsub("ACCESS_TOKEN", serpent.block(access_token, {comment = false }))
-    :gsub("JWT_SIGNATURE_ALG", custom_config["jwt_signature_alg"] or DEFAULT_JWT_SIGNATURE_ALG)
     :gsub("JWT_VERIFY_SECRET", custom_config["jwt_verify_secret"] or DEFAULT_JWT_VERIFY_SECRET)
     :gsub("VERIFY_OPTS", serpent.block(verify_opts, {comment = false }))
     :gsub("JWK", custom_config["jwk"] or DEFAULT_JWK)
@@ -207,6 +212,7 @@ end
 -- - jwt_signature_alg algorithm to use for signing JWTs
 -- - jwt_verify_secret the secret to use when verifying the secret
 -- - access_token is a table containing claims for the access token provided by /jwt
+-- - access_token_header is a table containing claims for the header used by /jwt
 -- - jwk the JWK keystore to provide
 function test_support.start_server(custom_config)
   assert(os.execute("rm -rf /tmp/server"), "failed to remove old server dir")
