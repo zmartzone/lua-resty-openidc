@@ -78,7 +78,9 @@ describe("when using a statically configured symmetric key for HMAC", function()
       secret = "secret"
     },
     jwt_verify_secret = "secret",
-    jwt_signature_alg = "HS256"
+    access_token_header = {
+      alg = "HS256",
+    }
   })
   teardown(test_support.stop_server)
   base_checks()
@@ -111,6 +113,45 @@ describe("when using a RSA key from a JWK that doesn't contain the x5c claim", f
   base_checks()
 end)
 ]]
+
+describe("when the JWK specifies a kid and the JWKS contains multiple keys", function()
+  test_support.start_server({
+    verify_opts = {
+      discovery = {
+        jwks_uri = "http://127.0.0.1/jwk",
+      }
+    },
+    jwk = test_support.load("/spec/jwks_with_two_keys.json"),
+    access_token_header = {
+      kid = "abcd",
+    }
+  })
+  teardown(test_support.stop_server)
+  base_checks()
+end)
+
+describe("when the JWK specifies no kid and the JWKS contains multiple keys", function()
+  test_support.start_server({
+    verify_opts = {
+      discovery = {
+        jwks_uri = "http://127.0.0.1/jwk",
+      }
+    },
+    jwk = test_support.load("/spec/jwks_with_two_keys.json"),
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/verify_bearer_token",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the token is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error is logged", function()
+    assert.error_log_contains("JWT doesn't specify kid but the keystore contains multiple keys")
+  end)
+end)
 
 describe("when the access token has expired", function()
   test_support.start_server({
