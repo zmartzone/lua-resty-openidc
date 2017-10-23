@@ -78,7 +78,7 @@ describe("when using a statically configured symmetric key for HMAC", function()
       secret = "secret"
     },
     jwt_verify_secret = "secret",
-    access_token_header = {
+    token_header = {
       alg = "HS256",
     }
   })
@@ -122,7 +122,7 @@ describe("when the JWK specifies a kid and the JWKS contains multiple keys", fun
       }
     },
     jwk = test_support.load("/spec/jwks_with_two_keys.json"),
-    access_token_header = {
+    token_header = {
       kid = "abcd",
     }
   })
