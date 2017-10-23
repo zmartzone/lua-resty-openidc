@@ -171,14 +171,13 @@ describe("when the access token has expired", function()
   it("the token is invalid", function()
     assert.are.equals(401, status)
   end)
-  --[[ getting error message from lua-resty-jwt rather than our own
   it("an error is logged", function()
-    assert.error_log_contains("JWT expired")
+    -- this is the error message from lua-resty-jwt rather than our
+    -- own as its verification comes first
+    assert.error_log_contains("'exp' claim expired at")
   end)
-  ]]
 end)
 
---[[ will need to configure lua-resty-jwt as well or suppress its "exp" claim spec
 describe("when the access token has expired but slack is big enough", function()
   test_support.start_server({
     verify_opts = {
@@ -196,7 +195,7 @@ describe("when the access token has expired but slack is big enough", function()
     headers = { authorization = "Bearer " .. jwt }
   })
   it("the token is valid", function()
-    assert.are.equals(200, status)
+    assert.are.equals(204, status)
   end)
 end)
-]]
+
