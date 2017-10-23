@@ -935,7 +935,8 @@ function openidc.jwt_verify(access_token, opts, ...)
     -- cache the results
     if json and json.valid == true and json.verified == true then
       json = json.payload
-      openidc_cache_set("introspection", access_token, cjson.encode(json), json.exp - ngx.time())
+      local ttl = json.exp and json.exp - ngx.time() or 120
+      openidc_cache_set("introspection", access_token, cjson.encode(json), ttl)
     else
       err = "invalid token: ".. json.reason
     end
