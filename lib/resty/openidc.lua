@@ -332,7 +332,7 @@ local function openidc_access_token_expires_in(opts, expires_in)
 end
 
 -- parse a JWT and verify its signature (if present)
-local function openidc_load_jwt_and_verify_crypto(opts, jwt_string)
+local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, ...)
   local jwt_obj = jwt:load_jwt(jwt_string, nil)
   if not jwt_obj.valid then
     local reason = "invalid jwt"
@@ -358,7 +358,7 @@ local function openidc_load_jwt_and_verify_crypto(opts, jwt_string)
       return nil, err
     end
   end
-  jwt_obj = jwt:verify_jwt_obj(secret, jwt_obj)
+  jwt_obj = jwt:verify_jwt_obj(secret, jwt_obj, ...)
   if jwt_obj then
     ngx.log(ngx.DEBUG, "jwt: ", cjson.encode(jwt_obj), " ,valid: ", jwt_obj.valid, ", verified: ", jwt_obj.verified)
   end
@@ -648,6 +648,12 @@ local function encode_bit_string(str)
 end
 
 function openidc_pem_from_jwk (opts, kid)
+  if type(opts.discovery) == "string" then
+    opts.discovery, err = openidc_discover(opts.discovery, opts.ssl_verify)
+    if err then
+      return nil, err
+    end
+  end
   local cache_id = opts.discovery.jwks_uri .. '#' .. (kid or '')
   local v = openidc_cache_get("jwks", cache_id)
 
@@ -1057,41 +1063,14 @@ function openidc.jwt_verify(access_token, opts, ...)
   -- see if we've previously cached the validation result for this access token
   local v = openidc_cache_get("introspection", access_token)
   if not v then
+    local jwt_obj
+    jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, access_token, ...)
+    if not err then
+      json = jwt_obj.payload
+      ngx.log(ngx.DEBUG, "jwt: ", cjson.encode(json))
 
-    -- No secret given try getting it from the jwks endpoint
-    if not opts.secret and opts.discovery then
-      ngx.log(ngx.DEBUG, "bearer_jwt_verify using discovery.")
-      if type(opts.discovery) == "string" then
-        opts.discovery, err = openidc_discover(opts.discovery, opts.ssl_verify)
-        if err then
-          return nil, err
-        end
-      end
-
-      -- We decode the token twice, could be saved
-      local jwt_obj = jwt:load_jwt(access_token, nil)
-
-      if not jwt_obj.valid then
-        return nil, "invalid jwt"
-      end
-
-      opts.secret, err = openidc_pem_from_jwk(opts, jwt_obj.header.kid)
-
-      if opts.secret == nil then
-        return nil, err
-      end
-    end
-
-    json = jwt:verify(opts.secret, access_token, ...)
-
-    ngx.log(ngx.DEBUG, "jwt: ", cjson.encode(json))
-
-    -- cache the results
-    if json and json.valid == true and json.verified == true then
-      json = json.payload
+      -- cache the results
       openidc_cache_set("introspection", access_token, cjson.encode(json), json.exp - ngx.time())
-    else
-      err = "invalid token: ".. json.reason
     end
 
   else
