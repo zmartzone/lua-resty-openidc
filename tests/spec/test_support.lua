@@ -69,6 +69,8 @@ http {
     lua_shared_dict discovery 1m;
     init_by_lua_block {
         oidc = require "resty.openidc"
+        secret = [=[
+JWT_VERIFY_SECRET]=]
     }
 
     resolver      8.8.8.8;
@@ -87,8 +89,6 @@ http {
                   header = TOKEN_HEADER,
                   payload = ACCESS_TOKEN
                 }
-                local secret = [=[
-JWT_VERIFY_SECRET]=]
                 local jwt = require "resty.jwt"
                 local jwt_token = jwt:sign(secret, jwt_content)
                 ngx.header.content_type = 'text/plain'
@@ -138,8 +138,6 @@ JWT_VERIFY_SECRET]=]
                   payload = id_token
                 }
                 local jwt = require "resty.jwt"
-                local secret = [=[
-JWT_VERIFY_SECRET]=]
                 local jwt_token = jwt:sign(secret, jwt_content)
                 ngx.say([=[{
   "access_token":"a_token",
