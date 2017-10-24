@@ -199,3 +199,21 @@ describe("when the access token has expired but slack is big enough", function()
   end)
 end)
 
+describe("when the access token doesn't contain the exp claim at all", function()
+  test_support.start_server({
+    verify_opts = {
+      secret = test_support.load("/spec/public_rsa_key.pem"),
+    },
+    remove_access_token_claims = { "exp" },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/verify_bearer_token",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the token is valid", function()
+    assert.are.equals(204, status)
+  end)
+end)
+
