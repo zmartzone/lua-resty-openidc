@@ -203,3 +203,21 @@ describe("when the array value aud claim of the id_token obtained from the token
     assert.are.equals(302, status)
   end)
 end)
+
+describe("when the id token signature key isn't part of the JWK", function()
+  test_support.start_server({
+    jwt_verify_secret = "secret",
+    token_header = {
+      alg = "HS256",
+    }
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login has failed", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error message has been logged", function()
+    assert.error_log_contains("signature mismatch")
+  end)
+end)
+
