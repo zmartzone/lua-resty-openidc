@@ -331,37 +331,45 @@ local function openidc_access_token_expires_in(opts, expires_in)
   return (expires_in or opts.access_token_expires_in or 3600) - 1 - (opts.access_token_expires_leeway or 0)
 end
 
--- verify the signature on an id_token
-local function openidc_verify_id_token(opts, header, id_token, signature)
-
-  ngx.log(ngx.DEBUG, "verifying JWT with header: ", header)
-
-  local hdr_obj = cjson.decode(header)
-  if hdr_obj.alg == "none" and (not signature or signature == "") then
-    ngx.log(ngx.DEBUG, "accept JWT with alg \"none\" and no signature from \"code\" flow")
-    return true, nil
-  end
-
-  local jwt_obj = jwt:load_jwt(id_token, nil)
+-- parse a JWT and verify its signature (if present)
+local function openidc_load_jwt_and_verify_crypto(opts, jwt_string)
+  local jwt_obj = jwt:load_jwt(jwt_string, nil)
   if not jwt_obj.valid then
-    err = "invalid JWT"
-    ngx.log(ngx.ERR, err)
-    return false, err
-  end
-    
-  secret, err = openidc_pem_from_jwk(opts, jwt_obj.header.kid)
-
-  if secret == nil then
-    ngx.log(ngx.ERR, err)
-    return false, err
+    local reason = "invalid jwt"
+    if jwt_obj.reason then
+      reason = reason .. ": " .. jwt_obj.reason
+    end
+    return nil, reason
   end
 
-  jwt_obj = jwt:verify_jwt_obj(secret, jwt_obj)  
+  if jwt_obj.header.alg == "none" and (not jwt_obj.signature or jwt_obj.signature == "") then
+    ngx.log(ngx.DEBUG, "accept JWT with alg \"none\" and no signature from \"code\" flow")
+    return jwt_obj, nil
+  end
+
+  local secret = opts.secret
+  if not secret and opts.discovery then
+    ngx.log(ngx.DEBUG, "using discovery to find key")
+    local err
+    secret, err = openidc_pem_from_jwk(opts, jwt_obj.header.kid)
+
+    if secret == nil then
+      ngx.log(ngx.ERR, err)
+      return nil, err
+    end
+  end
+  jwt_obj = jwt:verify_jwt_obj(secret, jwt_obj)
   if jwt_obj then
     ngx.log(ngx.DEBUG, "jwt: ", cjson.encode(jwt_obj), " ,valid: ", jwt_obj.valid, ", verified: ", jwt_obj.verified)
   end
-
-  return jwt_obj and jwt_obj.valid and jwt_obj.verified
+  if not jwt_obj.verified then
+    local reason = "jwt signature verification failed"
+    if jwt_obj.reason then
+      reason = reason .. ": " .. jwt_obj.reason
+    end
+    return nil, reason
+  end
+  return jwt_obj
 end
 
 -- handle a "code" authorization response from the OP
@@ -411,23 +419,14 @@ local function openidc_authorization_response(opts, session)
     return nil, err, session.data.original_url, session
   end
 
-  -- process the token endpoint response with the id_token and access_token
-  local enc_hdr, enc_pay, enc_sign = string.match(json.id_token, '^(.+)%.(.+)%.(.*)$')
-
-  local header = openidc_base64_url_decode(enc_hdr)  
-  local payload = openidc_base64_url_decode(enc_pay)
-  
-  -- process the token endpoint response with the id_token and access_token    
-  if not openidc_verify_id_token(opts, header, json.id_token, enc_sign) then
-    err = "id_token verification failed"
-    ngx.log(ngx.ERR, err)
+  local jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, json.id_token)
+  if err then
     return nil, err, session.data.original_url, session
   end
-    
-  ngx.log(ngx.DEBUG, "id_token header: ", header)
-  ngx.log(ngx.DEBUG, "id_token payload: ", payload)
+  local id_token = jwt_obj.payload
 
-  local id_token = cjson.decode(payload)
+  ngx.log(ngx.DEBUG, "id_token header: ", cjson.encode(jwt_obj.header))
+  ngx.log(ngx.DEBUG, "id_token payload: ", cjson.encode(jwt_obj.payload))
 
   -- validate the id_token contents
   if openidc_validate_id_token(opts, id_token, session.data.nonce) == false then

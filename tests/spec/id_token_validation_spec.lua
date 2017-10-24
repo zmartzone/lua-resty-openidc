@@ -221,3 +221,19 @@ describe("when the id token signature key isn't part of the JWK", function()
   end)
 end)
 
+describe("when the id token signature uses a known symmetric key", function()
+  test_support.start_server({
+    jwt_verify_secret = "secret",
+    token_header = {
+      alg = "HS256",
+    },
+    oidc_opts = { secret = "secret" }
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login succeeds", function()
+    assert.are.equals(302, status)
+  end)
+end)
+
+-- TODO: add a test for when the id_token uses the "none" algorithm
