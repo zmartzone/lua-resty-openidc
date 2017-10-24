@@ -125,14 +125,13 @@ describe("when the id_token obtained from the token endpoint has expired",
   it("login has failed", function()
     assert.are.equals(401, status)
   end)
-  --[[ now need a fix similar to #106
   it("an error message has been logged", function()
-    assert.error_log_contains("token expired")
+    -- this is the error message from lua-resty-jwt rather than our
+    -- own as its verification comes first
+    assert.error_log_contains("'exp' claim expired at")
   end)
-  ]]
 end)
 
---[[ now needs a fix similar to #106
 describe("when the id_token obtained from the token endpoint seems to have expired but slack is big enough",
          function()
   test_support.start_server({
@@ -145,7 +144,6 @@ describe("when the id_token obtained from the token endpoint seems to have expir
     assert.are.equals(302, status)
   end)
 end)
-]]
 
 describe("when the id_token obtained from the token endpoint doesn't contain an aud claim",
          function()
