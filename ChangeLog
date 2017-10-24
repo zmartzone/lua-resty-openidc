@@ -1,3 +1,8 @@
+10/24/2017
+- rely on lua-resty-jwt validators for id_token and/or JWT access_token validation
+- unify JWT access token and OIDC id_token validation
+- added many more tests
+
 10/11/2017
 - add testbed / unit tests; thanks @bodewig
 
