@@ -98,8 +98,6 @@ describe("when using a RSA key from a JWK that contains the x5c claim", function
   base_checks()
 end)
 
---[[ requires https://github.com/pingidentity/lua-resty-openidc/pull/82 or
-     something equivalent
 describe("when using a RSA key from a JWK that doesn't contain the x5c claim", function()
   test_support.start_server({
     verify_opts = {
@@ -112,7 +110,6 @@ describe("when using a RSA key from a JWK that doesn't contain the x5c claim", f
   teardown(test_support.stop_server)
   base_checks()
 end)
-]]
 
 describe("when the JWK specifies a kid and the JWKS contains multiple keys", function()
   test_support.start_server({
