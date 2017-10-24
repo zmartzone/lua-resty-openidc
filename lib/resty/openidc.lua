@@ -55,6 +55,8 @@ local ipairs  = ipairs
 local pairs   = pairs
 local type    = type
 local ngx     = ngx
+local b64     = ngx.encode_base64
+local unb64   = ngx.decode_base64
 
 local supported_token_auth_methods = {
    client_secret_basic = true,
@@ -535,6 +537,79 @@ local function get_jwk (keys, kid)
   return nil, "key with id " .. kid .. " not found"
 end
 
+-- Base64url decode
+local b64map = { ['-'] = '+', ['_'] = '/' };
+local function unb64url(s)
+    return (unb64(s:gsub("[-_]", b64map) .. "=="));
+end
+
+local wrap = ('.'):rep(64);
+
+local envelope = "-----BEGIN %s-----\n%s\n-----END %s-----\n"
+
+local function der2pem(data, header, typ)  
+    typ = typ:upper() or "CERTIFICATE";
+  if header == nil then    
+    data = b64(data);
+    return string.format(envelope, typ, data:gsub(wrap, '%0\n', (#data-1)/64), typ);
+  else 
+    -- ADDING b64 RSA HEADER WITH OID 
+    data = header .. b64(data)
+    return string.format(envelope, typ,  data:gsub(wrap, '%0\n', (#data-1)/64), typ);
+  end  
+end
+
+
+local function encode_length(length)
+    if length < 0x80 then
+        return string.char(length);
+    elseif length < 0x100 then
+        return string.char(0x81, length);
+    elseif length < 0x10000 then
+        return string.char(0x82, math.floor(length/0x100), length%0x100);
+    end
+    error("Can't encode lengths over 65535");
+end
+
+
+local function encode_sequence(array, of)
+    local encoded_array = array;
+    if of then
+        encoded_array = {};
+        for i = 1, #array do
+            encoded_array[i] = of(array[i]);
+        end
+    end
+    encoded_array = table.concat(encoded_array);
+ 
+    return string.char(0x30) .. encode_length(#encoded_array) .. encoded_array;
+end
+ 
+local function encode_binary_integer(bytes)
+    if bytes:byte(1) > 128 then
+        -- We currenly only use this for unsigned integers,
+        -- however since the high bit is set here, it would look
+        -- like a negative signed int, so prefix with zeroes
+        bytes = "\0" .. bytes;
+     end
+     return "\2" .. encode_length(#bytes) .. bytes;
+end
+
+local function encode_sequence_of_integer(array)
+  return encode_sequence(array,encode_binary_integer);
+end
+
+local function encode_string(str, typ)
+  if str:byte(1) > 128 then str = "\0" .. str; end
+  return string.char(typ) .. encode_length(#str) .. str;
+end
+
+-- BIT STRING 0X03
+-- OCTET STRING 0X04
+local function encode_bit_string(str)
+  return encode_string(str, 0x03);
+end
+
 local function pem_from_jwk (opts, kid)
   local cache_id = opts.discovery.jwks_uri .. '#' .. (kid or '')
   local v = openidc_cache_get("jwks", cache_id)
@@ -555,8 +630,51 @@ local function pem_from_jwk (opts, kid)
   end
   local x5c = jwk.x5c
   -- TODO check x5c length
-  local chunks = split_by_chunk(ngx.encode_base64(openidc_base64_url_decode(x5c[1])), 64)
-  local pem = "-----BEGIN CERTIFICATE-----\n" .. table.concat(chunks, "\n") .. "\n-----END CERTIFICATE-----"
+  local pem=""
+  if x5c ~= nil then    
+    ngx.log(ngx.DEBUG, "Found x5c, getting PEM public key from x5c entry of json public key")
+    local chunks = split_by_chunk(ngx.encode_base64(openidc_base64_url_decode(x5c[1])), 64)
+    pem = "-----BEGIN CERTIFICATE-----\n" .. table.concat(chunks, "\n") .. "\n-----END CERTIFICATE-----"    
+    ngx.log(ngx.DEBUG,"Generated PEM key from x5c:",pem)
+  else
+    ngx.log(ngx.DEBUG , "x5c is nil, getting PEM public key from n and e parameters of json public key")
+
+    --USE FIELD ORDER TO GENERATE PRIVATE KEY. NOT NEEDED FOR PUBLIC KEY 
+    --RFC2313, OBJECT IDENTIFIER : http://www.oid-info.com/get/1.2.840.113549.1.1.1
+   local algorithms = {
+  RSA = {
+    -- CONVERTED ASN.1 DOT NOTATION  1.2.840.113549.1.1.1 TO HEX AND THEN HEX TO ASCII AND ASCII TO DECIMAL TO GET THE BELOW STRING
+    OID = "\006\009\042\134\072\134\247\013\001\001\001";     
+    field_order = { 'n', 'e', 'd', 'p', 'q', 'dp', 'dq', 'qi', };
+    start = { "\0" };
+    parameters = "\5\0";
+  };
+     };
+ 
+  local kty = get_jwk(jwks.keys, kid).kty;
+  local info = assert(algorithms[kty], "Unsupported key type");
+
+  local der_key = {};
+  local e = get_jwk(jwks.keys,kid).e;
+
+  table.insert(der_key, unb64url(get_jwk(jwks.keys,kid).n));
+  table.insert(der_key, unb64url(get_jwk(jwks.keys,kid).e));    
+
+  local encoded_key = encode_sequence_of_integer(der_key);
+  
+  --PEM KEY FROM PUBLIC KEYS, PASSING 64 BIT ENCODED RSA HEADER STRING WHICH IS SAME FOR ALL KEYS
+  local pem_key = der2pem(encoded_key,"MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A","PUBLIC KEY")   
+  ngx.log(ngx.DEBUG,"Generated pem key from n and e:",pem_key)
+  pem = pem_key
+
+  --ADDING RSA HEADER WITH OID, CURRENTLY NOT WORKING
+  --local header = encode_sequence({ info.OID, info.parameters });
+  -- SEQUENCE of above SEQUENCE, BIT STRING
+  --local output = encode_sequence({ header, encode_bit_string(encoded_key) });
+  --FINAL KEY WITH RSA HEADER
+  --local final_key = der2pem(output, "PUBLIC KEY")) 
+  end
+
   openidc_cache_set("jwks", cache_id, pem, 24 * 60 * 60)
   return pem
 end
