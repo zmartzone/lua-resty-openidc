@@ -1,4 +1,5 @@
 10/24/2017
+- verify RSA signatures on JWTs (id_token/access_token); thanks @venkatmarepalli
 - rely on lua-resty-jwt validators for id_token and/or JWT access_token validation
 - unify JWT access token and OIDC id_token validation
 - added many more tests
