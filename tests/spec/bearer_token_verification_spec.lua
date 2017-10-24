@@ -2,6 +2,19 @@ local http = require("socket.http")
 local test_support = require("test_support")
 require 'busted.runner'()
 
+local function none_signature_jwt(payload)
+  local function b64url(s)
+    local dkjson = require "dkjson"
+    local mime = require "mime"
+    return mime.b64(dkjson.encode(s)):gsub('+','-'):gsub('/','_')
+  end
+  local header = b64url({
+      typ = "JWT",
+      alg = "none"
+  })
+  return header .. "." .. b64url(payload) .. "."
+end
+
 local function base_checks()
   local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
   describe("and not sending any Authorization header", function()
@@ -197,3 +210,26 @@ describe("when the access token has expired but slack is big enough", function()
   end)
 end)
 ]]
+
+describe("when using a JWT not signed but using the 'none' alg", function()
+  test_support.start_server({
+    verify_opts = {
+      discovery = {
+        jwks_uri = "http://127.0.0.1/jwk",
+      }
+    },
+    jwk = test_support.load("/spec/jwks_with_two_keys.json"),
+  })
+  teardown(test_support.stop_server)
+  local jwt = none_signature_jwt({
+      exp = os.time() + 3600,
+  })
+  local _, status = http.request({
+      url = "http://127.0.0.1/verify_bearer_token",
+      headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the token is valid", function()
+    assert.are.equals(204, status)
+  end)
+end)
+

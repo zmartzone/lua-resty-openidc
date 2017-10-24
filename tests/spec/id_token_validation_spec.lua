@@ -235,5 +235,3 @@ describe("when the id token signature uses a known symmetric key", function()
     assert.are.equals(302, status)
   end)
 end)
-
--- TODO: add a test for when the id_token uses the "none" algorithm

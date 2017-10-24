@@ -331,8 +331,30 @@ local function openidc_access_token_expires_in(opts, expires_in)
   return (expires_in or opts.access_token_expires_in or 3600) - 1 - (opts.access_token_expires_leeway or 0)
 end
 
+local function openidc_load_jwt_none_alg(enc_hdr, enc_payload)
+  local header = cjson.decode(openidc_base64_url_decode(enc_hdr))
+  local payload = cjson.decode(openidc_base64_url_decode(enc_payload))
+  if header.alg == "none" then
+    ngx.log(ngx.DEBUG, "accept JWT with alg \"none\" and no signature from \"code\" flow")
+    return {
+      raw_header = enc_hdr,
+      raw_payload = enc_payload,
+      header = header_obj,
+      payload = payload,
+      signature = signature
+    }
+  end
+  return nil
+end
+
 -- parse a JWT and verify its signature (if present)
 local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, ...)
+  local enc_hdr, enc_payload, enc_sign = string.match(jwt_string, '^(.+)%.(.+)%.(.*)$')
+  if enc_payload and (not enc_sign or enc_sign == "") then
+    local jwt, err = openidc_load_jwt_none_alg(enc_hdr, enc_payload)
+    if jwt then return jwt end -- otherwise the JWT is invalid and load_jwt produces an error
+  end
+
   local jwt_obj = jwt:load_jwt(jwt_string, nil)
   if not jwt_obj.valid then
     local reason = "invalid jwt"
@@ -340,11 +362,6 @@ local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, ...)
       reason = reason .. ": " .. jwt_obj.reason
     end
     return nil, reason
-  end
-
-  if jwt_obj.header.alg == "none" and (not jwt_obj.signature or jwt_obj.signature == "") then
-    ngx.log(ngx.DEBUG, "accept JWT with alg \"none\" and no signature from \"code\" flow")
-    return jwt_obj, nil
   end
 
   local secret = opts.secret
