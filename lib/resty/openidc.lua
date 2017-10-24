@@ -897,6 +897,7 @@ function openidc.jwt_verify(access_token, opts, ...)
   local err
   local json
 
+  local slack = opts.iat_slack and opts.iat_slack or 120
   -- see if we've previously cached the validation result for this access token
   local v = openidc_cache_get("introspection", access_token)
   if not v then
@@ -928,6 +929,15 @@ function openidc.jwt_verify(access_token, opts, ...)
       end
     end
 
+    if #{...} == 0 then
+      -- an empty list of claim specs makes lua-resty-jwt add default
+      -- validators for the exp and nbf claims if they are
+      -- present. These validators need to know the configured slack
+      -- value
+      local jwt_validators = require "resty.jwt-validators"
+      jwt_validators.set_system_leeway(slack)
+    end
+
     json = jwt:verify(opts.secret, access_token, ...)
 
     ngx.log(ngx.DEBUG, "jwt: ", cjson.encode(json))
@@ -935,7 +945,8 @@ function openidc.jwt_verify(access_token, opts, ...)
     -- cache the results
     if json and json.valid == true and json.verified == true then
       json = json.payload
-      openidc_cache_set("introspection", access_token, cjson.encode(json), json.exp - ngx.time())
+      local ttl = json.exp and json.exp - ngx.time() or 120
+      openidc_cache_set("introspection", access_token, cjson.encode(json), ttl)
     else
       err = "invalid token: ".. json.reason
     end
@@ -945,7 +956,6 @@ function openidc.jwt_verify(access_token, opts, ...)
     json = cjson.decode(v)
   end
 
-  local slack=opts.iat_slack and opts.iat_slack or 120
   -- check the token expiry
   if json then
     if json.exp and json.exp + slack < ngx.time() then

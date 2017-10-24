@@ -192,6 +192,9 @@ local function write_config(out, custom_config)
   for _, k in ipairs(custom_config["remove_id_token_claims"] or {}) do
     id_token[k] = nil
   end
+  for _, k in ipairs(custom_config["remove_access_token_claims"] or {}) do
+    access_token[k] = nil
+  end
   local config = DEFAULT_CONFIG_TEMPLATE
     :gsub("OIDC_CONFIG", serpent.block(oidc_config, {comment = false }))
     :gsub("ID_TOKEN", serpent.block(id_token, {comment = false }))
@@ -213,6 +216,7 @@ end
 -- - jwt_verify_secret the secret to use when verifying the secret
 -- - access_token is a table containing claims for the access token provided by /jwt
 -- - access_token_header is a table containing claims for the header used by /jwt
+-- - remove_access_token_claims is an array of claims to remove from the access_token
 -- - jwk the JWK keystore to provide
 function test_support.start_server(custom_config)
   assert(os.execute("rm -rf /tmp/server"), "failed to remove old server dir")
