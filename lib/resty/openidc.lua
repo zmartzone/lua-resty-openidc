@@ -375,6 +375,16 @@ local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, ...)
       return nil, err
     end
   end
+
+  if #{...} == 0 then
+    -- an empty list of claim specs makes lua-resty-jwt add default
+    -- validators for the exp and nbf claims if they are
+    -- present. These validators need to know the configured slack
+    -- value
+    local jwt_validators = require "resty.jwt-validators"
+    jwt_validators.set_system_leeway(opts.iat_slack and opts.iat_slack or 120)
+  end
+
   jwt_obj = jwt:verify_jwt_obj(secret, jwt_obj, ...)
   if jwt_obj then
     ngx.log(ngx.DEBUG, "jwt: ", cjson.encode(jwt_obj), " ,valid: ", jwt_obj.valid, ", verified: ", jwt_obj.verified)
