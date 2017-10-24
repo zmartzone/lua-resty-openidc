@@ -11,6 +11,7 @@ local DEFAULT_OIDC_CONFIG = {
       token_endpoint = "http://127.0.0.1/token",
       token_endpoint_auth_methods_supported = { "client_secret_post" },
       issuer = "http://127.0.0.1/",
+      jwks_uri = "http://127.0.0.1/jwk",
    },
    client_id = "client_id",
    client_secret = "client_secret",
@@ -30,7 +31,7 @@ local DEFAULT_ACCESS_TOKEN = {
   exp = os.time() + 3600,
 }
 
-local DEFAULT_ACCESS_TOKEN_HEADER = {
+local DEFAULT_TOKEN_HEADER = {
   typ = "JWT",
   alg = "RS256",
 }
@@ -68,6 +69,8 @@ http {
     lua_shared_dict discovery 1m;
     init_by_lua_block {
         oidc = require "resty.openidc"
+        secret = [=[
+JWT_VERIFY_SECRET]=]
     }
 
     resolver      8.8.8.8;
@@ -83,11 +86,9 @@ http {
         location /jwt {
             content_by_lua_block {
                 local jwt_content = {
-                  header = ACCESS_TOKEN_HEADER,
+                  header = TOKEN_HEADER,
                   payload = ACCESS_TOKEN
                 }
-                local secret = [=[
-JWT_VERIFY_SECRET]=]
                 local jwt = require "resty.jwt"
                 local jwt_token = jwt:sign(secret, jwt_content)
                 ngx.header.content_type = 'text/plain'
@@ -133,11 +134,11 @@ JWT_VERIFY_SECRET]=]
                 id_token.nonce = nonce_file:read("*all")
                 assert(nonce_file:close())
                 local jwt_content = {
-                  header = { typ = "JWT", alg = "HS256"},
+                  header = TOKEN_HEADER,
                   payload = id_token
                 }
                 local jwt = require "resty.jwt"
-                local jwt_token = jwt:sign("lua-resty-jwt", jwt_content)
+                local jwt_token = jwt:sign(secret, jwt_content)
                 ngx.say([=[{
   "access_token":"a_token",
   "expires_in":3600,
@@ -187,8 +188,7 @@ local function write_config(out, custom_config)
   local id_token = merge(merge({}, DEFAULT_ID_TOKEN), custom_config["id_token"] or {})
   local verify_opts = merge(merge({}, DEFAULT_VERIFY_OPTS), custom_config["verify_opts"] or {})
   local access_token = merge(merge({}, DEFAULT_ACCESS_TOKEN), custom_config["access_token"] or {})
-  local access_token_header = merge(merge({}, DEFAULT_ACCESS_TOKEN_HEADER),
-                                    custom_config["access_token_header"] or {})
+  local token_header = merge(merge({}, DEFAULT_TOKEN_HEADER), custom_config["token_header"] or {})
   for _, k in ipairs(custom_config["remove_id_token_claims"] or {}) do
     id_token[k] = nil
   end
@@ -198,7 +198,7 @@ local function write_config(out, custom_config)
   local config = DEFAULT_CONFIG_TEMPLATE
     :gsub("OIDC_CONFIG", serpent.block(oidc_config, {comment = false }))
     :gsub("ID_TOKEN", serpent.block(id_token, {comment = false }))
-    :gsub("ACCESS_TOKEN_HEADER", serpent.block(access_token_header, {comment = false }))
+    :gsub("TOKEN_HEADER", serpent.block(token_header, {comment = false }))
     :gsub("ACCESS_TOKEN", serpent.block(access_token, {comment = false }))
     :gsub("JWT_VERIFY_SECRET", custom_config["jwt_verify_secret"] or DEFAULT_JWT_VERIFY_SECRET)
     :gsub("VERIFY_OPTS", serpent.block(verify_opts, {comment = false }))
@@ -215,7 +215,8 @@ end
 -- - jwt_signature_alg algorithm to use for signing JWTs
 -- - jwt_verify_secret the secret to use when verifying the secret
 -- - access_token is a table containing claims for the access token provided by /jwt
--- - access_token_header is a table containing claims for the header used by /jwt
+-- - token_header is a table containing claims for the header used by /jwt
+--   as well as the id token
 -- - remove_access_token_claims is an array of claims to remove from the access_token
 -- - jwk the JWK keystore to provide
 function test_support.start_server(custom_config)

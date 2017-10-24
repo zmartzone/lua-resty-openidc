@@ -11,6 +11,7 @@ RUN ["apt-get", "install", "-y", "git"]
 RUN ["luarocks", "install", "busted"]
 RUN ["luarocks", "install", "LuaSocket"]
 RUN ["luarocks", "install", "serpent"]
+RUN ["luarocks", "install", "dkjson"]
 
 ADD lib/resty/openidc.lua /usr/local/openresty/lualib/resty/openidc.lua
 

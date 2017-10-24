@@ -50,11 +50,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 local require = require
 local cjson   = require "cjson"
 local http    = require "resty.http"
+local jwt     = require "resty.jwt"
 local string  = string
 local ipairs  = ipairs
 local pairs   = pairs
 local type    = type
 local ngx     = ngx
+local b64     = ngx.encode_base64
+local unb64   = ngx.decode_base64
 
 local supported_token_auth_methods = {
    client_secret_basic = true,
@@ -181,12 +184,12 @@ local function openidc_base64_url_decode(input)
     input = input .. string.rep('=', padlen)
   end
   input = input:gsub('-','+'):gsub('_','/')
-  return ngx.decode_base64(input)
+  return unb64(input)
 end
 
 -- perform base64url encoding
 local function openidc_base64_url_encode(input)
-  input = ngx.encode_base64(input)
+  input = b64(input)
   return input:gsub('+','-'):gsub('/','_'):gsub('=','')
 end
 
@@ -264,7 +267,7 @@ local function openidc_call_token_endpoint(opts, endpoint, body, auth)
 
   if auth then
     if auth == "client_secret_basic" then
-      headers.Authorization = "Basic "..ngx.encode_base64( opts.client_id..":"..opts.client_secret)
+      headers.Authorization = "Basic "..b64( opts.client_id..":"..opts.client_secret)
       ngx.log(ngx.DEBUG,"client_secret_basic: authorization header '"..headers.Authorization.."'")
     end
     if auth == "client_secret_post" then
@@ -328,6 +331,64 @@ local function openidc_access_token_expires_in(opts, expires_in)
   return (expires_in or opts.access_token_expires_in or 3600) - 1 - (opts.access_token_expires_leeway or 0)
 end
 
+local function openidc_load_jwt_none_alg(enc_hdr, enc_payload)
+  local header = cjson.decode(openidc_base64_url_decode(enc_hdr))
+  local payload = cjson.decode(openidc_base64_url_decode(enc_payload))
+  if header.alg == "none" then
+    ngx.log(ngx.DEBUG, "accept JWT with alg \"none\" and no signature from \"code\" flow")
+    return {
+      raw_header = enc_hdr,
+      raw_payload = enc_payload,
+      header = header_obj,
+      payload = payload,
+      signature = signature
+    }
+  end
+  return nil
+end
+
+-- parse a JWT and verify its signature (if present)
+local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, ...)
+  local enc_hdr, enc_payload, enc_sign = string.match(jwt_string, '^(.+)%.(.+)%.(.*)$')
+  if enc_payload and (not enc_sign or enc_sign == "") then
+    local jwt, err = openidc_load_jwt_none_alg(enc_hdr, enc_payload)
+    if jwt then return jwt end -- otherwise the JWT is invalid and load_jwt produces an error
+  end
+
+  local jwt_obj = jwt:load_jwt(jwt_string, nil)
+  if not jwt_obj.valid then
+    local reason = "invalid jwt"
+    if jwt_obj.reason then
+      reason = reason .. ": " .. jwt_obj.reason
+    end
+    return nil, reason
+  end
+
+  local secret = opts.secret
+  if not secret and opts.discovery then
+    ngx.log(ngx.DEBUG, "using discovery to find key")
+    local err
+    secret, err = openidc_pem_from_jwk(opts, jwt_obj.header.kid)
+
+    if secret == nil then
+      ngx.log(ngx.ERR, err)
+      return nil, err
+    end
+  end
+  jwt_obj = jwt:verify_jwt_obj(secret, jwt_obj, ...)
+  if jwt_obj then
+    ngx.log(ngx.DEBUG, "jwt: ", cjson.encode(jwt_obj), " ,valid: ", jwt_obj.valid, ", verified: ", jwt_obj.verified)
+  end
+  if not jwt_obj.verified then
+    local reason = "jwt signature verification failed"
+    if jwt_obj.reason then
+      reason = reason .. ": " .. jwt_obj.reason
+    end
+    return nil, reason
+  end
+  return jwt_obj
+end
+
 -- handle a "code" authorization response from the OP
 local function openidc_authorization_response(opts, session)
   local args = ngx.req.get_uri_args()
@@ -375,10 +436,14 @@ local function openidc_authorization_response(opts, session)
     return nil, err, session.data.original_url, session
   end
 
-  -- process the token endpoint response with the id_token and access_token
-  local enc_hdr, enc_pay, enc_sign = string.match(json.id_token, '^(.+)%.(.+)%.(.*)$')
-  local jwt = openidc_base64_url_decode(enc_pay)
-  local id_token = cjson.decode(jwt)
+  local jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, json.id_token)
+  if err then
+    return nil, err, session.data.original_url, session
+  end
+  local id_token = jwt_obj.payload
+
+  ngx.log(ngx.DEBUG, "id_token header: ", cjson.encode(jwt_obj.header))
+  ngx.log(ngx.DEBUG, "id_token payload: ", cjson.encode(jwt_obj.payload))
 
   -- validate the id_token contents
   if openidc_validate_id_token(opts, id_token, session.data.nonce) == false then
@@ -386,9 +451,6 @@ local function openidc_authorization_response(opts, session)
     ngx.log(ngx.ERR, err)
     return nil, err, session.data.original_url, session
   end
-
-  ngx.log(ngx.DEBUG, "id_token header: ", openidc_base64_url_decode(enc_hdr))
-  ngx.log(ngx.DEBUG, "id_token payload: ", jwt)
 
   session:start()
   -- mark this sessions as authenticated
@@ -535,7 +597,80 @@ local function get_jwk (keys, kid)
   return nil, "key with id " .. kid .. " not found"
 end
 
-local function pem_from_jwk (opts, kid)
+local wrap = ('.'):rep(64);
+
+local envelope = "-----BEGIN %s-----\n%s\n-----END %s-----\n"
+
+local function der2pem(data, header, typ)  
+    typ = typ:upper() or "CERTIFICATE";
+  if header == nil then    
+    data = b64(data);
+    return string.format(envelope, typ, data:gsub(wrap, '%0\n', (#data-1)/64), typ);
+  else 
+    -- ADDING b64 RSA HEADER WITH OID 
+    data = header .. b64(data)
+    return string.format(envelope, typ,  data:gsub(wrap, '%0\n', (#data-1)/64), typ);
+  end  
+end
+
+
+local function encode_length(length)
+    if length < 0x80 then
+        return string.char(length);
+    elseif length < 0x100 then
+        return string.char(0x81, length);
+    elseif length < 0x10000 then
+        return string.char(0x82, math.floor(length/0x100), length%0x100);
+    end
+    error("Can't encode lengths over 65535");
+end
+
+
+local function encode_sequence(array, of)
+    local encoded_array = array;
+    if of then
+        encoded_array = {};
+        for i = 1, #array do
+            encoded_array[i] = of(array[i]);
+        end
+    end
+    encoded_array = table.concat(encoded_array);
+ 
+    return string.char(0x30) .. encode_length(#encoded_array) .. encoded_array;
+end
+ 
+local function encode_binary_integer(bytes)
+    if bytes:byte(1) > 128 then
+        -- We currenly only use this for unsigned integers,
+        -- however since the high bit is set here, it would look
+        -- like a negative signed int, so prefix with zeroes
+        bytes = "\0" .. bytes;
+     end
+     return "\2" .. encode_length(#bytes) .. bytes;
+end
+
+local function encode_sequence_of_integer(array)
+  return encode_sequence(array,encode_binary_integer);
+end
+
+local function encode_string(str, typ)
+  if str:byte(1) > 128 then str = "\0" .. str; end
+  return string.char(typ) .. encode_length(#str) .. str;
+end
+
+-- BIT STRING 0X03
+-- OCTET STRING 0X04
+local function encode_bit_string(str)
+  return encode_string(str, 0x03);
+end
+
+function openidc_pem_from_jwk (opts, kid)
+  if type(opts.discovery) == "string" then
+    opts.discovery, err = openidc_discover(opts.discovery, opts.ssl_verify)
+    if err then
+      return nil, err
+    end
+  end
   local cache_id = opts.discovery.jwks_uri .. '#' .. (kid or '')
   local v = openidc_cache_get("jwks", cache_id)
 
@@ -554,9 +689,54 @@ local function pem_from_jwk (opts, kid)
     return nil, err
   end
   local x5c = jwk.x5c
-  -- TODO check x5c length
-  local chunks = split_by_chunk(ngx.encode_base64(openidc_base64_url_decode(x5c[1])), 64)
-  local pem = "-----BEGIN CERTIFICATE-----\n" .. table.concat(chunks, "\n") .. "\n-----END CERTIFICATE-----"
+  
+  -- TODO check x5c length  
+  local pem=""
+  if x5c ~= nil then    
+    ngx.log(ngx.DEBUG, "Found x5c, getting PEM public key from x5c entry of json public key")
+    local chunks = split_by_chunk(b64(openidc_base64_url_decode(x5c[1])), 64)
+    pem = "-----BEGIN CERTIFICATE-----\n" .. table.concat(chunks, "\n") .. "\n-----END CERTIFICATE-----"    
+    ngx.log(ngx.DEBUG,"Generated PEM key from x5c:",pem)
+  else
+    ngx.log(ngx.DEBUG , "x5c is nil, getting PEM public key from n and e parameters of json public key")
+
+    --USE FIELD ORDER TO GENERATE PRIVATE KEY. NOT NEEDED FOR PUBLIC KEY 
+    --RFC2313, OBJECT IDENTIFIER : http://www.oid-info.com/get/1.2.840.113549.1.1.1
+    local algorithms = {
+      RSA = {
+        -- CONVERTED ASN.1 DOT NOTATION  1.2.840.113549.1.1.1 TO HEX AND THEN HEX TO ASCII AND ASCII TO DECIMAL TO GET THE BELOW STRING
+        OID = "\006\009\042\134\072\134\247\013\001\001\001";     
+        field_order = { 'n', 'e', 'd', 'p', 'q', 'dp', 'dq', 'qi', };
+        start = { "\0" };
+        parameters = "\5\0";
+      };
+    };
+ 
+    local kty = get_jwk(jwks.keys, kid).kty;
+    local info = assert(algorithms[kty], "Unsupported key type");
+
+    local der_key = {};
+    local e = get_jwk(jwks.keys,kid).e;
+    local n = get_jwk(jwks.keys,kid).n
+
+    table.insert(der_key, openidc_base64_url_decode(n));
+    table.insert(der_key, openidc_base64_url_decode(e));    
+
+    local encoded_key = encode_sequence_of_integer(der_key);
+  
+    --PEM KEY FROM PUBLIC KEYS, PASSING 64 BIT ENCODED RSA HEADER STRING WHICH IS SAME FOR ALL KEYS
+    local pem_key = der2pem(encoded_key,"MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A","PUBLIC KEY")   
+    ngx.log(ngx.DEBUG,"Generated pem key from n and e:",pem_key)
+    pem = pem_key
+
+    --ADDING RSA HEADER WITH OID, CURRENTLY NOT WORKING
+    --local header = encode_sequence({ info.OID, info.parameters });
+    -- SEQUENCE of above SEQUENCE, BIT STRING
+    --local output = encode_sequence({ header, encode_bit_string(encoded_key) });
+    --FINAL KEY WITH RSA HEADER
+    --local final_key = der2pem(output, "PUBLIC KEY")) 
+  end
+  
   openidc_cache_set("jwks", cache_id, pem, 24 * 60 * 60)
   return pem
 end
@@ -901,54 +1081,14 @@ function openidc.jwt_verify(access_token, opts, ...)
   -- see if we've previously cached the validation result for this access token
   local v = openidc_cache_get("introspection", access_token)
   if not v then
+    local jwt_obj
+    jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, access_token, ...)
+    if not err then
+      json = jwt_obj.payload
+      ngx.log(ngx.DEBUG, "jwt: ", cjson.encode(json))
 
-    -- do the verification first time
-    local jwt = require "resty.jwt"
-
-    -- No secret given try getting it from the jwks endpoint
-    if not opts.secret and opts.discovery then
-      ngx.log(ngx.DEBUG, "bearer_jwt_verify using discovery.")
-      if type(opts.discovery) == "string" then
-        opts.discovery, err = openidc_discover(opts.discovery, opts.ssl_verify)
-        if err then
-          return nil, err
-        end
-      end
-
-      -- We decode the token twice, could be saved
-      local jwt_obj = jwt:load_jwt(access_token, nil)
-
-      if not jwt_obj.valid then
-        return nil, "invalid jwt"
-      end
-
-      opts.secret, err = pem_from_jwk(opts, jwt_obj.header.kid)
-
-      if opts.secret == nil then
-        return nil, err
-      end
-    end
-
-    if #{...} == 0 then
-      -- an empty list of claim specs makes lua-resty-jwt add default
-      -- validators for the exp and nbf claims if they are
-      -- present. These validators need to know the configured slack
-      -- value
-      local jwt_validators = require "resty.jwt-validators"
-      jwt_validators.set_system_leeway(slack)
-    end
-
-    json = jwt:verify(opts.secret, access_token, ...)
-
-    ngx.log(ngx.DEBUG, "jwt: ", cjson.encode(json))
-
-    -- cache the results
-    if json and json.valid == true and json.verified == true then
-      json = json.payload
       local ttl = json.exp and json.exp - ngx.time() or 120
       openidc_cache_set("introspection", access_token, cjson.encode(json), ttl)
-    else
-      err = "invalid token: ".. json.reason
     end
 
   else

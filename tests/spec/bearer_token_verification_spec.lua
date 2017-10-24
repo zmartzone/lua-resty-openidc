@@ -2,6 +2,19 @@ local http = require("socket.http")
 local test_support = require("test_support")
 require 'busted.runner'()
 
+local function none_signature_jwt(payload)
+  local function b64url(s)
+    local dkjson = require "dkjson"
+    local mime = require "mime"
+    return mime.b64(dkjson.encode(s)):gsub('+','-'):gsub('/','_')
+  end
+  local header = b64url({
+      typ = "JWT",
+      alg = "none"
+  })
+  return header .. "." .. b64url(payload) .. "."
+end
+
 local function base_checks()
   local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
   describe("and not sending any Authorization header", function()
@@ -78,7 +91,7 @@ describe("when using a statically configured symmetric key for HMAC", function()
       secret = "secret"
     },
     jwt_verify_secret = "secret",
-    access_token_header = {
+    token_header = {
       alg = "HS256",
     }
   })
@@ -98,8 +111,6 @@ describe("when using a RSA key from a JWK that contains the x5c claim", function
   base_checks()
 end)
 
---[[ requires https://github.com/pingidentity/lua-resty-openidc/pull/82 or
-     something equivalent
 describe("when using a RSA key from a JWK that doesn't contain the x5c claim", function()
   test_support.start_server({
     verify_opts = {
@@ -112,7 +123,6 @@ describe("when using a RSA key from a JWK that doesn't contain the x5c claim", f
   teardown(test_support.stop_server)
   base_checks()
 end)
-]]
 
 describe("when the JWK specifies a kid and the JWKS contains multiple keys", function()
   test_support.start_server({
@@ -122,7 +132,7 @@ describe("when the JWK specifies a kid and the JWKS contains multiple keys", fun
       }
     },
     jwk = test_support.load("/spec/jwks_with_two_keys.json"),
-    access_token_header = {
+    token_header = {
       kid = "abcd",
     }
   })
@@ -211,6 +221,28 @@ describe("when the access token doesn't contain the exp claim at all", function(
   local _, status = http.request({
     url = "http://127.0.0.1/verify_bearer_token",
     headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the token is valid", function()
+    assert.are.equals(204, status)
+  end)
+end)
+
+describe("when using a JWT not signed but using the 'none' alg", function()
+  test_support.start_server({
+    verify_opts = {
+      discovery = {
+        jwks_uri = "http://127.0.0.1/jwk",
+      }
+    },
+    jwk = test_support.load("/spec/jwks_with_two_keys.json"),
+  })
+  teardown(test_support.stop_server)
+  local jwt = none_signature_jwt({
+      exp = os.time() + 3600,
+  })
+  local _, status = http.request({
+      url = "http://127.0.0.1/verify_bearer_token",
+      headers = { authorization = "Bearer " .. jwt }
   })
   it("the token is valid", function()
     assert.are.equals(204, status)
