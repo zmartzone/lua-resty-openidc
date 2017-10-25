@@ -550,14 +550,18 @@ local function openidc_discover(url, ssl_verify)
   return json, err
 end
 
-local function openidc_jwks(url, ssl_verify)
-  ngx.log(ngx.DEBUG, "openidc_jwks: URL is: "..url)
+local function openidc_jwks(url, force, ssl_verify)
+  ngx.log(ngx.DEBUG, "openidc_jwks: URL is: "..url.. " (force=" .. force .. ")")
 
-  local json, err
-  local v = openidc_cache_get("jwks", url)
+  local json, err, v
+  
+  if force == 0 then
+    v = openidc_cache_get("jwks", url)
+  end
+
   if not v then
 
-    ngx.log(ngx.DEBUG, "JWKS data not in cache. Making call to jwks endpoint")
+    ngx.log(ngx.DEBUG, "cannot use cached JWKS data; making call to jwks endpoint")
     -- make the call to the jwks endpoint
     local httpc = http.new()
     local res, error = httpc:request_uri(url, {
@@ -696,16 +700,25 @@ function openidc_pem_from_jwk (opts, kid)
     return v
   end
 
-  local jwks, err = openidc_jwks(opts.discovery.jwks_uri, opts.ssl_verify)
+  local jwk, jwks, err
+
+  for force=0, 1 do
+    jwks, err = openidc_jwks(opts.discovery.jwks_uri, force, opts.ssl_verify)
+    if err then
+      return nil, err
+    end
+  
+    jwk, err = get_jwk(jwks.keys, kid)
+    
+    if jwk and not err then
+      break
+    end
+  end
+
   if err then
     return nil, err
   end
 
-  local jwk
-  jwk, err = get_jwk(jwks.keys, kid)
-  if err then
-    return nil, err
-  end
   local x5c = jwk.x5c
   
   -- TODO check x5c length  
