@@ -68,7 +68,9 @@ http {
     lua_package_path '~/lua/?.lua;;';
     lua_shared_dict discovery 1m;
     init_by_lua_block {
-        require("luacov.runner")("/spec/luacov/settings.luacov")
+        if os.getenv('coverage') then
+          require("luacov.runner")("/spec/luacov/settings.luacov")
+        end
         oidc = require "resty.openidc"
         secret = [=[
 JWT_VERIFY_SECRET]=]

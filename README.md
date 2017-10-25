@@ -318,6 +318,16 @@ $ docker build -f tests/Dockerfile . -t lua-resty-openidc/test
 $ docker run -it --rm lua-resty-openidc/test:latest
 ```
 
+if you want to create
+[luacov](https://keplerproject.github.io/luacov/) coverage while
+testing use
+
+```shell
+$ docker run -it --rm -e coverage=t lua-resty-openidc/test:latest
+```
+
+as the second command
+
 ## Support
 
 See the Wiki pages with Frequently Asked Questions at:  
