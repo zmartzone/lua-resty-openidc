@@ -75,6 +75,8 @@ http {
 
   # cache for discovery metadata documents
   lua_shared_dict discovery 1m;
+  # cache for JWKs
+  lua_shared_dict jwks 1m;
 
   # NB: if you have "lua_code_cache off;", use:
   # set $session_secret xxxxxxxxxxxxxxxxxxx;
