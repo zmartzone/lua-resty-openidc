@@ -159,7 +159,7 @@ describe("when the JWK specifies no kid and the JWKS contains multiple keys", fu
     assert.are.equals(401, status)
   end)
   it("an error is logged", function()
-    assert.error_log_contains("JWT doesn't specify kid but the keystore contains multiple keys")
+    assert.error_log_contains("JWT doesn't specify kid but the keystore contains multiple RSA keys")
   end)
 end)
 
