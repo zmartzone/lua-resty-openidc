@@ -112,7 +112,7 @@ local function openidc_validate_id_token(opts, id_token, nonce)
     ngx.log(ngx.ERR, "no \"sub\" claim found in id_token")
     return false
   end
-  
+
   -- check nonce
   if nonce and nonce ~= id_token.nonce then
     ngx.log(ngx.ERR, "nonce \"", id_token.nonce, "\" in id_token is not equal to the nonce that was sent in the request \"", nonce, "\"")
@@ -206,11 +206,11 @@ local function openidc_authorize(opts, session, target_url)
   }
 
   if opts.prompt then
-    params.prompt = opts.prompt  
+    params.prompt = opts.prompt
   end
 
   if opts.display then
-    params.display = opts.display  
+    params.display = opts.display
   end
 
   -- merge any provided extra parameters
@@ -287,7 +287,7 @@ local function openidc_call_token_endpoint(opts, endpoint, body, auth)
 
   ngx.log(ngx.DEBUG, "token endpoint response: ", res.body)
 
-  return openidc_parse_json_response(res);
+  return openidc_parse_json_response(res)
 end
 
 -- make a call to the userinfo endpoint
@@ -300,7 +300,7 @@ local function openidc_call_userinfo_endpoint(opts, access_token)
   local headers = {
       ["Authorization"] = "Bearer "..access_token,
   }
-      
+
   ngx.log(ngx.DEBUG,"authorization header '"..headers.Authorization.."'")
 
   local httpc = http.new()
@@ -394,7 +394,7 @@ local function openidc_jwks(url, force, ssl_verify)
   ngx.log(ngx.DEBUG, "openidc_jwks: URL is: "..url.. " (force=" .. force .. ")")
 
   local json, err, v
-  
+
   if force == 0 then
     v = openidc_cache_get("jwks", url)
   end
@@ -438,7 +438,7 @@ local function get_jwk (keys, kid)
   rsa_keys = {}
   for _, value in pairs(keys) do
     if value.kty == "RSA" and (not value.use or value.use == "sig") then
-      table.insert(rsa_keys, value)      
+      table.insert(rsa_keys, value)
     end
   end
 
@@ -459,60 +459,60 @@ local function get_jwk (keys, kid)
   return nil, "RSA key with id " .. kid .. " not found"
 end
 
-local wrap = ('.'):rep(64);
+local wrap = ('.'):rep(64)
 
 local envelope = "-----BEGIN %s-----\n%s\n-----END %s-----\n"
 
-local function der2pem(data, header, typ)  
-    typ = typ:upper() or "CERTIFICATE";
-  if header == nil then    
-    data = b64(data);
-    return string.format(envelope, typ, data:gsub(wrap, '%0\n', (#data-1)/64), typ);
-  else 
-    -- ADDING b64 RSA HEADER WITH OID 
+local function der2pem(data, header, typ)
+  typ = typ:upper() or "CERTIFICATE"
+  if header == nil then
+    data = b64(data)
+    return string.format(envelope, typ, data:gsub(wrap, '%0\n', (#data-1)/64), typ)
+  else
+    -- ADDING b64 RSA HEADER WITH OID
     data = header .. b64(data)
-    return string.format(envelope, typ,  data:gsub(wrap, '%0\n', (#data-1)/64), typ);
-  end  
+    return string.format(envelope, typ,  data:gsub(wrap, '%0\n', (#data-1)/64), typ)
+  end
 end
 
 
 local function encode_length(length)
     if length < 0x80 then
-        return string.char(length);
+        return string.char(length)
     elseif length < 0x100 then
-        return string.char(0x81, length);
+        return string.char(0x81, length)
     elseif length < 0x10000 then
-        return string.char(0x82, math.floor(length/0x100), length%0x100);
+        return string.char(0x82, math.floor(length/0x100), length%0x100)
     end
-    error("Can't encode lengths over 65535");
+    error("Can't encode lengths over 65535")
 end
 
 
 local function encode_sequence(array, of)
-    local encoded_array = array;
+    local encoded_array = array
     if of then
-        encoded_array = {};
+        encoded_array = {}
         for i = 1, #array do
-            encoded_array[i] = of(array[i]);
+            encoded_array[i] = of(array[i])
         end
     end
-    encoded_array = table.concat(encoded_array);
- 
-    return string.char(0x30) .. encode_length(#encoded_array) .. encoded_array;
+    encoded_array = table.concat(encoded_array)
+
+    return string.char(0x30) .. encode_length(#encoded_array) .. encoded_array
 end
- 
+
 local function encode_binary_integer(bytes)
     if bytes:byte(1) > 128 then
         -- We currenly only use this for unsigned integers,
         -- however since the high bit is set here, it would look
         -- like a negative signed int, so prefix with zeroes
-        bytes = "\0" .. bytes;
+        bytes = "\0" .. bytes
      end
-     return "\2" .. encode_length(#bytes) .. bytes;
+     return "\2" .. encode_length(#bytes) .. bytes
 end
 
 local function encode_sequence_of_integer(array)
-  return encode_sequence(array,encode_binary_integer);
+  return encode_sequence(array,encode_binary_integer)
 end
 
 local function openidc_pem_from_x5c(x5c)
@@ -532,7 +532,7 @@ local function openidc_pem_from_rsa_n_and_e(n, e)
   local der_key = {
     openidc_base64_url_decode(n), openidc_base64_url_decode(e)
   }
-  local encoded_key = encode_sequence_of_integer(der_key);
+  local encoded_key = encode_sequence_of_integer(der_key)
 
   --PEM KEY FROM PUBLIC KEYS, PASSING 64 BIT ENCODED RSA HEADER STRING WHICH IS SAME FOR ALL KEYS
   local pem = der2pem(encoded_key,"MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A","PUBLIC KEY")
@@ -559,9 +559,9 @@ local function openidc_pem_from_jwk(opts, kid)
     if err then
       return nil, err
     end
-  
+
     jwk, err = get_jwk(jwks.keys, kid)
-    
+
     if jwk and not err then
       break
     end
@@ -1045,12 +1045,12 @@ function openidc.introspect(opts)
 
     -- call the introspection endpoint
     json, err = openidc_call_token_endpoint(opts, opts.introspection_endpoint, body, nil)
-    
+
     -- cache the results
     if json then
       local expiry_claim = opts.introspection_expiry_claim or "exp"
       if json.active or json[expiry_claim] then
-        local ttl = json[expiry_claim]        
+        local ttl = json[expiry_claim]
         if expiry_claim == "exp" then --https://tools.ietf.org/html/rfc7662#section-2.2
           ttl = ttl - ngx.time()
         end
