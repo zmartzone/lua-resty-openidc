@@ -435,7 +435,7 @@ end
 
 local function get_jwk (keys, kid)
 
-  rsa_keys = {}
+  local rsa_keys = {}
   for _, value in pairs(keys) do
     if value.kty == "RSA" and (not value.use or value.use == "sig") then
       table.insert(rsa_keys, value)
@@ -679,12 +679,14 @@ local function openidc_authorization_response(opts, session)
 
   local current_time = ngx.time()
   -- make the call to the token endpoint
-  local json, err = openidc_call_token_endpoint(opts, opts.discovery.token_endpoint, body, opts.token_endpoint_auth_method)
+  local json
+  json, err = openidc_call_token_endpoint(opts, opts.discovery.token_endpoint, body, opts.token_endpoint_auth_method)
   if err then
     return nil, err, session.data.original_url, session
   end
 
-  local jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, json.id_token)
+  local jwt_obj
+  jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, json.id_token)
   if err then
     return nil, err, session.data.original_url, session
   end
@@ -713,8 +715,9 @@ local function openidc_authorization_response(opts, session)
   if store_in_session(opts, 'user') then
     -- call the user info endpoint
     -- TODO: should this error be checked?
-    local user, err = openidc_call_userinfo_endpoint(opts, json.access_token)
-    
+    local user
+    user, err = openidc_call_userinfo_endpoint(opts, json.access_token)
+
     if user then
       if id_token.sub ~= user.sub then
         err = "\"sub\" claim in id_token (\"" .. (id_token.sub or "null") .. "\") is not equal to the \"sub\" claim returned from the userinfo endpoint (\"" .. (user.sub or "null") .. "\")"
@@ -865,7 +868,8 @@ local function openidc_access_token(opts, session)
     scope=opts.scope and opts.scope or "openid email profile"
   }
 
-  local json, err = openidc_call_token_endpoint(opts, opts.discovery.token_endpoint, body, opts.token_endpoint_auth_method)
+  local json
+  json, err = openidc_call_token_endpoint(opts, opts.discovery.token_endpoint, body, opts.token_endpoint_auth_method)
   if err then
     return nil, err
   end
@@ -892,7 +896,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
 
   local session = require("resty.session").open(session_opts)
 
-  local target_url = target_url or ngx.var.request_uri
+  target_url = target_url or ngx.var.request_uri
 
   local access_token
 
@@ -1040,7 +1044,7 @@ function openidc.introspect(opts)
 
     -- merge any provided extra parameters
     if opts.introspection_params then
-      for k,v in pairs(opts.introspection_params) do body[k] = v end
+      for key,val in pairs(opts.introspection_params) do body[key] = val end
     end
 
     -- call the introspection endpoint
