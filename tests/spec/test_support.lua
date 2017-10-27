@@ -12,6 +12,7 @@ local DEFAULT_OIDC_CONFIG = {
       token_endpoint_auth_methods_supported = { "client_secret_post" },
       issuer = "http://127.0.0.1/",
       jwks_uri = "http://127.0.0.1/jwk",
+      userinfo_endpoint = "http://127.0.0.1/user-info",
    },
    client_id = "client_id",
    client_secret = "client_secret",
@@ -176,6 +177,15 @@ JWT_VERIFY_SECRET]=]
 }]=])
             }
         }
+
+        location /user-info {
+            content_by_lua_block {
+                local auth = ngx.req.get_headers()["Authorization"]
+                ngx.log(ngx.ERR, "userinfo authorization header: " .. (auth and auth or ""))
+                ngx.header.content_type = 'application/json;charset=UTF-8'
+                ngx.say((require "cjson").encode(USERINFO))
+            }
+        }
     }
 }
 ]]
@@ -204,11 +214,15 @@ local function write_config(out, custom_config)
   local verify_opts = merge(merge({}, DEFAULT_VERIFY_OPTS), custom_config["verify_opts"] or {})
   local access_token = merge(merge({}, DEFAULT_ACCESS_TOKEN), custom_config["access_token"] or {})
   local token_header = merge(merge({}, DEFAULT_TOKEN_HEADER), custom_config["token_header"] or {})
+  local userinfo = merge(merge({}, DEFAULT_ID_TOKEN), custom_config["userinfo"] or {})
   for _, k in ipairs(custom_config["remove_id_token_claims"] or {}) do
     id_token[k] = nil
   end
   for _, k in ipairs(custom_config["remove_access_token_claims"] or {}) do
     access_token[k] = nil
+  end
+  for _, k in ipairs(custom_config["remove_userinfo_claims"] or {}) do
+    userinfo[k] = nil
   end
   local config = DEFAULT_CONFIG_TEMPLATE
     :gsub("OIDC_CONFIG", serpent.block(oidc_config, {comment = false }))
@@ -218,6 +232,7 @@ local function write_config(out, custom_config)
     :gsub("JWT_VERIFY_SECRET", custom_config["jwt_verify_secret"] or DEFAULT_JWT_VERIFY_SECRET)
     :gsub("VERIFY_OPTS", serpent.block(verify_opts, {comment = false }))
     :gsub("JWK", custom_config["jwk"] or DEFAULT_JWK)
+    :gsub("USERINFO", serpent.block(userinfo, {comment = false }))
   out:write(config)
 end
 
@@ -234,6 +249,8 @@ end
 --   as well as the id token
 -- - remove_access_token_claims is an array of claims to remove from the access_token
 -- - jwk the JWK keystore to provide
+-- - userinfo is a table containing claims returned by the userinfo endpoint
+-- - remove_userinfo_claims is an array of claims to remove from the userinfo response
 function test_support.start_server(custom_config)
   assert(os.execute("rm -rf /tmp/server"), "failed to remove old server dir")
   assert(os.execute("mkdir -p /tmp/server/conf"), "failed to create server dir")
