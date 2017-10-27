@@ -200,6 +200,9 @@ local function merge(t1, t2)
   for k, v in pairs(t2) do
     if (type(v) == "table") and (type(t1[k] or false) == "table") then
       merge(t1[k], t2[k])
+    elseif type(v) == "table" then
+      t1[k] = {}
+      merge(t1[k], v)
     else
       t1[k] = v
     end
