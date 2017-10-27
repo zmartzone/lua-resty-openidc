@@ -164,6 +164,18 @@ JWT_VERIFY_SECRET]=]
             }
         }
 
+        location /discovery {
+            content_by_lua_block {
+                ngx.header.content_type = 'application/json;charset=UTF-8'
+                ngx.say([=[{
+  "authorization_endpoint": "http://127.0.0.1/authorize",
+  "token_endpoint": "http://127.0.0.1/token",
+  "token_endpoint_auth_methods_supported": [ "client_secret_post" ],
+  "issuer": "http://127.0.0.1/",
+  "jwks_uri": "http://127.0.0.1/jwk"
+}]=])
+            }
+        }
     }
 }
 ]]

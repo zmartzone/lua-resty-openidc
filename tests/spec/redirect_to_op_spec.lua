@@ -93,3 +93,19 @@ describe("when explicitly asking for custom parameters", function()
   end)
 end)
 
+describe("when discovery data must be loaded", function()
+  test_support.start_server({
+      oidc_opts = {
+        discovery = "http://127.0.0.1/discovery"
+      }
+  })
+  teardown(test_support.stop_server)
+  local _, status, headers = http.request({
+    url = "http://127.0.0.1/default/t",
+    redirect = false
+  })
+  it("the authorization request redirects to the discovered authorization endpoint", function()
+    assert.are.equals(302, status)
+    assert.truthy(string.match(headers["location"], "http://127.0.0.1/authorize%?.*client_id=client_id.*"))
+  end)
+end)
