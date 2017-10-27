@@ -339,9 +339,9 @@ local function openidc_load_jwt_none_alg(enc_hdr, enc_payload)
     return {
       raw_header = enc_hdr,
       raw_payload = enc_payload,
-      header = header_obj,
+      header = header,
       payload = payload,
-      signature = signature
+      signature = ''
     }
   end
   return nil
