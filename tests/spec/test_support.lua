@@ -6,6 +6,7 @@ local test_support = {}
 
 local DEFAULT_OIDC_CONFIG = {
    redirect_uri_path = "/default/redirect_uri",
+   logout_path = "/default/logout",
    discovery = {
       authorization_endpoint = "http://127.0.0.1/authorize",
       token_endpoint = "http://127.0.0.1/token",
