@@ -48,3 +48,48 @@ describe("when accessing the custom protected resource without token", function(
     assert.truthy(string.match(headers["location"], ".*scope=my%-scope.*"))
   end)
 end)
+
+describe("when explicitly asking for a prompt parameter", function()
+  test_support.start_server({oidc_opts = {prompt = "none"}})
+  teardown(test_support.stop_server)
+  local _, status, headers = http.request({
+    url = "http://127.0.0.1/default/t",
+    redirect = false
+  })
+  it("then it is included", function()
+    assert.truthy(string.match(headers["location"], ".*prompt=none.*"))
+  end)
+end)
+
+describe("when explicitly asking for a display parameter", function()
+  test_support.start_server({oidc_opts = {display = "page"}})
+  teardown(test_support.stop_server)
+  local _, status, headers = http.request({
+    url = "http://127.0.0.1/default/t",
+    redirect = false
+  })
+  it("then it is included", function()
+    assert.truthy(string.match(headers["location"], ".*display=page.*"))
+  end)
+end)
+
+describe("when explicitly asking for custom parameters", function()
+  test_support.start_server({
+      oidc_opts = {
+        ["authorization_params"] = {
+          test = "abc",
+          foo = "bar",
+        }
+      }
+  })
+  teardown(test_support.stop_server)
+  local _, status, headers = http.request({
+    url = "http://127.0.0.1/default/t",
+    redirect = false
+  })
+  it("then they are included", function()
+    assert.truthy(string.match(headers["location"], ".*test=abc.*"))
+    assert.truthy(string.match(headers["location"], ".*foo=bar.*"))
+  end)
+end)
+
