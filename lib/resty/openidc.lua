@@ -550,6 +550,15 @@ local function openidc_discover(url, ssl_verify)
   return json, err
 end
 
+-- turn a discovery url set in the opts dictionary into the discovered information
+local function openidc_ensure_discovered_data(opts)
+  local err
+  if type(opts.discovery) == "string" then
+    opts.discovery, err = openidc_discover(opts.discovery, opts.ssl_verify)
+  end
+  return err
+end
+
 local function openidc_jwks(url, force, ssl_verify)
   ngx.log(ngx.DEBUG, "openidc_jwks: URL is: "..url.. " (force=" .. force .. ")")
 
@@ -687,11 +696,9 @@ local function encode_bit_string(str)
 end
 
 function openidc_pem_from_jwk (opts, kid)
-  if type(opts.discovery) == "string" then
-    opts.discovery, err = openidc_discover(opts.discovery, opts.ssl_verify)
-    if err then
-      return nil, err
-    end
+  local err = openidc_ensure_discovered_data(opts)
+  if err then
+    return nil, err
   end
   local cache_id = opts.discovery.jwks_uri .. '#' .. (kid or '')
   local v = openidc_cache_get("jwks", cache_id)
@@ -700,7 +707,7 @@ function openidc_pem_from_jwk (opts, kid)
     return v
   end
 
-  local jwk, jwks, err
+  local jwk, jwks
 
   for force=0, 1 do
     jwks, err = openidc_jwks(opts.discovery.jwks_uri, force, opts.ssl_verify)
@@ -876,11 +883,9 @@ local function openidc_access_token(opts, session)
   ngx.log(ngx.DEBUG, "refreshing expired access_token: ", session.data.access_token, " with: ", session.data.refresh_token)
 
   -- retrieve token endpoint URL from discovery endpoint if necessary
-  if type(opts.discovery) == "string" then
-    opts.discovery, err = openidc_discover(opts.discovery, opts.ssl_verify)
-    if err then
-      return nil, err
-    end
+  err = openidc_ensure_discovered_data(opts)
+  if err then
+    return nil, err
   end
 
   -- set the authentication method for the token endpoint
@@ -923,16 +928,9 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
 
   local access_token
 
-  if type(opts.discovery) == "string" then
-    --if session.data.discovery then
-    --  opts.discovery = session.data.discovery
-    --else
-    --  session.data.discovery = opts.discovery
-    --end
-    opts.discovery, err = openidc_discover(opts.discovery, opts.ssl_verify)
-    if err then
-      return nil, err, target_url, session
-    end
+  err = openidc_ensure_discovered_data(opts)
+  if err then
+    return nil, err, target_url, session
   end
 
   -- set the authentication method for the token endpoint
