@@ -91,9 +91,8 @@ end
 local function openidc_cache_get(type, key)
   local dict = ngx.shared[type]
   local value
-  local flags
   if dict then
-    value, flags = dict:get(key)
+    value = dict:get(key)
     if value then ngx.log(ngx.DEBUG, "cache hit: type=", type, " key=", key) end
   end
   return value
@@ -150,7 +149,7 @@ local function openidc_validate_id_token(opts, id_token, nonce)
   end
 
   if (type(id_token.aud) == "table") then
-    for key, value in pairs(id_token.aud) do
+    for _, value in pairs(id_token.aud) do
       if value == opts.client_id then
         return true
       end
@@ -185,12 +184,6 @@ local function openidc_base64_url_decode(input)
   end
   input = input:gsub('-','+'):gsub('_','/')
   return unb64(input)
-end
-
--- perform base64url encoding
-local function openidc_base64_url_encode(input)
-  input = b64(input)
-  return input:gsub('+','-'):gsub('/','_'):gsub('=','')
 end
 
 -- send the browser of to the OP's authorization endpoint
@@ -522,17 +515,6 @@ local function encode_sequence_of_integer(array)
   return encode_sequence(array,encode_binary_integer);
 end
 
-local function encode_string(str, typ)
-  if str:byte(1) > 128 then str = "\0" .. str; end
-  return string.char(typ) .. encode_length(#str) .. str;
-end
-
--- BIT STRING 0X03
--- OCTET STRING 0X04
-local function encode_bit_string(str)
-  return encode_string(str, 0x03);
-end
-
 local function openidc_pem_from_x5c(x5c)
   -- TODO check x5c length
   ngx.log(ngx.DEBUG, "Found x5c, getting PEM public key from x5c entry of json public key")
@@ -547,18 +529,6 @@ end
 local function openidc_pem_from_rsa_n_and_e(n, e)
   ngx.log(ngx.DEBUG , "getting PEM public key from n and e parameters of json public key")
 
-  --USE FIELD ORDER TO GENERATE PRIVATE KEY. NOT NEEDED FOR PUBLIC KEY
-  --RFC2313, OBJECT IDENTIFIER : http://www.oid-info.com/get/1.2.840.113549.1.1.1
-  local algorithms = {
-    RSA = {
-      -- CONVERTED ASN.1 DOT NOTATION  1.2.840.113549.1.1.1 TO HEX AND THEN HEX TO ASCII AND ASCII TO DECIMAL TO GET THE BELOW STRING
-      OID = "\006\009\042\134\072\134\247\013\001\001\001",
-      field_order = { 'n', 'e', 'd', 'p', 'q', 'dp', 'dq', 'qi', },
-      start = { "\0" },
-      parameters = "\5\0",
-    }
-  }
-
   local der_key = {
     openidc_base64_url_decode(n), openidc_base64_url_decode(e)
   }
@@ -567,13 +537,6 @@ local function openidc_pem_from_rsa_n_and_e(n, e)
   --PEM KEY FROM PUBLIC KEYS, PASSING 64 BIT ENCODED RSA HEADER STRING WHICH IS SAME FOR ALL KEYS
   local pem = der2pem(encoded_key,"MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A","PUBLIC KEY")
   ngx.log(ngx.DEBUG, "Generated pem key from n and e: ", pem)
-
-  --ADDING RSA HEADER WITH OID, CURRENTLY NOT WORKING
-  --local header = encode_sequence({ info.OID, info.parameters });
-  -- SEQUENCE of above SEQUENCE, BIT STRING
-  --local output = encode_sequence({ header, encode_bit_string(encoded_key) });
-  --FINAL KEY WITH RSA HEADER
-  --local final_key = der2pem(output, "PUBLIC KEY"))
   return pem
 end
 
@@ -626,7 +589,7 @@ end
 local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, ...)
   local enc_hdr, enc_payload, enc_sign = string.match(jwt_string, '^(.+)%.(.+)%.(.*)$')
   if enc_payload and (not enc_sign or enc_sign == "") then
-    local jwt, err = openidc_load_jwt_none_alg(enc_hdr, enc_payload)
+    local jwt = openidc_load_jwt_none_alg(enc_hdr, enc_payload)
     if jwt then return jwt end -- otherwise the JWT is invalid and load_jwt produces an error
   end
 
@@ -1142,7 +1105,6 @@ function openidc.jwt_verify(access_token, opts, ...)
 end
 
 function openidc.bearer_jwt_verify(opts, ...)
-  local err
   local json
 
   -- get the access token from the request
