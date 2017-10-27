@@ -347,168 +347,6 @@ local function openidc_load_jwt_none_alg(enc_hdr, enc_payload)
   return nil
 end
 
--- parse a JWT and verify its signature (if present)
-local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, ...)
-  local enc_hdr, enc_payload, enc_sign = string.match(jwt_string, '^(.+)%.(.+)%.(.*)$')
-  if enc_payload and (not enc_sign or enc_sign == "") then
-    local jwt, err = openidc_load_jwt_none_alg(enc_hdr, enc_payload)
-    if jwt then return jwt end -- otherwise the JWT is invalid and load_jwt produces an error
-  end
-
-  local jwt_obj = jwt:load_jwt(jwt_string, nil)
-  if not jwt_obj.valid then
-    local reason = "invalid jwt"
-    if jwt_obj.reason then
-      reason = reason .. ": " .. jwt_obj.reason
-    end
-    return nil, reason
-  end
-
-  local secret = opts.secret
-  if not secret and opts.discovery then
-    ngx.log(ngx.DEBUG, "using discovery to find key")
-    local err
-    secret, err = openidc_pem_from_jwk(opts, jwt_obj.header.kid)
-
-    if secret == nil then
-      ngx.log(ngx.ERR, err)
-      return nil, err
-    end
-  end
-
-  if #{...} == 0 then
-    -- an empty list of claim specs makes lua-resty-jwt add default
-    -- validators for the exp and nbf claims if they are
-    -- present. These validators need to know the configured slack
-    -- value
-    local jwt_validators = require "resty.jwt-validators"
-    jwt_validators.set_system_leeway(opts.iat_slack and opts.iat_slack or 120)
-  end
-
-  jwt_obj = jwt:verify_jwt_obj(secret, jwt_obj, ...)
-  if jwt_obj then
-    ngx.log(ngx.DEBUG, "jwt: ", cjson.encode(jwt_obj), " ,valid: ", jwt_obj.valid, ", verified: ", jwt_obj.verified)
-  end
-  if not jwt_obj.verified then
-    local reason = "jwt signature verification failed"
-    if jwt_obj.reason then
-      reason = reason .. ": " .. jwt_obj.reason
-    end
-    return nil, reason
-  end
-  return jwt_obj
-end
-
--- handle a "code" authorization response from the OP
-local function openidc_authorization_response(opts, session)
-  local args = ngx.req.get_uri_args()
-  local err
-
-  if not args.code or not args.state then
-    err = "unhandled request to the redirect_uri: "..ngx.var.request_uri
-    ngx.log(ngx.ERR, err)
-    return nil, err, session.data.original_url, session
-  end
-
-  -- check that the state returned in the response against the session; prevents CSRF
-  if args.state ~= session.data.state then
-    err = "state from argument: "..(args.state and args.state or "nil").." does not match state restored from session: "..(session.data.state and session.data.state or "nil")
-    ngx.log(ngx.ERR, err)
-    return nil, err, session.data.original_url, session
-  end
-
-  -- check the iss if returned from the OP
-  if args.iss and args.iss ~= opts.discovery.issuer then
-    err = "iss from argument: "..args.iss.." does not match expected issuer: "..opts.discovery.issuer
-    ngx.log(ngx.ERR, err)
-    return nil, err, session.data.original_url, session
-  end
-
-  -- check the client_id if returned from the OP
-  if args.client_id and args.client_id ~= opts.client_id then
-    err = "client_id from argument: "..args.client_id.." does not match expected client_id: "..opts.client_id
-    ngx.log(ngx.ERR, err)
-    return nil, err, session.data.original_url, session
-  end
-
-  -- assemble the parameters to the token endpoint
-  local body = {
-    grant_type="authorization_code",
-    code=args.code,
-    redirect_uri=openidc_get_redirect_uri(opts),
-    state = session.data.state
-  }
-
-  local current_time = ngx.time()
-  -- make the call to the token endpoint
-  local json, err = openidc_call_token_endpoint(opts, opts.discovery.token_endpoint, body, opts.token_endpoint_auth_method)
-  if err then
-    return nil, err, session.data.original_url, session
-  end
-
-  local jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, json.id_token)
-  if err then
-    return nil, err, session.data.original_url, session
-  end
-  local id_token = jwt_obj.payload
-
-  ngx.log(ngx.DEBUG, "id_token header: ", cjson.encode(jwt_obj.header))
-  ngx.log(ngx.DEBUG, "id_token payload: ", cjson.encode(jwt_obj.payload))
-
-  -- validate the id_token contents
-  if openidc_validate_id_token(opts, id_token, session.data.nonce) == false then
-    err = "id_token validation failed"
-    ngx.log(ngx.ERR, err)
-    return nil, err, session.data.original_url, session
-  end
-
-  session:start()
-  -- mark this sessions as authenticated
-  session.data.authenticated = true
-  -- clear state and nonce to protect against potential misuse
-  session.data.nonce = nil
-  session.data.state = nil
-  if store_in_session(opts, 'id_token') then
-    session.data.id_token = id_token
-  end
-
-  if store_in_session(opts, 'user') then
-    -- call the user info endpoint
-    -- TODO: should this error be checked?
-    local user, err = openidc_call_userinfo_endpoint(opts, json.access_token)
-    
-    if user then
-      if id_token.sub ~= user.sub then
-        err = "\"sub\" claim in id_token (\"" .. (id_token.sub or "null") .. "\") is not equal to the \"sub\" claim returned from the userinfo endpoint (\"" .. (user.sub or "null") .. "\")"
-        ngx.log(ngx.ERR, err)
-      else
-        session.data.user = user
-	    end
-	  end
-  end
-
-  if store_in_session(opts, 'enc_id_token') then
-    session.data.enc_id_token = json.id_token
-  end
-
-  if store_in_session(opts, 'access_token') then
-    session.data.access_token = json.access_token
-    session.data.access_token_expiration = current_time
-            + openidc_access_token_expires_in(opts, json.expires_in)
-    if json.refresh_token ~= nil then
-      session.data.refresh_token = json.refresh_token
-    end
-  end
-
-  -- save the session with the obtained id_token
-  session:save()
-
-  -- redirect to the URL that was accessed originally
-  ngx.redirect(session.data.original_url)
-  return nil, nil, session.data.original_url, session
-
-end
-
 -- get the Discovery metadata from the specified URL
 local function openidc_discover(url, ssl_verify)
   ngx.log(ngx.DEBUG, "openidc_discover: URL is: "..url)
@@ -739,7 +577,7 @@ local function openidc_pem_from_rsa_n_and_e(n, e)
   return pem
 end
 
-function openidc_pem_from_jwk(opts, kid)
+local function openidc_pem_from_jwk(opts, kid)
   local err = openidc_ensure_discovered_data(opts)
   if err then
     return nil, err
@@ -782,6 +620,168 @@ function openidc_pem_from_jwk(opts, kid)
 
   openidc_cache_set("jwks", cache_id, pem, 24 * 60 * 60)
   return pem
+end
+
+-- parse a JWT and verify its signature (if present)
+local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, ...)
+  local enc_hdr, enc_payload, enc_sign = string.match(jwt_string, '^(.+)%.(.+)%.(.*)$')
+  if enc_payload and (not enc_sign or enc_sign == "") then
+    local jwt, err = openidc_load_jwt_none_alg(enc_hdr, enc_payload)
+    if jwt then return jwt end -- otherwise the JWT is invalid and load_jwt produces an error
+  end
+
+  local jwt_obj = jwt:load_jwt(jwt_string, nil)
+  if not jwt_obj.valid then
+    local reason = "invalid jwt"
+    if jwt_obj.reason then
+      reason = reason .. ": " .. jwt_obj.reason
+    end
+    return nil, reason
+  end
+
+  local secret = opts.secret
+  if not secret and opts.discovery then
+    ngx.log(ngx.DEBUG, "using discovery to find key")
+    local err
+    secret, err = openidc_pem_from_jwk(opts, jwt_obj.header.kid)
+
+    if secret == nil then
+      ngx.log(ngx.ERR, err)
+      return nil, err
+    end
+  end
+
+  if #{...} == 0 then
+    -- an empty list of claim specs makes lua-resty-jwt add default
+    -- validators for the exp and nbf claims if they are
+    -- present. These validators need to know the configured slack
+    -- value
+    local jwt_validators = require "resty.jwt-validators"
+    jwt_validators.set_system_leeway(opts.iat_slack and opts.iat_slack or 120)
+  end
+
+  jwt_obj = jwt:verify_jwt_obj(secret, jwt_obj, ...)
+  if jwt_obj then
+    ngx.log(ngx.DEBUG, "jwt: ", cjson.encode(jwt_obj), " ,valid: ", jwt_obj.valid, ", verified: ", jwt_obj.verified)
+  end
+  if not jwt_obj.verified then
+    local reason = "jwt signature verification failed"
+    if jwt_obj.reason then
+      reason = reason .. ": " .. jwt_obj.reason
+    end
+    return nil, reason
+  end
+  return jwt_obj
+end
+
+-- handle a "code" authorization response from the OP
+local function openidc_authorization_response(opts, session)
+  local args = ngx.req.get_uri_args()
+  local err
+
+  if not args.code or not args.state then
+    err = "unhandled request to the redirect_uri: "..ngx.var.request_uri
+    ngx.log(ngx.ERR, err)
+    return nil, err, session.data.original_url, session
+  end
+
+  -- check that the state returned in the response against the session; prevents CSRF
+  if args.state ~= session.data.state then
+    err = "state from argument: "..(args.state and args.state or "nil").." does not match state restored from session: "..(session.data.state and session.data.state or "nil")
+    ngx.log(ngx.ERR, err)
+    return nil, err, session.data.original_url, session
+  end
+
+  -- check the iss if returned from the OP
+  if args.iss and args.iss ~= opts.discovery.issuer then
+    err = "iss from argument: "..args.iss.." does not match expected issuer: "..opts.discovery.issuer
+    ngx.log(ngx.ERR, err)
+    return nil, err, session.data.original_url, session
+  end
+
+  -- check the client_id if returned from the OP
+  if args.client_id and args.client_id ~= opts.client_id then
+    err = "client_id from argument: "..args.client_id.." does not match expected client_id: "..opts.client_id
+    ngx.log(ngx.ERR, err)
+    return nil, err, session.data.original_url, session
+  end
+
+  -- assemble the parameters to the token endpoint
+  local body = {
+    grant_type="authorization_code",
+    code=args.code,
+    redirect_uri=openidc_get_redirect_uri(opts),
+    state = session.data.state
+  }
+
+  local current_time = ngx.time()
+  -- make the call to the token endpoint
+  local json, err = openidc_call_token_endpoint(opts, opts.discovery.token_endpoint, body, opts.token_endpoint_auth_method)
+  if err then
+    return nil, err, session.data.original_url, session
+  end
+
+  local jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, json.id_token)
+  if err then
+    return nil, err, session.data.original_url, session
+  end
+  local id_token = jwt_obj.payload
+
+  ngx.log(ngx.DEBUG, "id_token header: ", cjson.encode(jwt_obj.header))
+  ngx.log(ngx.DEBUG, "id_token payload: ", cjson.encode(jwt_obj.payload))
+
+  -- validate the id_token contents
+  if openidc_validate_id_token(opts, id_token, session.data.nonce) == false then
+    err = "id_token validation failed"
+    ngx.log(ngx.ERR, err)
+    return nil, err, session.data.original_url, session
+  end
+
+  session:start()
+  -- mark this sessions as authenticated
+  session.data.authenticated = true
+  -- clear state and nonce to protect against potential misuse
+  session.data.nonce = nil
+  session.data.state = nil
+  if store_in_session(opts, 'id_token') then
+    session.data.id_token = id_token
+  end
+
+  if store_in_session(opts, 'user') then
+    -- call the user info endpoint
+    -- TODO: should this error be checked?
+    local user, err = openidc_call_userinfo_endpoint(opts, json.access_token)
+    
+    if user then
+      if id_token.sub ~= user.sub then
+        err = "\"sub\" claim in id_token (\"" .. (id_token.sub or "null") .. "\") is not equal to the \"sub\" claim returned from the userinfo endpoint (\"" .. (user.sub or "null") .. "\")"
+        ngx.log(ngx.ERR, err)
+      else
+        session.data.user = user
+      end
+    end
+  end
+
+  if store_in_session(opts, 'enc_id_token') then
+    session.data.enc_id_token = json.id_token
+  end
+
+  if store_in_session(opts, 'access_token') then
+    session.data.access_token = json.access_token
+    session.data.access_token_expiration = current_time
+            + openidc_access_token_expires_in(opts, json.expires_in)
+    if json.refresh_token ~= nil then
+      session.data.refresh_token = json.refresh_token
+    end
+  end
+
+  -- save the session with the obtained id_token
+  session:save()
+
+  -- redirect to the URL that was accessed originally
+  ngx.redirect(session.data.original_url)
+  return nil, nil, session.data.original_url, session
+
 end
 
 local openidc_transparent_pixel = "\137\080\078\071\013\010\026\010\000\000\000\013\073\072\068\082" ..
