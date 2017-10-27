@@ -773,7 +773,11 @@ local function openidc_logout(opts, session)
     ngx.exit(ngx.OK)
     return
   elseif opts.redirect_after_logout_uri and opts.redirect_after_logout_with_id_token_hint then
-    return ngx.redirect(opts.redirect_after_logout_uri.."&id_token_hint="..session_token)
+    local sep = "?"
+    if string.find(opts.redirect_after_logout_uri, "?", 1, true) then
+      sep = "&"
+    end
+    return ngx.redirect(opts.redirect_after_logout_uri..sep..ngx.encode_args({id_token_hint=session_token}))
   elseif opts.redirect_after_logout_uri then
     return ngx.redirect(opts.redirect_after_logout_uri)
   elseif opts.discovery.end_session_endpoint then
