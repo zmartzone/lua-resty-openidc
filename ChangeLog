@@ -1,3 +1,7 @@
+10/27/2017
+- ensured id_token_hint uses the correct query string separator when
+  opts.redirect_after_logout_uri is used together with redirect_after_logout_with_id_token_hint
+
 10/24/2017
 - verify RSA signatures on JWTs (id_token/access_token); thanks @venkatmarepalli
 - rely on lua-resty-jwt validators for id_token and/or JWT access_token validation
