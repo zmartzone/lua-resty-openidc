@@ -56,6 +56,13 @@ local DEFAULT_JWK = test_support.load("/spec/rsa_key_jwk_with_x5c.json")
 local DEFAULT_VERIFY_OPTS = {
 }
 
+local DEFAULT_INTROSPECTION_OPTS = {
+  -- TODO verify there is no discovery option for this
+  introspection_endpoint = "http://127.0.0.1/introspection",
+  client_id = "client_id",
+  client_secret = "client_secret",
+}
+
 local DEFAULT_CONFIG_TEMPLATE = [[
 worker_processes  1;
 pid       /tmp/server/logs/nginx.pid;
@@ -74,6 +81,7 @@ http {
           require("luacov.runner")("/spec/luacov/settings.luacov")
         end
         oidc = require "resty.openidc"
+        cjson = require "cjson"
         secret = [=[
 JWT_VERIFY_SECRET]=]
     }
@@ -161,7 +169,7 @@ JWT_VERIFY_SECRET]=]
                   ngx.log(ngx.ERR, "Invalid token: " .. err)
                 else
                   ngx.status = 204
-                  ngx.log(ngx.ERR, "Valid token: " .. (require "cjson").encode(json))
+                  ngx.log(ngx.ERR, "Valid token: " .. cjson.encode(json))
                 end
             }
         }
@@ -184,7 +192,31 @@ JWT_VERIFY_SECRET]=]
                 local auth = ngx.req.get_headers()["Authorization"]
                 ngx.log(ngx.ERR, "userinfo authorization header: " .. (auth and auth or ""))
                 ngx.header.content_type = 'application/json;charset=UTF-8'
-                ngx.say((require "cjson").encode(USERINFO))
+                ngx.say(cjson.encode(USERINFO))
+            }
+        }
+
+        location /introspection {
+            content_by_lua_block {
+                ngx.req.read_body()
+                ngx.log(ngx.ERR, "Received introspection request: " .. ngx.req.get_body_data())
+                local auth = ngx.req.get_headers()["Authorization"]
+                ngx.log(ngx.ERR, "introspection authorization header: " .. (auth and auth or ""))
+                ngx.header.content_type = 'application/json;charset=UTF-8'
+                ngx.say(cjson.encode(INTROSPECTION_RESPONSE))
+            }
+        }
+
+        location /introspect {
+            content_by_lua_block {
+                local json, err, token = oidc.introspect(INTROSPECTION_OPTS)
+                if err then
+                  ngx.status = 401
+                  ngx.log(ngx.ERR, "Introspection error: " .. err)
+                else
+                  ngx.header.content_type = 'application/json;charset=UTF-8'
+                  ngx.say(cjson.encode(json))
+                end
             }
         }
     }
@@ -211,6 +243,8 @@ local function merge(t1, t2)
   return t1
 end
 
+local DEFAULT_INTROSPECTION_RESPONSE = merge({active=true}, DEFAULT_ACCESS_TOKEN)
+
 local function write_config(out, custom_config)
   custom_config = custom_config or {}
   local oidc_config = merge(merge({}, DEFAULT_OIDC_CONFIG), custom_config["oidc_opts"] or {})
@@ -219,6 +253,10 @@ local function write_config(out, custom_config)
   local access_token = merge(merge({}, DEFAULT_ACCESS_TOKEN), custom_config["access_token"] or {})
   local token_header = merge(merge({}, DEFAULT_TOKEN_HEADER), custom_config["token_header"] or {})
   local userinfo = merge(merge({}, DEFAULT_ID_TOKEN), custom_config["userinfo"] or {})
+  local introspection_response = merge(merge({}, DEFAULT_INTROSPECTION_RESPONSE),
+                                       custom_config["introspection_response"] or {})
+  local introspection_opts = merge(merge({}, DEFAULT_INTROSPECTION_OPTS),
+                                   custom_config["introspection_opts"] or {})
   for _, k in ipairs(custom_config["remove_id_token_claims"] or {}) do
     id_token[k] = nil
   end
@@ -227,6 +265,9 @@ local function write_config(out, custom_config)
   end
   for _, k in ipairs(custom_config["remove_userinfo_claims"] or {}) do
     userinfo[k] = nil
+  end
+  for _, k in ipairs(custom_config["remove_introspection_claims"] or {}) do
+    introspection_response[k] = nil
   end
   local config = DEFAULT_CONFIG_TEMPLATE
     :gsub("OIDC_CONFIG", serpent.block(oidc_config, {comment = false }))
@@ -237,6 +278,8 @@ local function write_config(out, custom_config)
     :gsub("VERIFY_OPTS", serpent.block(verify_opts, {comment = false }))
     :gsub("JWK", custom_config["jwk"] or DEFAULT_JWK)
     :gsub("USERINFO", serpent.block(userinfo, {comment = false }))
+    :gsub("INTROSPECTION_RESPONSE", serpent.block(introspection_response, {comment = false }))
+    :gsub("INTROSPECTION_OPTS", serpent.block(introspection_opts, {comment = false }))
   out:write(config)
 end
 
@@ -255,6 +298,10 @@ end
 -- - jwk the JWK keystore to provide
 -- - userinfo is a table containing claims returned by the userinfo endpoint
 -- - remove_userinfo_claims is an array of claims to remove from the userinfo response
+-- - introspection_response is a table containing claims returned by
+--   the introspection endpoint
+-- - remove_introspection_claims is an array of claims to remove from the introspection response
+-- - introspection_opts is a table containing options that are accepted by oidc.introspect
 function test_support.start_server(custom_config)
   assert(os.execute("rm -rf /tmp/server"), "failed to remove old server dir")
   assert(os.execute("mkdir -p /tmp/server/conf"), "failed to create server dir")
