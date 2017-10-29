@@ -57,7 +57,6 @@ local DEFAULT_VERIFY_OPTS = {
 }
 
 local DEFAULT_INTROSPECTION_OPTS = {
-  -- TODO verify there is no discovery option for this
   introspection_endpoint = "http://127.0.0.1/introspection",
   client_id = "client_id",
   client_secret = "client_secret",
