@@ -62,7 +62,7 @@ describe("when a different token parameter name is configured", function()
   end)
 end)
 
-describe("when additional parameters have been configured", ()
+describe("when additional parameters have been configured", function()
   test_support.start_server({
     introspection_opts = {
       introspection_params = {
