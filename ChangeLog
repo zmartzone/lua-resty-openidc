@@ -1,6 +1,9 @@
 10/30/2017
 - fixed case where openidc.introspect would accept invalid tokens if they contained an exp claim
 
+10/28/2017
+- add id_token_hint when calling end_session_endpoint
+
 10/27/2017
 - ensured id_token_hint uses the correct query string separator when
   opts.redirect_after_logout_uri is used together with redirect_after_logout_with_id_token_hint
