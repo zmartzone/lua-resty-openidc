@@ -91,8 +91,6 @@ describe("when the response is inactive", function()
     introspection_response = {
       active = false
     },
-    -- TODO shouldn't be neccesary, see https://github.com/pingidentity/lua-resty-openidc/commit/1e2d705708531a5e584a612391243cf6bf324840#commitcomment-25265312
-    remove_introspection_claims = { "exp" }
   })
   teardown(test_support.stop_server)
   local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
@@ -105,6 +103,21 @@ describe("when the response is inactive", function()
   end)
   it("an error has been logged", function()
     assert.error_log_contains("Introspection error: invalid token")
+  end)
+end)
+
+describe("when the response is active but lacks the exp claim", function()
+  test_support.start_server({
+    remove_introspection_claims = { "exp" }
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/introspect",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the response is valid", function()
+    assert.are.equals(200, status)
   end)
 end)
 
