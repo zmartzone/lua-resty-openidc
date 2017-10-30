@@ -186,6 +186,14 @@ local function openidc_base64_url_decode(input)
   return unb64(input)
 end
 
+local function openidc_combine_uri(uri, params)
+  local sep = "?"
+  if string.find(uri, "?", 1, true) then
+    sep = "&"
+  end
+  return uri .. sep .. ngx.encode_args(params)
+end
+
 -- send the browser of to the OP's authorization endpoint
 local function openidc_authorize(opts, session, target_url)
   local resty_random = require "resty.random"
@@ -227,7 +235,7 @@ local function openidc_authorize(opts, session, target_url)
   session:save()
 
   -- redirect to the /authorization endpoint
-  return ngx.redirect(opts.discovery.authorization_endpoint.."?"..ngx.encode_args(params))
+  return ngx.redirect(openidc_combine_uri(opts.discovery.authorization_endpoint, params))
 end
 
 -- parse the JSON result from a call to the OP
@@ -772,14 +780,12 @@ local function openidc_logout(opts, session)
     ngx.print(openidc_transparent_pixel)
     ngx.exit(ngx.OK)
     return
-  elseif opts.redirect_after_logout_uri and opts.redirect_after_logout_with_id_token_hint then
-    local sep = "?"
-    if string.find(opts.redirect_after_logout_uri, "?", 1, true) then
-      sep = "&"
-    end
-    return ngx.redirect(opts.redirect_after_logout_uri..sep..ngx.encode_args({id_token_hint=session_token}))
+  elseif opts.redirect_after_logout_uri and opts.redirect_after_logout_with_id_token_hint and session_token then
+    return ngx.redirect(openidc_combine_uri(opts.redirect_after_logout_uri, {id_token_hint=session_token}))
   elseif opts.redirect_after_logout_uri then
     return ngx.redirect(opts.redirect_after_logout_uri)
+  elseif opts.discovery.end_session_endpoint and session_token then
+    return ngx.redirect(openidc_combine_uri(opts.discovery.end_session_endpoint, {id_token_hint=session_token}))
   elseif opts.discovery.end_session_endpoint then
     return ngx.redirect(opts.discovery.end_session_endpoint)
   elseif opts.discovery.ping_end_session_endpoint then
