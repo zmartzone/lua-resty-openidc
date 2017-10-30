@@ -1062,14 +1062,16 @@ function openidc.introspect(opts)
 
     -- cache the results
     if json then
-      local expiry_claim = opts.introspection_expiry_claim or "exp"
-      if json.active or json[expiry_claim] then
-        local ttl = json[expiry_claim]
-        if expiry_claim == "exp" then --https://tools.ietf.org/html/rfc7662#section-2.2
-          ttl = ttl - ngx.time()
+      if json.active then
+        local expiry_claim = opts.introspection_expiry_claim or "exp"
+        if json[expiry_claim] then
+          local ttl = json[expiry_claim]
+          if expiry_claim == "exp" then --https://tools.ietf.org/html/rfc7662#section-2.2
+            ttl = ttl - ngx.time()
+          end
+          ngx.log(ngx.DEBUG, "cache token ttl: "..ttl)
+          openidc_cache_set("introspection", access_token, cjson.encode(json), ttl)
         end
-        ngx.log(ngx.DEBUG, "cache token ttl: "..ttl)
-        openidc_cache_set("introspection", access_token, cjson.encode(json), ttl)
       else
         err = "invalid token"
       end
