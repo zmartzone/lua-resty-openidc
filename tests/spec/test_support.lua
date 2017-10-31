@@ -62,6 +62,10 @@ local DEFAULT_INTROSPECTION_OPTS = {
   client_secret = "client_secret",
 }
 
+local DEFAULT_TOKEN_RESPONSE_EXPIRES_IN = "3600"
+
+local DEFAULT_TOKEN_RESPONSE_CONTAINS_REFRESH_TOKEN = "true"
+
 local DEFAULT_CONFIG_TEMPLATE = [[
 worker_processes  1;
 pid       /tmp/server/logs/nginx.pid;
@@ -142,21 +146,30 @@ JWT_VERIFY_SECRET]=]
                 ngx.log(ngx.ERR, "token authorization header: " .. (auth and auth or ""))
                 ngx.header.content_type = 'application/json;charset=UTF-8'
                 local id_token = ID_TOKEN
-                local nonce_file = assert(io.open("/tmp/nonce", "r"))
-                id_token.nonce = nonce_file:read("*all")
-                assert(nonce_file:close())
+                local args = ngx.req.get_post_args()
+                local access_token = "a_token"
+                local refresh_token = "r_token"
+                if args.grant_type == "authorization_code" then
+                  local nonce_file = assert(io.open("/tmp/nonce", "r"))
+                  id_token.nonce = nonce_file:read("*all")
+                  assert(nonce_file:close())
+                else
+                  access_token = access_token .. "2"
+                  refresh_token = refresh_token .. "2"
+                end
                 local jwt_content = {
                   header = TOKEN_HEADER,
                   payload = id_token
                 }
                 local jwt = require "resty.jwt"
                 local jwt_token = jwt:sign(secret, jwt_content)
-                ngx.say([=[{
-  "access_token":"a_token",
-  "expires_in":3600,
-  "refresh_token":"r_token",
-  "id_token": "]=] .. jwt_token .. [=["
-}]=])
+                local token_response = {
+                  access_token = access_token,
+                  expires_in = TOKEN_RESPONSE_EXPIRES_IN,
+                  refresh_token = TOKEN_RESPONSE_CONTAINS_REFRESH_TOKEN and refresh_token or nil,
+                  id_token = jwt_token
+                }
+                ngx.say(cjson.encode(token_response))
             }
         }
 
@@ -208,13 +221,26 @@ JWT_VERIFY_SECRET]=]
 
         location /introspect {
             content_by_lua_block {
-                local json, err, token = oidc.introspect(INTROSPECTION_OPTS)
+                local json, err = oidc.introspect(INTROSPECTION_OPTS)
                 if err then
                   ngx.status = 401
                   ngx.log(ngx.ERR, "Introspection error: " .. err)
                 else
                   ngx.header.content_type = 'application/json;charset=UTF-8'
                   ngx.say(cjson.encode(json))
+                end
+            }
+        }
+
+        location /access_token {
+            content_by_lua_block {
+                local access_token, err = oidc.access_token(OIDC_CONFIG)
+                if not access_token then
+                  ngx.status = 401
+                  ngx.log(ngx.ERR, "access_token error: " .. (err or 'no message'))
+                else
+                  ngx.header.content_type = 'text/plain'
+                  ngx.say(access_token)
                 end
             }
         }
@@ -256,6 +282,9 @@ local function write_config(out, custom_config)
                                        custom_config["introspection_response"] or {})
   local introspection_opts = merge(merge({}, DEFAULT_INTROSPECTION_OPTS),
                                    custom_config["introspection_opts"] or {})
+  local token_response_expires_in = custom_config["token_response_expires_in"] or DEFAULT_TOKEN_RESPONSE_EXPIRES_IN
+  local token_response_contains_refresh_token = custom_config["token_response_contains_refresh_token"]
+    or DEFAULT_TOKEN_RESPONSE_CONTAINS_REFRESH_TOKEN
   for _, k in ipairs(custom_config["remove_id_token_claims"] or {}) do
     id_token[k] = nil
   end
@@ -279,6 +308,8 @@ local function write_config(out, custom_config)
     :gsub("USERINFO", serpent.block(userinfo, {comment = false }))
     :gsub("INTROSPECTION_RESPONSE", serpent.block(introspection_response, {comment = false }))
     :gsub("INTROSPECTION_OPTS", serpent.block(introspection_opts, {comment = false }))
+    :gsub("TOKEN_RESPONSE_EXPIRES_IN", token_response_expires_in)
+    :gsub("TOKEN_RESPONSE_CONTAINS_REFRESH_TOKEN", token_response_contains_refresh_token)
   out:write(config)
 end
 
@@ -301,6 +332,9 @@ end
 --   the introspection endpoint
 -- - remove_introspection_claims is an array of claims to remove from the introspection response
 -- - introspection_opts is a table containing options that are accepted by oidc.introspect
+-- - token_response_expires_in value for the expires_in claim of the token response
+-- - token_response_contains_refresh_token whether to include a
+--   refresh token with the token response (a boolean in quotes, i.e. "true" or "false")
 function test_support.start_server(custom_config)
   assert(os.execute("rm -rf /tmp/server"), "failed to remove old server dir")
   assert(os.execute("mkdir -p /tmp/server/conf"), "failed to create server dir")
