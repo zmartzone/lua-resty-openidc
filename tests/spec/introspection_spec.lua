@@ -139,7 +139,6 @@ describe("when introspection endpoint is not resolvable", function()
     assert.are.equals(401, status)
   end)
   it("an error has been logged", function()
-    -- TODO fix error message, talks about "token endpoint"
     assert.error_log_contains("Introspection error:.*foo.example.org could not be resolved.*")
   end)
 end)
@@ -160,8 +159,7 @@ describe("when introspection endpoint is not reachable", function()
     assert.are.equals(401, status)
   end)
   it("an error has been logged", function()
-    -- TODO fix error message
-    assert.error_log_contains("Introspection error:.*accessing token endpoint %(http://192.0.2.1/%) failed")
+    assert.error_log_contains("Introspection error:.*accessing introspection endpoint %(http://192.0.2.1/%) failed")
   end)
 end)
 

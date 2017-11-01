@@ -261,8 +261,9 @@ local function openidc_parse_json_response(response)
 end
 
 -- make a call to the token endpoint
-local function openidc_call_token_endpoint(opts, endpoint, body, auth)
+local function openidc_call_token_endpoint(opts, endpoint, body, auth, endpoint_name)
 
+  local ep_name = endpoint_name or 'token'
   local headers = {
       ["Content-Type"] = "application/x-www-form-urlencoded"
   }
@@ -279,7 +280,7 @@ local function openidc_call_token_endpoint(opts, endpoint, body, auth)
     end
   end
 
-  ngx.log(ngx.DEBUG, "request body for token endpoint call: ", ngx.encode_args(body))
+  ngx.log(ngx.DEBUG, "request body for "..ep_name.." endpoint call: ", ngx.encode_args(body))
 
   local httpc = http.new()
   local res, err = httpc:request_uri(endpoint, {
@@ -289,12 +290,12 @@ local function openidc_call_token_endpoint(opts, endpoint, body, auth)
     ssl_verify = (opts.ssl_verify ~= "no")
   })
   if not res then
-    err = "accessing token endpoint ("..endpoint..") failed: "..err
+    err = "accessing "..ep_name.." endpoint ("..endpoint..") failed: "..err
     ngx.log(ngx.ERR, err)
     return nil, err
   end
 
-  ngx.log(ngx.DEBUG, "token endpoint response: ", res.body)
+  ngx.log(ngx.DEBUG, ep_name.." endpoint response: ", res.body)
 
   return openidc_parse_json_response(res)
 end
@@ -317,8 +318,7 @@ local function openidc_call_userinfo_endpoint(opts, access_token)
     headers = headers
   })
   if not res then
-    err = "accessing userinfo endpoint ("..opts.discovery.userinfo_endpoint..") failed: "..err
-    ngx.log(ngx.ERR, err)
+    err = "accessing ("..opts.discovery.userinfo_endpoint..") failed: "..err
     return nil, err
   end
 
@@ -727,7 +727,9 @@ local function openidc_authorization_response(opts, session)
     local user
     user, err = openidc_call_userinfo_endpoint(opts, json.access_token)
 
-    if user then
+    if err then
+      ngx.log(ngx.ERR, "error calling userinfo endpoint: " .. err)
+    elseif user then
       if id_token.sub ~= user.sub then
         err = "\"sub\" claim in id_token (\"" .. (id_token.sub or "null") .. "\") is not equal to the \"sub\" claim returned from the userinfo endpoint (\"" .. (user.sub or "null") .. "\")"
         ngx.log(ngx.ERR, err)
@@ -1059,7 +1061,7 @@ function openidc.introspect(opts)
     end
 
     -- call the introspection endpoint
-    json, err = openidc_call_token_endpoint(opts, opts.introspection_endpoint, body, nil)
+    json, err = openidc_call_token_endpoint(opts, opts.introspection_endpoint, body, nil, "introspection")
 
     -- cache the results
     if json then
