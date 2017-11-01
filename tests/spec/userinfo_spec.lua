@@ -84,7 +84,7 @@ describe("when userinfo endpoint is not reachable", function()
     assert.are.equals(302, status)
   end)
   it("an error has been logged", function()
-    assert.error_log_contains(".*accessing userinfo endpoint %(http://192.0.2.1/%) failed")
+    assert.error_log_contains(".*error calling userinfo endpoint: accessing %(http://192.0.2.1/%) failed")
   end)
 end)
 
@@ -101,14 +101,11 @@ describe("when userinfo endpoint sends a 4xx status", function()
   it("login succeeds", function()
     assert.are.equals(302, status)
   end)
-  --[[ TODO check error of openidc_parse_json_response in openidc_call_userinfo_endpoint and act on it
   it("an error has been logged", function()
     assert.error_log_contains(".*response indicates failure, status=404,")
   end)
-  ]]
 end)
 
---[[ TODO: cjson.decode throws an error, we lack proper error handling here
 describe("when userinfo endpoint doesn't return proper JSON", function()
   test_support.start_server({
     oidc_opts = {
@@ -123,7 +120,6 @@ describe("when userinfo endpoint doesn't return proper JSON", function()
     assert.are.equals(302, status)
   end)
   it("an error has been logged", function()
-    assert.error_log_contains("access_token error: ")
+    assert.error_log_contains("JSON decoding failed")
   end)
 end)
-]]

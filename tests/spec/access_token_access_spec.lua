@@ -220,7 +220,6 @@ describe("when token endpoint sends a 4xx status", function()
   end)
 end)
 
---[[ TODO: cjson.decode throws an error, we lack proper error handling here
 describe("when token endpoint doesn't return proper JSON", function()
   test_support.start_server({
     access_token_opts = {
@@ -242,7 +241,6 @@ describe("when token endpoint doesn't return proper JSON", function()
     assert.are.equals(401, status)
   end)
   it("an error has been logged", function()
-    assert.error_log_contains("access_token error: ")
+    assert.error_log_contains("access_token error: JSON decoding failed")
   end)
 end)
-]]

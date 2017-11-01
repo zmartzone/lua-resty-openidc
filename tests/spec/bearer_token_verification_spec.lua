@@ -331,11 +331,10 @@ describe("when jwks endpoint sends a 4xx status", function()
     assert.are.equals(401, status)
   end)
   it("an error has been logged", function()
-    assert.error_log_contains(".*response indicates failure, status=404,")
+    assert.error_log_contains("Invalid token:.*response indicates failure, status=404,")
   end)
 end)
 
---[[ TODO: cjson.decode throws an error, we lack proper error handling here
 describe("when jwks endpoint doesn't return proper JSON", function()
   test_support.start_server({
     verify_opts = {
@@ -354,7 +353,6 @@ describe("when jwks endpoint doesn't return proper JSON", function()
     assert.are.equals(401, status)
   end)
   it("an error has been logged", function()
-    assert.error_log_contains("access_token error: ")
+    assert.error_log_contains("Invalid token: JSON decoding failed")
   end)
 end)
-]]
