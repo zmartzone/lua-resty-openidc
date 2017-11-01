@@ -249,3 +249,112 @@ describe("when using a JWT not signed but using the 'none' alg", function()
   end)
 end)
 
+describe("when discovery endpoint is not resolvable", function()
+  test_support.start_server({
+    verify_opts = {
+      discovery = "http://foo.example.org/"
+    },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/verify_bearer_token",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the token is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("Invalid token: accessing discovery url.*foo.example.org could not be resolved.*")
+  end)
+end)
+
+describe("when jwk endpoint is not resolvable", function()
+  test_support.start_server({
+    verify_opts = {
+      discovery = {
+        jwks_uri = "http://foo.example.org/",
+      }
+    },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/verify_bearer_token",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the token is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("Invalid token: accessing jwks url.*foo.example.org could not be resolved.*")
+  end)
+end)
+
+describe("when jwks endpoint is not reachable", function()
+  test_support.start_server({
+    verify_opts = {
+      discovery = {
+        jwks_uri = "http://192.0.2.1/"
+      }
+    },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/verify_bearer_token",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("Invalid token: accessing jwks url.*%(http://192.0.2.1/%) failed")
+  end)
+end)
+
+describe("when jwks endpoint sends a 4xx status", function()
+  test_support.start_server({
+    verify_opts = {
+      discovery = {
+        jwks_uri = "http://127.0.0.1/not-there"
+      }
+    },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/verify_bearer_token",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains(".*response indicates failure, status=404,")
+  end)
+end)
+
+--[[ TODO: cjson.decode throws an error, we lack proper error handling here
+describe("when jwks endpoint doesn't return proper JSON", function()
+  test_support.start_server({
+    verify_opts = {
+      discovery = {
+        jwks_uri = "http://127.0.0.1/t"
+      }
+    },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/verify_bearer_token",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("access_token error: ")
+  end)
+end)
+]]

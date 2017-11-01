@@ -83,3 +83,77 @@ describe("when an explicit auth method is configured", function()
     assert_token_endpoint_call_contains("client_secret=client_secret")
   end)
 end)
+
+describe("if token endpoint is not resolvable", function()
+  test_support.start_server({
+    oidc_opts = {
+      discovery = {
+        token_endpoint = "http://foo.example.org/"
+      }
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login fails", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("authenticate failed:.*foo.example.org could not be resolved.*")
+  end)
+end)
+
+describe("if token endpoint is not reachable", function()
+  test_support.start_server({
+    oidc_opts = {
+      discovery = {
+        token_endpoint = "http://192.0.2.1/"
+      }
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login fails", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("authenticate failed:.*accessing token endpoint %(http://192.0.2.1/%) failed")
+  end)
+end)
+
+describe("if token endpoint sends a 4xx status", function()
+  test_support.start_server({
+    oidc_opts = {
+      discovery = {
+        token_endpoint = "http://127.0.0.1/not-there"
+      }
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login fails", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("authenticate failed:.*response indicates failure, status=404,")
+  end)
+end)
+
+--[[ TODO: cjson.decode throws an error, we lack proper error handling here
+describe("if token endpoint doesn't return proper JSON", function()
+  test_support.start_server({
+    oidc_opts = {
+      discovery = {
+        token_endpoint = "http://127.0.0.1/t"
+      }
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login fails", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("access_token error: ")
+  end)
+end)
+]]

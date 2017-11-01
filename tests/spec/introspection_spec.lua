@@ -122,3 +122,87 @@ describe("when the response is active but lacks the exp claim", function()
 end)
 
 -- TODO find a way to assert caching
+
+describe("when introspection endpoint is not resolvable", function()
+  test_support.start_server({
+    introspection_opts = {
+      introspection_endpoint = "http://foo.example.org/"
+    },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/introspect",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    -- TODO fix error message, talks about "token endpoint"
+    assert.error_log_contains("Introspection error:.*foo.example.org could not be resolved.*")
+  end)
+end)
+
+describe("when introspection endpoint is not reachable", function()
+  test_support.start_server({
+    introspection_opts = {
+      introspection_endpoint = "http://192.0.2.1/"
+    },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/introspect",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    -- TODO fix error message
+    assert.error_log_contains(".*accessing token endpoint %(http://192.0.2.1/%) failed")
+  end)
+end)
+
+describe("when introspection endpoint sends a 4xx status", function()
+  test_support.start_server({
+    introspection_opts = {
+      introspection_endpoint = "http://127.0.0.1/not-there"
+    },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/introspect",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains(".*response indicates failure, status=404,")
+  end)
+end)
+
+--[[ TODO: cjson.decode throws an error, we lack proper error handling here
+describe("when introspection endpoint doesn't return proper JSON", function()
+  test_support.start_server({
+    introspection_opts = {
+      introspection_endpoint = "http://127.0.0.1/t"
+    },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/introspect",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("access_token error: ")
+  end)
+end)
+]]

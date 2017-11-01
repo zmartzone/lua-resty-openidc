@@ -130,8 +130,9 @@ JWT_VERIFY_SECRET]=]
               local res, err, target, session = oidc.authenticate(opts)
               if err then
                 ngx.status = 401
-                ngx.say(err)
-                ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+                ngx.log(ngx.ERR, "authenticate failed: " .. err)
+                ngx.say("authenticate failed: " .. err)
+                ngx.exit(ngx.HTTP_UNAUTHORIZED)
               end
             }
             rewrite ^/default/(.*)$ /$1  break;

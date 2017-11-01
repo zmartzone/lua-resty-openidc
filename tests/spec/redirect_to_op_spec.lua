@@ -109,3 +109,83 @@ describe("when discovery data must be loaded", function()
     assert.truthy(string.match(headers["location"], "http://127.0.0.1/authorize%?.*client_id=client_id.*"))
   end)
 end)
+
+describe("when discovery endpoint is not resolvable", function()
+  test_support.start_server({
+    oidc_opts = {
+      discovery = "http://foo.example.org/"
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, status, headers = http.request({
+    url = "http://127.0.0.1/default/t",
+    redirect = false
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("authenticate failed: accessing discovery url.*foo.example.org could not be resolved.*")
+  end)
+end)
+
+describe("when discovery endpoint is not reachable", function()
+  test_support.start_server({
+    oidc_opts = {
+      discovery = "http://192.0.2.1/"
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, status = http.request({
+    url = "http://127.0.0.1/default/t",
+    redirect = false
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("authenticate failed: accessing discovery url.*%(http://192.0.2.1/%) failed")
+  end)
+end)
+
+describe("when discovery endpoint sends a 4xx status", function()
+  test_support.start_server({
+    oidc_opts = {
+      discovery = "http://127.0.0.1/not-there"
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, status = http.request({
+    url = "http://127.0.0.1/default/t",
+    redirect = false
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  --[[ TODO don't swallow error message from openidc_parse_json_response in openidc_discover
+  it("an error has been logged", function()
+    assert.error_log_contains(".*response indicates failure, status=404,")
+  end)
+  ]]
+end)
+
+--[[ TODO: cjson.decode throws an error, we lack proper error handling here
+describe("when discovery endpoint doesn't return proper JSON", function()
+  test_support.start_server({
+    oidc_opts = {
+      discovery = "http://127.0.0.1/t"
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, status = http.request({
+    url = "http://127.0.0.1/default/t",
+    redirect = false
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("access_token error: ")
+  end)
+end)
+]]

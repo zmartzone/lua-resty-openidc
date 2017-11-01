@@ -52,3 +52,78 @@ describe("when the userinfo response's sub disagrees with the id_token", functio
   -- TODO find a way to verify user has not been stored in session
 end)
 
+describe("when userinfo endpoint is not resolvable", function()
+  test_support.start_server({
+    oidc_opts = {
+      discovery = {
+        userinfo_endpoint = "http://foo.example.org/"
+      }
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login aucceeds", function()
+    assert.are.equals(302, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains(".*foo.example.org could not be resolved.*")
+  end)
+end)
+
+describe("when userinfo endpoint is not reachable", function()
+  test_support.start_server({
+    oidc_opts = {
+      discovery = {
+        userinfo_endpoint = "http://192.0.2.1/"
+      }
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login succeeds", function()
+    assert.are.equals(302, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains(".*accessing userinfo endpoint %(http://192.0.2.1/%) failed")
+  end)
+end)
+
+describe("when userinfo endpoint sends a 4xx status", function()
+  test_support.start_server({
+    oidc_opts = {
+      discovery = {
+        userinfo_endpoint = "http://127.0.0.1/not-there"
+      }
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login succeeds", function()
+    assert.are.equals(302, status)
+  end)
+  --[[ TODO check error of openidc_parse_json_response in openidc_call_userinfo_endpoint and act on it
+  it("an error has been logged", function()
+    assert.error_log_contains(".*response indicates failure, status=404,")
+  end)
+  ]]
+end)
+
+--[[ TODO: cjson.decode throws an error, we lack proper error handling here
+describe("when userinfo endpoint doesn't return proper JSON", function()
+  test_support.start_server({
+    oidc_opts = {
+      discovery = {
+        userinfo_endpoint = "http://127.0.0.1/t"
+      }
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login succeeds", function()
+    assert.are.equals(302, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("access_token error: ")
+  end)
+end)
+]]

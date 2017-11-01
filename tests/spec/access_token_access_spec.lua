@@ -122,3 +122,127 @@ describe("if no refresh_token has been provided and login has expired", function
   end)
 end)
 
+describe("when discovery endpoint is not resolvable", function()
+  test_support.start_server({
+    access_token_opts = {
+      discovery = "http://foo.example.org/"
+    },
+    token_response_expires_in = 0
+  })
+  teardown(test_support.stop_server)
+  local _, _, cookies = test_support.login()
+  os.execute("sleep 1.5")
+  local _, status = http.request({
+    url = "http://localhost/access_token",
+    redirect = false,
+    headers = { cookie = cookies },
+  })
+  it("the access_token is not available", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("access_token error: accessing discovery url.*foo.example.org could not be resolved.*")
+  end)
+end)
+
+describe("when token endpoint is not resolvable", function()
+  test_support.start_server({
+    access_token_opts = {
+      discovery = {
+        token_endpoint = "http://foo.example.org/",
+      }
+    },
+    token_response_expires_in = 0
+  })
+  teardown(test_support.stop_server)
+  local _, _, cookies = test_support.login()
+  os.execute("sleep 1.5")
+  local _, status = http.request({
+    url = "http://localhost/access_token",
+    redirect = false,
+    headers = { cookie = cookies },
+  })
+  it("the access_token is not available", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("access_token error: accessing token endpoint.*foo.example.org could not be resolved.*")
+  end)
+end)
+
+describe("when token endpoint is not reachable", function()
+  test_support.start_server({
+    access_token_opts = {
+      discovery = {
+        token_endpoint = "http://192.0.2.1/"
+      }
+    },
+    token_response_expires_in = 0
+  })
+  teardown(test_support.stop_server)
+  local _, _, cookies = test_support.login()
+  os.execute("sleep 1.5")
+  local _, status = http.request({
+    url = "http://localhost/access_token",
+    redirect = false,
+    headers = { cookie = cookies },
+  })
+  it("the access_token is not available", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("access_token error: accessing token endpoint.*%(http://192.0.2.1/%) failed")
+  end)
+end)
+
+describe("when token endpoint sends a 4xx status", function()
+  test_support.start_server({
+    access_token_opts = {
+      discovery = {
+        token_endpoint = "http://127.0.0.1/not-there"
+      }
+    },
+    token_response_expires_in = 0
+  })
+  teardown(test_support.stop_server)
+  local _, _, cookies = test_support.login()
+  os.execute("sleep 1.5")
+  local _, status = http.request({
+    url = "http://localhost/access_token",
+    redirect = false,
+    headers = { cookie = cookies },
+  })
+  it("the access_token is not available", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("access_token error:.*response indicates failure, status=404,")
+  end)
+end)
+
+--[[ TODO: cjson.decode throws an error, we lack proper error handling here
+describe("when token endpoint doesn't return proper JSON", function()
+  test_support.start_server({
+    access_token_opts = {
+      discovery = {
+        token_endpoint = "http://127.0.0.1/t"
+      }
+    },
+    token_response_expires_in = 0
+  })
+  teardown(test_support.stop_server)
+  local _, _, cookies = test_support.login()
+  os.execute("sleep 1.5")
+  local _, status = http.request({
+    url = "http://localhost/access_token",
+    redirect = false,
+    headers = { cookie = cookies },
+  })
+  it("the access_token is not available", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("access_token error: ")
+  end)
+end)
+]]
