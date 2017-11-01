@@ -49,6 +49,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 local require = require
 local cjson   = require "cjson"
+local cjson_s = require "cjson.safe"
 local http    = require "resty.http"
 local jwt     = require "resty.jwt"
 local string  = string
@@ -249,7 +250,7 @@ local function openidc_parse_json_response(response)
     err = "response indicates failure, status="..response.status..", body="..response.body
   else
     -- decode the response and extract the JSON object
-    res = cjson.decode(response.body)
+    res = cjson_s.decode(response.body)
 
     if not res then
       err = "JSON decoding failed"

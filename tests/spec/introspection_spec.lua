@@ -161,7 +161,7 @@ describe("when introspection endpoint is not reachable", function()
   end)
   it("an error has been logged", function()
     -- TODO fix error message
-    assert.error_log_contains(".*accessing token endpoint %(http://192.0.2.1/%) failed")
+    assert.error_log_contains("Introspection error:.*accessing token endpoint %(http://192.0.2.1/%) failed")
   end)
 end)
 
@@ -181,11 +181,10 @@ describe("when introspection endpoint sends a 4xx status", function()
     assert.are.equals(401, status)
   end)
   it("an error has been logged", function()
-    assert.error_log_contains(".*response indicates failure, status=404,")
+    assert.error_log_contains("Introspection error:.*response indicates failure, status=404,")
   end)
 end)
 
---[[ TODO: cjson.decode throws an error, we lack proper error handling here
 describe("when introspection endpoint doesn't return proper JSON", function()
   test_support.start_server({
     introspection_opts = {
@@ -202,7 +201,6 @@ describe("when introspection endpoint doesn't return proper JSON", function()
     assert.are.equals(401, status)
   end)
   it("an error has been logged", function()
-    assert.error_log_contains("access_token error: ")
+    assert.error_log_contains("Introspection error: JSON decoding failed")
   end)
 end)
-]]

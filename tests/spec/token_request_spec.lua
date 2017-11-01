@@ -138,7 +138,6 @@ describe("if token endpoint sends a 4xx status", function()
   end)
 end)
 
---[[ TODO: cjson.decode throws an error, we lack proper error handling here
 describe("if token endpoint doesn't return proper JSON", function()
   test_support.start_server({
     oidc_opts = {
@@ -153,7 +152,6 @@ describe("if token endpoint doesn't return proper JSON", function()
     assert.are.equals(401, status)
   end)
   it("an error has been logged", function()
-    assert.error_log_contains("access_token error: ")
+    assert.error_log_contains("authenticate failed: JSON decoding failed")
   end)
 end)
-]]

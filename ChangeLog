@@ -1,3 +1,6 @@
+11/01/2017
+- now uses cjson.safe when decoding JSON received from external sources for improved error handling
+
 10/30/2017
 - fixed case where openidc.introspect would accept invalid tokens if they contained an exp claim
 
