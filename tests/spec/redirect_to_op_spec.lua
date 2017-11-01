@@ -162,11 +162,9 @@ describe("when discovery endpoint sends a 4xx status", function()
   it("the response is invalid", function()
     assert.are.equals(401, status)
   end)
-  --[[ TODO don't swallow error message from openidc_parse_json_response in openidc_discover
   it("an error has been logged", function()
     assert.error_log_contains("authenticate failed:.*response indicates failure, status=404,")
   end)
-  ]]
 end)
 
 describe("when discovery endpoint doesn't return proper JSON", function()
@@ -183,10 +181,8 @@ describe("when discovery endpoint doesn't return proper JSON", function()
   it("the response is invalid", function()
     assert.are.equals(401, status)
   end)
-  --[[ TODO don't swallow error message from openidc_parse_json_response in openidc_discover
   it("an error has been logged", function()
-    assert.error_log_contains("authenticate failed: JSON decoding failed")
+    assert.error_log_contains("authenticate failed:.*JSON decoding failed")
   end)
-  ]]
 end)
 

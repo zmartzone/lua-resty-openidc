@@ -378,7 +378,7 @@ local function openidc_discover(url, ssl_verify)
           json = nil
         end
       else
-        err = "could not decode JSON from Discovery data"
+        err = "could not decode JSON from Discovery data" .. (err and (": " .. err) or '')
         ngx.log(ngx.ERR, err)
       end
     end
