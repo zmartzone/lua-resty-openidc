@@ -78,7 +78,7 @@ end)
 
 describe("if the login asked for custom scopes", function()
   test_support.start_server({
-    oidc_opts = {
+    access_token_opts = {
       scope = "my-scope"
     },
     token_response_expires_in = 0

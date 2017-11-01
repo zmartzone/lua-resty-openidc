@@ -234,7 +234,7 @@ JWT_VERIFY_SECRET]=]
 
         location /access_token {
             content_by_lua_block {
-                local access_token, err = oidc.access_token(OIDC_CONFIG)
+                local access_token, err = oidc.access_token(ACCESS_TOKEN_OPTS)
                 if not access_token then
                   ngx.status = 401
                   ngx.log(ngx.ERR, "access_token error: " .. (err or 'no message'))
@@ -285,6 +285,7 @@ local function write_config(out, custom_config)
   local token_response_expires_in = custom_config["token_response_expires_in"] or DEFAULT_TOKEN_RESPONSE_EXPIRES_IN
   local token_response_contains_refresh_token = custom_config["token_response_contains_refresh_token"]
     or DEFAULT_TOKEN_RESPONSE_CONTAINS_REFRESH_TOKEN
+  local access_token_opts = merge(merge({}, DEFAULT_OIDC_CONFIG), custom_config["access_token_opts"] or {})
   for _, k in ipairs(custom_config["remove_id_token_claims"] or {}) do
     id_token[k] = nil
   end
@@ -301,7 +302,6 @@ local function write_config(out, custom_config)
     :gsub("OIDC_CONFIG", serpent.block(oidc_config, {comment = false }))
     :gsub("ID_TOKEN", serpent.block(id_token, {comment = false }))
     :gsub("TOKEN_HEADER", serpent.block(token_header, {comment = false }))
-    :gsub("ACCESS_TOKEN", serpent.block(access_token, {comment = false }))
     :gsub("JWT_VERIFY_SECRET", custom_config["jwt_verify_secret"] or DEFAULT_JWT_VERIFY_SECRET)
     :gsub("VERIFY_OPTS", serpent.block(verify_opts, {comment = false }))
     :gsub("JWK", custom_config["jwk"] or DEFAULT_JWK)
@@ -310,6 +310,8 @@ local function write_config(out, custom_config)
     :gsub("INTROSPECTION_OPTS", serpent.block(introspection_opts, {comment = false }))
     :gsub("TOKEN_RESPONSE_EXPIRES_IN", token_response_expires_in)
     :gsub("TOKEN_RESPONSE_CONTAINS_REFRESH_TOKEN", token_response_contains_refresh_token)
+    :gsub("ACCESS_TOKEN_OPTS", serpent.block(access_token_opts, {comment = false }))
+    :gsub("ACCESS_TOKEN", serpent.block(access_token, {comment = false }))
   out:write(config)
 end
 
@@ -335,6 +337,7 @@ end
 -- - token_response_expires_in value for the expires_in claim of the token response
 -- - token_response_contains_refresh_token whether to include a
 --   refresh token with the token response (a boolean in quotes, i.e. "true" or "false")
+-- - access_token_opts is a table containing options that are accepted by oidc.access_token
 function test_support.start_server(custom_config)
   assert(os.execute("rm -rf /tmp/server"), "failed to remove old server dir")
   assert(os.execute("mkdir -p /tmp/server/conf"), "failed to create server dir")
