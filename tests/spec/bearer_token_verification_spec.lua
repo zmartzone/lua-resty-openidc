@@ -355,6 +355,74 @@ describe("when jwks endpoint is not reachable", function()
   end)
 end)
 
+describe("when jwk endpoint is slow but no timeout is configured", function()
+  test_support.start_server({
+    delay_response = { jwk = 1000 },
+    verify_opts = {
+      discovery = {
+        jwks_uri = "http://127.0.0.1/jwk",
+      }
+    }
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/verify_bearer_token",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the response is valid", function()
+    assert.are.equals(204, status)
+  end)
+end)
+
+describe("when jwk endpoint is slow and a simple timeout is configured", function()
+  test_support.start_server({
+    delay_response = { jwk = 1000 },
+    verify_opts = {
+      discovery = {
+        jwks_uri = "http://127.0.0.1/jwk",
+      },
+      timeout = 200,
+    },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/verify_bearer_token",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("Invalid token: accessing jwks url.*%(http://127.0.0.1/jwk%) failed: timeout")
+  end)
+end)
+
+describe("when jwk endpoint is slow and a table timeout is configured", function()
+  test_support.start_server({
+    delay_response = { jwk = 1000 },
+    verify_opts = {
+      discovery = {
+        jwks_uri = "http://127.0.0.1/jwk",
+      },
+      timeout = { read = 200 },
+    },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/verify_bearer_token",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("Invalid token: accessing jwks url.*%(http://127.0.0.1/jwk%) failed: timeout")
+  end)
+end)
+
 describe("when jwks endpoint sends a 4xx status", function()
   test_support.start_server({
     verify_opts = {

@@ -260,6 +260,16 @@ local function openidc_parse_json_response(response)
   return res, err
 end
 
+local function openidc_configure_timeouts(httpc, timeout)
+  if timeout then
+    if type(timeout) == "table" then
+      local r, e = httpc:set_timeouts(timeout.connect or 0, timeout.send or 0, timeout.read or 0)
+    else
+      local r, e = httpc:set_timeout(timeout)
+    end
+  end
+end
+
 -- make a call to the token endpoint
 local function openidc_call_token_endpoint(opts, endpoint, body, auth, endpoint_name)
 
@@ -283,6 +293,7 @@ local function openidc_call_token_endpoint(opts, endpoint, body, auth, endpoint_
   ngx.log(ngx.DEBUG, "request body for "..ep_name.." endpoint call: ", ngx.encode_args(body))
 
   local httpc = http.new()
+  openidc_configure_timeouts(httpc, opts.timeout)
   local res, err = httpc:request_uri(endpoint, {
     method = "POST",
     body = ngx.encode_args(body),
@@ -314,6 +325,7 @@ local function openidc_call_userinfo_endpoint(opts, access_token)
   ngx.log(ngx.DEBUG,"authorization header '"..headers.Authorization.."'")
 
   local httpc = http.new()
+  openidc_configure_timeouts(httpc, opts.timeout)
   local res, err = httpc:request_uri(opts.discovery.userinfo_endpoint, {
     headers = headers
   })
@@ -350,7 +362,7 @@ local function openidc_load_jwt_none_alg(enc_hdr, enc_payload)
 end
 
 -- get the Discovery metadata from the specified URL
-local function openidc_discover(url, ssl_verify)
+local function openidc_discover(url, ssl_verify, timeout)
   ngx.log(ngx.DEBUG, "openidc_discover: URL is: "..url)
 
   local json, err
@@ -360,6 +372,7 @@ local function openidc_discover(url, ssl_verify)
     ngx.log(ngx.DEBUG, "discovery data not in cache, making call to discovery endpoint")
     -- make the call to the discovery endpoint
     local httpc = http.new()
+    openidc_configure_timeouts(httpc, timeout)
     local res, error = httpc:request_uri(url, {
       ssl_verify = (ssl_verify ~= "no")
     })
@@ -394,12 +407,12 @@ end
 local function openidc_ensure_discovered_data(opts)
   local err
   if type(opts.discovery) == "string" then
-    opts.discovery, err = openidc_discover(opts.discovery, opts.ssl_verify)
+    opts.discovery, err = openidc_discover(opts.discovery, opts.ssl_verify, opts.timeout)
   end
   return err
 end
 
-local function openidc_jwks(url, force, ssl_verify)
+local function openidc_jwks(url, force, ssl_verify, timeout)
   ngx.log(ngx.DEBUG, "openidc_jwks: URL is: "..url.. " (force=" .. force .. ")")
 
   local json, err, v
@@ -413,6 +426,7 @@ local function openidc_jwks(url, force, ssl_verify)
     ngx.log(ngx.DEBUG, "cannot use cached JWKS data; making call to jwks endpoint")
     -- make the call to the jwks endpoint
     local httpc = http.new()
+    openidc_configure_timeouts(httpc, timeout)
     local res, error = httpc:request_uri(url, {
       ssl_verify = (ssl_verify ~= "no")
     })
@@ -564,7 +578,7 @@ local function openidc_pem_from_jwk(opts, kid)
   local jwk, jwks
 
   for force=0, 1 do
-    jwks, err = openidc_jwks(opts.discovery.jwks_uri, force, opts.ssl_verify)
+    jwks, err = openidc_jwks(opts.discovery.jwks_uri, force, opts.ssl_verify, opts.timeout)
     if err then
       return nil, err
     end
