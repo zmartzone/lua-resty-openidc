@@ -334,9 +334,9 @@ local function openidc_access_token_expires_in(opts, expires_in)
 end
 
 local function openidc_load_jwt_none_alg(enc_hdr, enc_payload)
-  local header = cjson.decode(openidc_base64_url_decode(enc_hdr))
-  local payload = cjson.decode(openidc_base64_url_decode(enc_payload))
-  if header.alg == "none" then
+  local header = cjson_s.decode(openidc_base64_url_decode(enc_hdr))
+  local payload = cjson_s.decode(openidc_base64_url_decode(enc_payload))
+  if header and payload and header.alg == "none" then
     ngx.log(ngx.DEBUG, "accept JWT with alg \"none\" and no signature from \"code\" flow")
     return {
       raw_header = enc_hdr,

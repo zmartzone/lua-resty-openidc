@@ -2,7 +2,7 @@ local http = require("socket.http")
 local test_support = require("test_support")
 require 'busted.runner'()
 
-local function none_signature_jwt(payload)
+local function none_signature_jwt(payload, alg)
   local function b64url(s)
     local dkjson = require "dkjson"
     local mime = require "mime"
@@ -10,7 +10,7 @@ local function none_signature_jwt(payload)
   end
   local header = b64url({
       typ = "JWT",
-      alg = "none"
+      alg = alg or "none"
   })
   return header .. "." .. b64url(payload) .. "."
 end
@@ -246,6 +246,48 @@ describe("when using a JWT not signed but using the 'none' alg", function()
   })
   it("the token is valid", function()
     assert.are.equals(204, status)
+  end)
+end)
+
+describe("when using an unsigned JWT with an alg different from 'none'", function()
+  test_support.start_server({
+    verify_opts = {
+      discovery = {
+        jwks_uri = "http://127.0.0.1/jwk",
+      }
+    },
+    jwk = test_support.load("/spec/jwks_with_two_keys.json"),
+  })
+  teardown(test_support.stop_server)
+  local jwt = none_signature_jwt({
+      exp = os.time() + 3600,
+  }, "RS256")
+  local _, status = http.request({
+    url = "http://127.0.0.1/verify_bearer_token",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the token is invalid", function()
+    assert.are.equals(401, status)
+  end)
+end)
+
+describe("when the bearer token doesn't contain JSON but looks like an unsigned token", function()
+  test_support.start_server({
+    verify_opts = {
+      discovery = {
+        jwks_uri = "http://127.0.0.1/jwk",
+      }
+    },
+    jwk = test_support.load("/spec/jwks_with_two_keys.json"),
+  })
+  teardown(test_support.stop_server)
+  local jwt = "foo.bar."
+  local _, status = http.request({
+    url = "http://127.0.0.1/verify_bearer_token",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the token is invalid", function()
+    assert.are.equals(401, status)
   end)
 end)
 
