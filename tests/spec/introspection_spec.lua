@@ -163,6 +163,63 @@ describe("when introspection endpoint is not reachable", function()
   end)
 end)
 
+describe("when introspection endpoint is slow but no timeout is configured", function()
+  test_support.start_server({
+    delay_response = { introspection = 1000 },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/introspect",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the response is valid", function()
+    assert.are.equals(200, status)
+  end)
+end)
+
+describe("when introspection endpoint is slow and a simple timeout is configured", function()
+  test_support.start_server({
+    delay_response = { introspection = 1000 },
+    introspection_opts = {
+      timeout = 200,
+    },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/introspect",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("Introspection error:.*accessing introspection endpoint %(http://127.0.0.1/introspection%) failed: timeout")
+  end)
+end)
+
+describe("when introspection endpoint is slow and a table timeout is configured", function()
+  test_support.start_server({
+    delay_response = { introspection = 1000 },
+    introspection_opts = {
+      timeout = { read = 200 },
+    },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/introspect",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("Introspection error:.*accessing introspection endpoint %(http://127.0.0.1/introspection%) failed: timeout")
+  end)
+end)
+
 describe("when introspection endpoint sends a 4xx status", function()
   test_support.start_server({
     introspection_opts = {

@@ -66,6 +66,8 @@ local DEFAULT_TOKEN_RESPONSE_EXPIRES_IN = "3600"
 
 local DEFAULT_TOKEN_RESPONSE_CONTAINS_REFRESH_TOKEN = "true"
 
+local DEFAULT_DELAY_RESPONSE = "0"
+
 local DEFAULT_CONFIG_TEMPLATE = [[
 worker_processes  1;
 pid       /tmp/server/logs/nginx.pid;
@@ -87,6 +89,11 @@ http {
         cjson = require "cjson"
         secret = [=[
 JWT_VERIFY_SECRET]=]
+        delay = function(delay_response)
+          if delay_response > 0 then
+            ngx.sleep(delay_response / 1000)
+          end
+        end
     }
 
     resolver      8.8.8.8;
@@ -115,6 +122,7 @@ JWT_VERIFY_SECRET]=]
         location /jwk {
             content_by_lua_block {
                 ngx.header.content_type = 'application/json;charset=UTF-8'
+                delay(JWK_DELAY_RESPONSE)
                 ngx.say([=[JWK]=])
             }
         }
@@ -170,6 +178,7 @@ JWT_VERIFY_SECRET]=]
                   refresh_token = TOKEN_RESPONSE_CONTAINS_REFRESH_TOKEN and refresh_token or nil,
                   id_token = jwt_token
                 }
+                delay(TOKEN_DELAY_RESPONSE)
                 ngx.say(cjson.encode(token_response))
             }
         }
@@ -190,6 +199,7 @@ JWT_VERIFY_SECRET]=]
         location /discovery {
             content_by_lua_block {
                 ngx.header.content_type = 'application/json;charset=UTF-8'
+                delay(DISCOVERY_DELAY_RESPONSE)
                 ngx.say([=[{
   "authorization_endpoint": "http://127.0.0.1/authorize",
   "token_endpoint": "http://127.0.0.1/token",
@@ -202,6 +212,7 @@ JWT_VERIFY_SECRET]=]
 
         location /user-info {
             content_by_lua_block {
+                delay(USERINFO_DELAY_RESPONSE)
                 local auth = ngx.req.get_headers()["Authorization"]
                 ngx.log(ngx.ERR, "userinfo authorization header: " .. (auth and auth or ""))
                 ngx.header.content_type = 'application/json;charset=UTF-8'
@@ -216,6 +227,7 @@ JWT_VERIFY_SECRET]=]
                 local auth = ngx.req.get_headers()["Authorization"]
                 ngx.log(ngx.ERR, "introspection authorization header: " .. (auth and auth or ""))
                 ngx.header.content_type = 'application/json;charset=UTF-8'
+                delay(INTROSPECTION_DELAY_RESPONSE)
                 ngx.say(cjson.encode(INTROSPECTION_RESPONSE))
             }
         }
@@ -305,14 +317,19 @@ local function write_config(out, custom_config)
     :gsub("TOKEN_HEADER", serpent.block(token_header, {comment = false }))
     :gsub("JWT_VERIFY_SECRET", custom_config["jwt_verify_secret"] or DEFAULT_JWT_VERIFY_SECRET)
     :gsub("VERIFY_OPTS", serpent.block(verify_opts, {comment = false }))
-    :gsub("JWK", custom_config["jwk"] or DEFAULT_JWK)
-    :gsub("USERINFO", serpent.block(userinfo, {comment = false }))
     :gsub("INTROSPECTION_RESPONSE", serpent.block(introspection_response, {comment = false }))
     :gsub("INTROSPECTION_OPTS", serpent.block(introspection_opts, {comment = false }))
     :gsub("TOKEN_RESPONSE_EXPIRES_IN", token_response_expires_in)
     :gsub("TOKEN_RESPONSE_CONTAINS_REFRESH_TOKEN", token_response_contains_refresh_token)
     :gsub("ACCESS_TOKEN_OPTS", serpent.block(access_token_opts, {comment = false }))
     :gsub("ACCESS_TOKEN", serpent.block(access_token, {comment = false }))
+    :gsub("JWK_DELAY_RESPONSE", ((custom_config["delay_response"] or {}).jwk or DEFAULT_DELAY_RESPONSE))
+    :gsub("TOKEN_DELAY_RESPONSE", ((custom_config["delay_response"] or {}).token or DEFAULT_DELAY_RESPONSE))
+    :gsub("DISCOVERY_DELAY_RESPONSE", ((custom_config["delay_response"] or {}).discovery or DEFAULT_DELAY_RESPONSE))
+    :gsub("USERINFO_DELAY_RESPONSE", ((custom_config["delay_response"] or {}).userinfo or DEFAULT_DELAY_RESPONSE))
+    :gsub("INTROSPECTION_DELAY_RESPONSE", ((custom_config["delay_response"] or {}).introspection or DEFAULT_DELAY_RESPONSE))
+    :gsub("JWK", custom_config["jwk"] or DEFAULT_JWK)
+    :gsub("USERINFO", serpent.block(userinfo, {comment = false }))
   out:write(config)
 end
 
@@ -339,6 +356,8 @@ end
 -- - token_response_contains_refresh_token whether to include a
 --   refresh token with the token response (a boolean in quotes, i.e. "true" or "false")
 -- - access_token_opts is a table containing options that are accepted by oidc.access_token
+-- - delay_response is a table specifying a delay for the response of various endpoint in ms
+--   { jwk = 1, token = 1, discovery = 1, userinfo = 1, introspection = 1}
 function test_support.start_server(custom_config)
   assert(os.execute("rm -rf /tmp/server"), "failed to remove old server dir")
   assert(os.execute("mkdir -p /tmp/server/conf"), "failed to create server dir")

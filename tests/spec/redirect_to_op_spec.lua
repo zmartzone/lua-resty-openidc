@@ -148,6 +148,65 @@ describe("when discovery endpoint is not reachable", function()
   end)
 end)
 
+describe("when discovery endpoint is slow and no timeout is configured", function()
+  test_support.start_server({
+    delay_response = { discovery = 1000 },
+    oidc_opts = {
+      discovery = "http://127.0.0.1/discovery"
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, status = http.request({
+    url = "http://127.0.0.1/default/t",
+    redirect = false
+  })
+  it("the response is a redirect", function()
+    assert.are.equals(302, status)
+  end)
+end)
+
+describe("when discovery endpoint is slow and a simple timeout is configured", function()
+  test_support.start_server({
+    delay_response = { discovery = 1000 },
+    oidc_opts = {
+      timeout = 200,
+      discovery = "http://127.0.0.1/discovery"
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, status = http.request({
+    url = "http://127.0.0.1/default/t",
+    redirect = false
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("authenticate failed: accessing discovery url.*%(http://127.0.0.1/discovery%) failed: timeout")
+  end)
+end)
+
+describe("when discovery endpoint is slow and a table timeout is configured", function()
+  test_support.start_server({
+    delay_response = { discovery = 1000 },
+    oidc_opts = {
+      timeout = { read = 200 },
+      discovery = "http://127.0.0.1/discovery"
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, status = http.request({
+    url = "http://127.0.0.1/default/t",
+    redirect = false
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("authenticate failed: accessing discovery url.*%(http://127.0.0.1/discovery%) failed: timeout")
+  end)
+end)
+
 describe("when discovery endpoint sends a 4xx status", function()
   test_support.start_server({
     oidc_opts = {

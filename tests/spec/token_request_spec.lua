@@ -120,6 +120,51 @@ describe("if token endpoint is not reachable", function()
   end)
 end)
 
+describe("if token endpoint is slow and no timeout is configured", function()
+  test_support.start_server({
+    delay_response = { token = 1000 },
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login succeeds", function()
+    assert.are.equals(302, status)
+  end)
+end)
+
+describe("if token endpoint is slow and a simple timeout is configured", function()
+  test_support.start_server({
+    delay_response = { token = 1000 },
+    oidc_opts = {
+      timeout = 200,
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login fails", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("authenticate failed:.*accessing token endpoint %(http://127.0.0.1/token%) failed: timeout")
+  end)
+end)
+
+describe("if token endpoint is slow and a table timeout is configured", function()
+  test_support.start_server({
+    delay_response = { token = 1000 },
+    oidc_opts = {
+      timeout = { read = 200 },
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login fails", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("authenticate failed:.*accessing token endpoint %(http://127.0.0.1/token%) failed: timeout")
+  end)
+end)
+
 describe("if token endpoint sends a 4xx status", function()
   test_support.start_server({
     oidc_opts = {

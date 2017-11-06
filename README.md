@@ -122,6 +122,10 @@ http {
              -- When not set everything will be included in the session.
              -- Available are: 
              -- id_token, enc_id_token, user, access_token (includes refresh token)
+
+             -- You can specify timeouts for connect/send/read as a single number (setting all timeouts) or as a table. Values are in milliseconds
+             -- timeout = 1000
+             -- timeout = { connect = 500, send = 1000, read = 1000 }
           }
 
           -- call authenticate for OpenID Connect user authentication

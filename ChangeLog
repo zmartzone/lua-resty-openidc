@@ -1,3 +1,6 @@
+11/06/2017
+- added support for configurable network timeouts
+
 11/01/2017
 - now uses cjson.safe when decoding JSON received from external sources for improved error handling
 

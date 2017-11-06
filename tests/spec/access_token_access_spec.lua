@@ -195,6 +195,72 @@ describe("when token endpoint is not reachable", function()
   end)
 end)
 
+describe("when token endpoint is slow but no timeout is configured", function()
+  test_support.start_server({
+    delay_response = { token = 1000 },
+    token_response_expires_in = 0
+  })
+  teardown(test_support.stop_server)
+  local _, _, cookies = test_support.login()
+  os.execute("sleep 1.5")
+  local _, status = http.request({
+    url = "http://localhost/access_token",
+    redirect = false,
+    headers = { cookie = cookies },
+  })
+  it("the access_token is available", function()
+    assert.are.equals(200, status)
+  end)
+end)
+
+describe("when token endpoint is slow and a simple timeout is configured", function()
+  test_support.start_server({
+    delay_response = { token = 1000 },
+    access_token_opts = {
+      timeout = 200
+    },
+    token_response_expires_in = 0
+  })
+  teardown(test_support.stop_server)
+  local _, _, cookies = test_support.login()
+  os.execute("sleep 1.5")
+  local _, status = http.request({
+    url = "http://localhost/access_token",
+    redirect = false,
+    headers = { cookie = cookies },
+  })
+  it("the access_token is not available", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("access_token error: accessing token endpoint.*%(http://127.0.0.1/token%) failed: timeout")
+  end)
+end)
+
+describe("when token endpoint is slow and a table timeout is configured", function()
+  test_support.start_server({
+    delay_response = { token = 1000 },
+    access_token_opts = {
+      timeout = { read = 200 }
+    },
+    token_response_expires_in = 0
+  })
+  teardown(test_support.stop_server)
+  local _, _, cookies = test_support.login()
+  os.execute("sleep 1.5")
+  local _, status = http.request({
+    url = "http://localhost/access_token",
+    redirect = false,
+    headers = { cookie = cookies },
+  })
+  it("the access_token is not available", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("access_token error: accessing token endpoint.*%(http://127.0.0.1/token%) failed: timeout")
+  end)
+end)
+
 describe("when token endpoint sends a 4xx status", function()
   test_support.start_server({
     access_token_opts = {
