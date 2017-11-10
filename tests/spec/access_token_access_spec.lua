@@ -39,6 +39,33 @@ describe("if there is an active non-expired login", function()
   end)
 end)
 
+describe("if there is an active non-expired login but access token is not stored in session", function()
+  test_support.start_server({
+    access_token_opts = {
+      session_contents = {
+        foo = true
+      }
+    },
+    oidc_opts = {
+      session_contents = {
+        foo = true
+      }
+    }
+  })
+  teardown(test_support.stop_server)
+  local _, _, cookies = test_support.login()
+  local content_table = {}
+  local _, status = http.request({
+    url = "http://localhost/access_token",
+    redirect = false,
+    headers = { cookie = cookies },
+    sink = ltn12.sink.table(content_table)
+  })
+  it("the access_token is not available", function()
+    assert.are.equals(401, status)
+  end)
+end)
+
 describe("if there is an active but expired login", function()
   test_support.start_server({
     token_response_expires_in = 0
