@@ -433,3 +433,20 @@ describe("when setting the use_nonce option to false", function()
     assert.falsy(string.match(headers["location"], ".*nonce=.*"))
   end)
 end)
+
+describe("when a request_decorator has been specified when calling the discovery endpoint", function()
+  test_support.start_server({
+    oidc_opts = {
+      discovery = "http://127.0.0.1/discovery",
+      decorate = "query"
+    },
+  })
+  teardown(test_support.stop_server)
+  http.request({
+    url = "http://127.0.0.1/default/t",
+    redirect = false
+  })
+  it("the request contains the additional parameter", function()
+    assert.error_log_contains('discovery uri_args:.*"foo"%s*:%s*"bar"')
+  end)
+end)

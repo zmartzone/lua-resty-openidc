@@ -508,3 +508,21 @@ describe("when introspection endpoint doesn't return proper JSON", function()
     assert.error_log_contains("Introspection error: JSON decoding failed")
   end)
 end)
+
+describe("when a request_decorator has been specified when calling the token endpoint", function()
+  test_support.start_server({
+    introspection_opts = {
+      decorate = true
+    }
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  http.request({
+    url = "http://127.0.0.1/introspect",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the request contains the additional parameter", function()
+    assert_introspection_endpoint_call_contains("foo=bar")
+  end)
+end)
+
