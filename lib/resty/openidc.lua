@@ -982,6 +982,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
         target_url,
         session
     end
+    opts.prompt = nil
     openidc_authorize(opts, session, target_url)
     return nil, nil, target_url, session
   end
