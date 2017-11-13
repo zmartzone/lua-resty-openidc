@@ -953,7 +953,10 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
   end
 
   local token_expired = false
-  if session.present and session.data.authenticated and store_in_session(opts, 'access_token') then
+  local try_to_renew = opts.renew_access_token_on_expiry == nil or opts.renew_access_token_on_expiry
+  if try_to_renew and session.present and session.data.authenticated
+    and store_in_session(opts, 'access_token')
+  then
     -- refresh access_token if necessary
     access_token, err = openidc_access_token(opts, session)
     if err then
@@ -970,7 +973,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
   if not session.present
     or not (session.data.id_token or session.data.authenticated)
     or opts.force_reauthorize
-    or token_expired
+    or (try_to_renew and token_expired)
   then
     if unauth_action == "pass" then
       return

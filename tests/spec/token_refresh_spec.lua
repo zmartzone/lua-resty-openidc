@@ -16,7 +16,7 @@ describe("if there is an active non-expired login", function()
   end)
 end)
 
-describe("if there is an active but expired login", function()
+describe("if there is an active but expired login and refresh is not configured explicitly", function()
   test_support.start_server({
     token_response_expires_in = 0
   })
@@ -33,6 +33,52 @@ describe("if there is an active but expired login", function()
   end)
   it("the token gets refreshed", function()
     assert.error_log_contains("request body for token endpoint call: .*grant_type=refresh_token.*")
+  end)
+end)
+
+describe("if there is an active but expired login and refresh is enabled explicitly", function()
+  test_support.start_server({
+    token_response_expires_in = 0,
+    oidc_opts = {
+      renew_access_token_on_expiry = true
+    }
+  })
+  teardown(test_support.stop_server)
+  local _, _, cookies = test_support.login()
+  os.execute("sleep 1.5")
+  local _, status = http.request({
+    url = "http://localhost/default/t",
+    redirect = false,
+    headers = { cookie = cookies },
+  })
+  it("no redirect occurs on the next call", function()
+    assert.are.equals(200, status)
+  end)
+  it("the token gets refreshed", function()
+    assert.error_log_contains("request body for token endpoint call: .*grant_type=refresh_token.*")
+  end)
+end)
+
+describe("if there is an active but expired login and refresh is disabled explicitly", function()
+  test_support.start_server({
+    token_response_expires_in = 0,
+    oidc_opts = {
+      renew_access_token_on_expiry = false
+    }
+  })
+  teardown(test_support.stop_server)
+  local _, _, cookies = test_support.login()
+  os.execute("sleep 1.5")
+  local _, status = http.request({
+    url = "http://localhost/default/t",
+    redirect = false,
+    headers = { cookie = cookies },
+  })
+  it("no redirect occurs on the next call", function()
+    assert.are.equals(200, status)
+  end)
+  it("the token doesn't get refreshed", function()
+    assert.is_not.error_log_contains("request body for token endpoint call: .*grant_type=refresh_token.*")
   end)
 end)
 
