@@ -108,9 +108,12 @@ http {
              --redirect_after_logout_with_id_token_hint = true,
              --token_endpoint_auth_method = ["client_secret_basic"|"client_secret_post"],
              --ssl_verify = "no"
+
+             --renew_access_token_on_expiry = true
+             -- whether this plugin shall try to silently renew the access token once it is expired if a refresh token is available.
+             -- if it fails to renew the token, the user will be redirected to the authorization endpoint.
              --access_token_expires_in = 3600
              -- Default lifetime in seconds of the access_token if no expires_in attribute is present in the token endpoint response. 
-             -- This plugin will silently renew the access_token once it is expired if refreshToken scope is present.
 
              --access_token_expires_leeway = 0
              --  Expiration leeway for access_token renewal. If this is set, renewal will happen access_token_expires_leeway seconds before the token expiration. This avoids errors in case the access_token just expires when arriving to the OAuth Resource Server.

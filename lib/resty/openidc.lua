@@ -875,7 +875,7 @@ local function openidc_access_token(opts, session)
     return session.data.access_token, err
   end
   if session.data.refresh_token == nil then
-    return nil, err
+    return nil, "token expired and no refresh token available"
   end
 
   ngx.log(ngx.DEBUG, "refreshing expired access_token: ", session.data.access_token, " with: ", session.data.refresh_token)
@@ -952,9 +952,29 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
     return nil, nil, target_url, session
   end
 
+  local token_expired = false
+  local try_to_renew = opts.renew_access_token_on_expiry == nil or opts.renew_access_token_on_expiry
+  if try_to_renew and session.present and session.data.authenticated
+    and store_in_session(opts, 'access_token')
+  then
+    -- refresh access_token if necessary
+    access_token, err = openidc_access_token(opts, session)
+    if err then
+      ngx.log(ngx.ERR, "lost access token:" .. err)
+      err = nil
+    end
+    if not access_token then
+      token_expired = true
+    end
+  end
+
   -- if we are not authenticated then redirect to the OP for authentication
   -- the presence of the id_token is check for backwards compatibility
-  if not session.present or not (session.data.id_token or session.data.authenticated) or opts.force_reauthorize then
+  if not session.present
+    or not (session.data.id_token or session.data.authenticated)
+    or opts.force_reauthorize
+    or (try_to_renew and token_expired)
+  then
     if unauth_action == "pass" then
       return
         nil,
@@ -972,14 +992,6 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
       opts.prompt = "none"
       openidc_authorize(opts, session, target_url)
       return nil, nil, target_url, session
-    end
-  end
-
-  if store_in_session(opts, 'access_token') then
-    -- refresh access_token if necessary
-    access_token, err = openidc_access_token(opts, session)
-    if err then
-      return nil, err, target_url, session
     end
   end
 

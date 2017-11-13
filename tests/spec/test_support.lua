@@ -65,6 +65,7 @@ local DEFAULT_INTROSPECTION_OPTS = {
 local DEFAULT_TOKEN_RESPONSE_EXPIRES_IN = "3600"
 
 local DEFAULT_TOKEN_RESPONSE_CONTAINS_REFRESH_TOKEN = "true"
+local DEFAULT_REFRESHING_TOKEN_FAILS = "false"
 
 local DEFAULT_DELAY_RESPONSE = "0"
 
@@ -163,6 +164,11 @@ JWT_VERIFY_SECRET]=]
                   id_token.nonce = nonce_file:read("*all")
                   assert(nonce_file:close())
                 else
+                  if REFRESHING_TOKEN_FAILS then
+                    ngx.status = 400
+                    ngx.say('{"error":"invalid_grant","error_description":"Refresh token expired"}')
+                    ngx.exit(400)
+                  end
                   access_token = access_token .. "2"
                   refresh_token = refresh_token .. "2"
                 end
@@ -298,6 +304,7 @@ local function write_config(out, custom_config)
   local token_response_expires_in = custom_config["token_response_expires_in"] or DEFAULT_TOKEN_RESPONSE_EXPIRES_IN
   local token_response_contains_refresh_token = custom_config["token_response_contains_refresh_token"]
     or DEFAULT_TOKEN_RESPONSE_CONTAINS_REFRESH_TOKEN
+  local refreshing_token_fails = custom_config["refreshing_token_fails"] or DEFAULT_REFRESHING_TOKEN_FAILS
   local access_token_opts = merge(merge({}, DEFAULT_OIDC_CONFIG), custom_config["access_token_opts"] or {})
   for _, k in ipairs(custom_config["remove_id_token_claims"] or {}) do
     id_token[k] = nil
@@ -321,6 +328,7 @@ local function write_config(out, custom_config)
     :gsub("INTROSPECTION_OPTS", serpent.block(introspection_opts, {comment = false }))
     :gsub("TOKEN_RESPONSE_EXPIRES_IN", token_response_expires_in)
     :gsub("TOKEN_RESPONSE_CONTAINS_REFRESH_TOKEN", token_response_contains_refresh_token)
+    :gsub("REFRESHING_TOKEN_FAILS", refreshing_token_fails)
     :gsub("ACCESS_TOKEN_OPTS", serpent.block(access_token_opts, {comment = false }))
     :gsub("ACCESS_TOKEN", serpent.block(access_token, {comment = false }))
     :gsub("JWK_DELAY_RESPONSE", ((custom_config["delay_response"] or {}).jwk or DEFAULT_DELAY_RESPONSE))
@@ -358,6 +366,7 @@ end
 -- - access_token_opts is a table containing options that are accepted by oidc.access_token
 -- - delay_response is a table specifying a delay for the response of various endpoint in ms
 --   { jwk = 1, token = 1, discovery = 1, userinfo = 1, introspection = 1}
+-- - refreshing_token_fails whether to grant an access token via the refresh token grant
 function test_support.start_server(custom_config)
   assert(os.execute("rm -rf /tmp/server"), "failed to remove old server dir")
   assert(os.execute("mkdir -p /tmp/server/conf"), "failed to create server dir")
