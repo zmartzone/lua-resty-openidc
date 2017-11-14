@@ -196,7 +196,7 @@ local function openidc_combine_uri(uri, params)
 end
 
 -- send the browser of to the OP's authorization endpoint
-local function openidc_authorize(opts, session, target_url)
+local function openidc_authorize(opts, session, target_url, prompt)
   local resty_random = require "resty.random"
   local resty_string = require "resty.string"
 
@@ -214,8 +214,8 @@ local function openidc_authorize(opts, session, target_url)
     nonce=nonce,
   }
 
-  if opts.prompt then
-    params.prompt = opts.prompt
+  if prompt then
+    params.prompt = prompt
   end
 
   if opts.display then
@@ -982,15 +982,14 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
         target_url,
         session
     end
-    openidc_authorize(opts, session, target_url)
+    openidc_authorize(opts, session, target_url, opts.prompt)
     return nil, nil, target_url, session
   end
 
   -- silently reauthenticate if necessary (mainly used for session refresh/getting updated id_token data)
   if opts.refresh_session_interval ~= nil then
     if session.data.last_authenticated == nil or (session.data.last_authenticated+opts.refresh_session_interval) < ngx.time() then
-      opts.prompt = "none"
-      openidc_authorize(opts, session, target_url)
+      openidc_authorize(opts, session, target_url, "none")
       return nil, nil, target_url, session
     end
   end
