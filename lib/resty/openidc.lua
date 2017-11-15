@@ -863,7 +863,7 @@ local function openidc_get_token_auth_method(opts)
 end
 
 -- returns a valid access_token (eventually refreshing the token)
-local function openidc_access_token(opts, session)
+local function openidc_access_token(opts, session, try_to_renew)
 
   local err
 
@@ -873,6 +873,9 @@ local function openidc_access_token(opts, session)
   local current_time = ngx.time()
   if current_time < session.data.access_token_expiration then
     return session.data.access_token, err
+  end
+  if not try_to_renew then
+    return nil, "token expired"
   end
   if session.data.refresh_token == nil then
     return nil, "token expired and no refresh token available"
@@ -954,11 +957,11 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
 
   local token_expired = false
   local try_to_renew = opts.renew_access_token_on_expiry == nil or opts.renew_access_token_on_expiry
-  if try_to_renew and session.present and session.data.authenticated
+  if session.present and session.data.authenticated
     and store_in_session(opts, 'access_token')
   then
     -- refresh access_token if necessary
-    access_token, err = openidc_access_token(opts, session)
+    access_token, err = openidc_access_token(opts, session, try_to_renew)
     if err then
       ngx.log(ngx.ERR, "lost access token:" .. err)
       err = nil
@@ -1016,7 +1019,7 @@ function openidc.access_token(opts, session_opts)
 
   local session = require("resty.session").open(session_opts)
 
-  return openidc_access_token(opts, session)
+  return openidc_access_token(opts, session, true)
 
 end
 

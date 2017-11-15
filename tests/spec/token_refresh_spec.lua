@@ -14,6 +14,27 @@ describe("if there is an active non-expired login", function()
   it("no redirect occurs on the next call", function()
     assert.are.equals(200, status)
   end)
+  it("the access token is returned by authenticate", function()
+    assert.is_not.error_log_contains("authenticate didn't return any access token")
+  end)
+end)
+
+-- see https://github.com/pingidentity/lua-resty-openidc/issues/121
+describe("if there is an active non-expired login and renew is disabled explicitly", function()
+  test_support.start_server()
+  teardown(test_support.stop_server)
+  local _, _, cookies = test_support.login()
+  local _, status = http.request({
+    url = "http://localhost/default/t",
+    redirect = false,
+    headers = { cookie = cookies },
+  })
+  it("no redirect occurs on the next call", function()
+    assert.are.equals(200, status)
+  end)
+  it("the access token is returned by authenticate", function()
+    assert.is_not.error_log_contains("authenticate didn't return any access token")
+  end)
 end)
 
 describe("if there is an active but expired login and refresh is not configured explicitly", function()
@@ -33,6 +54,9 @@ describe("if there is an active but expired login and refresh is not configured 
   end)
   it("the token gets refreshed", function()
     assert.error_log_contains("request body for token endpoint call: .*grant_type=refresh_token.*")
+  end)
+  it("the access token is returned by authenticate", function()
+    assert.is_not.error_log_contains("authenticate didn't return any access token")
   end)
 end)
 
@@ -57,6 +81,9 @@ describe("if there is an active but expired login and refresh is enabled explici
   it("the token gets refreshed", function()
     assert.error_log_contains("request body for token endpoint call: .*grant_type=refresh_token.*")
   end)
+  it("the access token is returned by authenticate", function()
+    assert.is_not.error_log_contains("authenticate didn't return any access token")
+  end)
 end)
 
 describe("if there is an active but expired login and refresh is disabled explicitly", function()
@@ -79,6 +106,9 @@ describe("if there is an active but expired login and refresh is disabled explic
   end)
   it("the token doesn't get refreshed", function()
     assert.is_not.error_log_contains("request body for token endpoint call: .*grant_type=refresh_token.*")
+  end)
+  it("no access token is returned by authenticate", function()
+    assert.error_log_contains("authenticate didn't return any access token")
   end)
 end)
 

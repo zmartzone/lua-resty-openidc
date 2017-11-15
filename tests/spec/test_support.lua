@@ -143,6 +143,9 @@ JWT_VERIFY_SECRET]=]
                 ngx.say("authenticate failed: " .. err)
                 ngx.exit(ngx.HTTP_UNAUTHORIZED)
               end
+              if not res or not res.access_token then
+                ngx.log(ngx.ERR, "authenticate didn't return any access token")
+              end
             }
             rewrite ^/default/(.*)$ /$1  break;
             proxy_pass http://localhost:80;
