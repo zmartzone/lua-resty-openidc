@@ -1,3 +1,6 @@
+11/15/2017
+- fix return of access_token when renew_access_token_on_expiry = false ; see #121
+
 11/14/2017
 - release 1.5.0
 
