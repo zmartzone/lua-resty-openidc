@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/pingidentity/lua-resty-openidc.svg?branch=master)](https://travis-ci.org/pingidentity/lua-resty-openidc)
+[![Build Status](https://travis-ci.org/zmartzone/lua-resty-openidc.svg?branch=master)](https://travis-ci.org/zmartzone/lua-resty-openidc)
 
 # lua-resty-openidc
 
@@ -97,7 +97,7 @@ http {
              discovery = "https://accounts.google.com/.well-known/openid-configuration",
              client_id = "<client_id>",
              client_secret = "<client_secret>"
-             --authorization_params = { hd="pingidentity.com" },
+             --authorization_params = { hd="zmartzone.eu" },
              --scope = "openid email profile",
              -- Refresh the users id_token after 900 seconds without requiring re-authentication
              --refresh_session_interval = 900,
@@ -145,7 +145,7 @@ http {
           --   access_token: the access token (optional)
           --   user        : a Lua table with the claims returned from the user info endpoint (optional)
 
-          --if res.id_token.hd ~= "pingidentity.com" then
+          --if res.id_token.hd ~= "zmartzone.eu" then
           --  ngx.exit(ngx.HTTP_FORBIDDEN)
           --end
 
@@ -340,7 +340,7 @@ as the second command
 ## Support
 
 See the Wiki pages with Frequently Asked Questions at:  
-  https://github.com/pingidentity/lua-resty-openidc/wiki  
+  https://github.com/zmartzone/lua-resty-openidc/wiki  
 For commercial support and consultancy you can contact:  
   [info@zmartzone.eu](mailto:info@zmartzone.eu)  
 
@@ -350,6 +350,5 @@ Any questions/issues should go to issues tracker or the primary author
 Disclaimer
 ----------
 
-*This software is open sourced by Ping Identity but not supported commercially
-by Ping Identity, see also the DISCLAIMER file in this directory. For commercial support
+*This software is open sourced by ZmartZone IAM. For commercial support
 you can contact [ZmartZone IAM](https://www.zmartzone.eu) as described above.*

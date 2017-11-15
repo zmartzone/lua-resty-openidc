@@ -19,7 +19,7 @@ describe("if there is an active non-expired login", function()
   end)
 end)
 
--- see https://github.com/pingidentity/lua-resty-openidc/issues/121
+-- see https://github.com/zmartzone/lua-resty-openidc/issues/121
 describe("if there is an active non-expired login and renew is disabled explicitly", function()
   test_support.start_server()
   teardown(test_support.stop_server)
@@ -130,7 +130,7 @@ describe("if there is an active but expired login and no refresh token", functio
   end)
 end)
 
--- https://github.com/pingidentity/lua-resty-openidc/issues/117
+-- https://github.com/zmartzone/lua-resty-openidc/issues/117
 describe("if there is an active but expired login and refreshing it fails", function()
   test_support.start_server({
     token_response_expires_in = 0,

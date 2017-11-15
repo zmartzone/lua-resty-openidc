@@ -1,7 +1,7 @@
 package = "lua-resty-openidc"
 version = "1.5.0-1"
 source = {
-    url = "git://github.com/pingidentity/lua-resty-openidc",
+    url = "git://github.com/zmartzone/lua-resty-openidc",
     tag = "v1.5.0",
     dir = "lua-resty-openidc"
 }
@@ -18,7 +18,7 @@ description = {
 
         It can be used as a reverse proxy terminating OAuth/OpenID Connect in front of an origin server so that the origin server/services can be protected with the relevant standards without implementing those on the server itself.
     ]],
-    homepage = "https://github.com/pingidentity/lua-resty-openidc",
+    homepage = "https://github.com/zmartzone/lua-resty-openidc",
     license = "Apache 2.0"
 }
 dependencies = {
