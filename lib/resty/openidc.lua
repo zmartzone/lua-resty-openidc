@@ -624,7 +624,7 @@ local function uses_asymmetric_algorithm(jwt_header)
 end
 
 -- parse a JWT and verify its signature (if present)
-local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, symmetric_secret, ...)
+local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, asymmetric_secret, symmetric_secret, ...)
   local enc_hdr, enc_payload, enc_sign = string.match(jwt_string, '^(.+)%.(.+)%.(.*)$')
   if enc_payload and (not enc_sign or enc_sign == "") then
     local jwt = openidc_load_jwt_none_alg(enc_hdr, enc_payload)
@@ -643,7 +643,7 @@ local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, symmetric_se
   local secret
   if is_algorithm_supported(jwt_obj.header) then
     if uses_asymmetric_algorithm(jwt_obj.header) then
-      secret = opts.secret
+      secret = asymmetric_secret
       if not secret and opts.discovery then
         ngx.log(ngx.DEBUG, "using discovery to find key")
         local err
@@ -731,7 +731,7 @@ local function openidc_authorization_response(opts, session)
   end
 
   local jwt_obj
-  jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, json.id_token, opts.client_secret)
+  jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, json.id_token, opts.secret, opts.client_secret)
   if err then
     local is_unsupported_signature_error = jwt_obj and not jwt_obj.verified and not is_algorithm_supported(jwt_obj.header)
     if is_unsupported_signature_error then
@@ -1153,7 +1153,7 @@ function openidc.jwt_verify(access_token, opts, ...)
   local v = openidc_cache_get("introspection", access_token)
   if not v then
     local jwt_obj
-    jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, access_token, opts.secret, ...)
+    jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, access_token, opts.secret, opts.secret, ...)
     if not err then
       json = jwt_obj.payload
       ngx.log(ngx.DEBUG, "jwt: ", cjson.encode(json))
