@@ -66,7 +66,7 @@ local supported_token_auth_methods = {
 }
 
 local openidc = {
-  _VERSION = "1.5.0"
+  _VERSION = "1.5.1"
 }
 openidc.__index = openidc
 
@@ -737,6 +737,7 @@ local function openidc_authorization_response(opts, session)
     if is_unsupported_signature_error then
       ngx.log(ngx.WARN, "ignored id_token signature as algorithm '" .. jwt_obj.header.alg .. "' is not supported")
     else
+      ngx.log(ngx.ERR, "id_token '" .. jwt_obj.header.alg .. "' signature verification failed")
       return nil, err, session.data.original_url, session
     end
   end
