@@ -98,6 +98,9 @@ http {
     lua_package_path '~/lua/?.lua;;';
     lua_shared_dict discovery 1m;
     init_by_lua_block {
+        jwks = [=[JWK]=]
+        secret = [=[
+JWT_VERIFY_SECRET]=]
         if os.getenv('coverage') then
           require("luacov.runner")("/spec/luacov/settings.luacov")
         end
@@ -153,7 +156,7 @@ JWT_VERIFY_SECRET]=]
             content_by_lua_block {
                 ngx.header.content_type = 'application/json;charset=UTF-8'
                 delay(JWK_DELAY_RESPONSE)
-                ngx.say([=[JWK]=])
+                ngx.say(jwks)
             }
         }
 
