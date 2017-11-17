@@ -106,8 +106,6 @@ JWT_VERIFY_SECRET]=]
         end
         oidc = require "resty.openidc"
         cjson = require "cjson"
-        secret = [=[
-JWT_VERIFY_SECRET]=]
         delay = function(delay_response)
           if delay_response > 0 then
             ngx.sleep(delay_response / 1000)
