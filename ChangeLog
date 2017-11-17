@@ -1,3 +1,12 @@
+11/17/2017
+- added support for verifying HMAC signatures on id tokens - it has
+  already been supported for access tokens before
+- fix handling of signatures using unsupported algorithms on id
+  tokens. Such signatures will cause a warning to be logged but the id
+  tokens are considered valid. access tokens signed with an
+  unsupported algorithm are considered invalid. This is the same
+  behavior as has been present in 1.4.1. See #122
+
 11/15/2017
 - fix return of access_token when renew_access_token_on_expiry = false ; see #121
 

@@ -608,8 +608,23 @@ local function openidc_pem_from_jwk(opts, kid)
   return pem
 end
 
+-- does lua-resty-jwt and/or we know how to handle the algorithm of the JWT?
+local function is_algorithm_supported(jwt_header)
+  return jwt_header and jwt_header.alg and (
+    jwt_header.alg == "none"
+    or string.sub(jwt_header.alg, 1, 2) == "RS"
+    or string.sub(jwt_header.alg, 1, 2) == "HS"
+  )
+end
+
+-- is the JWT signing algorithm an asymmetric one whose key might be
+-- obtained from the discovery endpoint?
+local function uses_asymmetric_algorithm(jwt_header)
+  return string.sub(jwt_header.alg, 1, 2) == "RS"
+end
+
 -- parse a JWT and verify its signature (if present)
-local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, ...)
+local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, asymmetric_secret, symmetric_secret, ...)
   local enc_hdr, enc_payload, enc_sign = string.match(jwt_string, '^(.+)%.(.+)%.(.*)$')
   if enc_payload and (not enc_sign or enc_sign == "") then
     local jwt = openidc_load_jwt_none_alg(enc_hdr, enc_payload)
@@ -625,15 +640,22 @@ local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, ...)
     return nil, reason
   end
 
-  local secret = opts.secret
-  if not secret and opts.discovery then
-    ngx.log(ngx.DEBUG, "using discovery to find key")
-    local err
-    secret, err = openidc_pem_from_jwk(opts, jwt_obj.header.kid)
+  local secret
+  if is_algorithm_supported(jwt_obj.header) then
+    if uses_asymmetric_algorithm(jwt_obj.header) then
+      secret = asymmetric_secret
+      if not secret and opts.discovery then
+        ngx.log(ngx.DEBUG, "using discovery to find key")
+        local err
+        secret, err = openidc_pem_from_jwk(opts, jwt_obj.header.kid)
 
-    if secret == nil then
-      ngx.log(ngx.ERR, err)
-      return nil, err
+        if secret == nil then
+          ngx.log(ngx.ERR, err)
+          return nil, err
+        end
+      end
+    else
+      secret = symmetric_secret
     end
   end
 
@@ -655,7 +677,7 @@ local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, ...)
     if jwt_obj.reason then
       reason = reason .. ": " .. jwt_obj.reason
     end
-    return nil, reason
+    return jwt_obj, reason
   end
   return jwt_obj
 end
@@ -709,9 +731,14 @@ local function openidc_authorization_response(opts, session)
   end
 
   local jwt_obj
-  jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, json.id_token)
+  jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, json.id_token, opts.secret, opts.client_secret)
   if err then
-    return nil, err, session.data.original_url, session
+    local is_unsupported_signature_error = jwt_obj and not jwt_obj.verified and not is_algorithm_supported(jwt_obj.header)
+    if is_unsupported_signature_error then
+      ngx.log(ngx.WARN, "ignored id_token signature as algorithm '" .. jwt_obj.header.alg .. "' is not supported")
+    else
+      return nil, err, session.data.original_url, session
+    end
   end
   local id_token = jwt_obj.payload
 
@@ -1126,7 +1153,7 @@ function openidc.jwt_verify(access_token, opts, ...)
   local v = openidc_cache_get("introspection", access_token)
   if not v then
     local jwt_obj
-    jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, access_token, ...)
+    jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, access_token, opts.secret, opts.secret, ...)
     if not err then
       json = jwt_obj.payload
       ngx.log(ngx.DEBUG, "jwt: ", cjson.encode(json))
