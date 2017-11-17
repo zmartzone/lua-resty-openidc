@@ -219,17 +219,30 @@ describe("when the id token signature key isn't part of the JWK", function()
   end)
 end)
 
-describe("when the id token signature uses a known symmetric key", function()
+describe("when the id token signature uses a symmetric algorithm", function()
   test_support.start_server({
-    jwt_verify_secret = "secret",
+    jwt_verify_secret = "client_secret",
     token_header = {
       alg = "HS256",
     },
-    oidc_opts = { secret = "secret" }
   })
   teardown(test_support.stop_server)
   local _, status = test_support.login()
   it("login succeeds", function()
     assert.are.equals(302, status)
+  end)
+end)
+
+describe("when the id claims to be signed by an unsupported algorithm", function()
+  test_support.start_server({
+    fake_id_token_signature = "true"
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login succeeds", function()
+    assert.are.equals(302, status)
+  end)
+  it("an error is logged", function()
+    assert.error_log_contains("ignored id_token signature as algorithm 'AB256' is not supported")
   end)
 end)

@@ -2,19 +2,6 @@ local http = require("socket.http")
 local test_support = require("test_support")
 require 'busted.runner'()
 
-local function none_signature_jwt(payload, alg)
-  local function b64url(s)
-    local dkjson = require "dkjson"
-    local mime = require "mime"
-    return mime.b64(dkjson.encode(s)):gsub('+','-'):gsub('/','_')
-  end
-  local header = b64url({
-      typ = "JWT",
-      alg = alg or "none"
-  })
-  return header .. "." .. b64url(payload) .. "."
-end
-
 local function base_checks()
   local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
   describe("and not sending any Authorization header", function()
@@ -237,7 +224,7 @@ describe("when using a JWT not signed but using the 'none' alg", function()
     jwk = test_support.load("/spec/jwks_with_two_keys.json"),
   })
   teardown(test_support.stop_server)
-  local jwt = none_signature_jwt({
+  local jwt = test_support.self_signed_jwt({
       exp = os.time() + 3600,
   })
   local _, status = http.request({
@@ -259,7 +246,7 @@ describe("when using an unsigned JWT with an alg different from 'none'", functio
     jwk = test_support.load("/spec/jwks_with_two_keys.json"),
   })
   teardown(test_support.stop_server)
-  local jwt = none_signature_jwt({
+  local jwt = test_support.self_signed_jwt({
       exp = os.time() + 3600,
   }, "RS256")
   local _, status = http.request({
@@ -285,6 +272,21 @@ describe("when the bearer token doesn't contain JSON but looks like an unsigned 
   local _, status = http.request({
     url = "http://127.0.0.1/verify_bearer_token",
     headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the token is invalid", function()
+    assert.are.equals(401, status)
+  end)
+end)
+
+describe("when the JWT claims to be signed by an unsupported algorithm", function()
+  test_support.start_server({
+    fake_access_token_signature = "true"
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+      url = "http://127.0.0.1/verify_bearer_token",
+      headers = { authorization = "Bearer " .. jwt }
   })
   it("the token is invalid", function()
     assert.are.equals(401, status)

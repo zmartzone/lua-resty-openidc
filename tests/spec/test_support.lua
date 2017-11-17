@@ -49,6 +49,19 @@ function test_support.trim(s)
   return s:gsub("^%s*(.-)%s*$", "%1")
 end
 
+function test_support.self_signed_jwt(payload, alg, signature)
+  local function b64url(s)
+    local dkjson = require "dkjson"
+    local mime = require "mime"
+    return mime.b64(dkjson.encode(s)):gsub('+','-'):gsub('/','_')
+  end
+  local header = b64url({
+      typ = "JWT",
+      alg = alg or "none"
+  })
+  return header .. "." .. b64url(payload) .. "." .. (signature or "")
+end
+
 local DEFAULT_JWT_VERIFY_SECRET = test_support.load("/spec/private_rsa_key.pem")
 
 local DEFAULT_JWK = test_support.load("/spec/rsa_key_jwk_with_x5c.json")
@@ -66,6 +79,8 @@ local DEFAULT_TOKEN_RESPONSE_EXPIRES_IN = "3600"
 
 local DEFAULT_TOKEN_RESPONSE_CONTAINS_REFRESH_TOKEN = "true"
 local DEFAULT_REFRESHING_TOKEN_FAILS = "false"
+local DEFAULT_FAKE_ACCESS_TOKEN_SIGNATURE = "false"
+local DEFAULT_FAKE_ID_TOKEN_SIGNATURE = "false"
 
 local DEFAULT_DELAY_RESPONSE = "0"
 
@@ -95,6 +110,25 @@ JWT_VERIFY_SECRET]=]
             ngx.sleep(delay_response / 1000)
           end
         end
+        create_jwt = function(payload, fake_signature)
+          if not fake_signature then
+            local jwt_content = {
+              header = TOKEN_HEADER,
+              payload = payload
+            }
+            local jwt = require "resty.jwt"
+            return jwt:sign(secret, jwt_content)
+          else
+            local function b64url(s)
+              return ngx.encode_base64(cjson.encode(s)):gsub('+','-'):gsub('/','_')
+            end
+            local header = b64url({
+                typ = "JWT",
+                alg = "AB256"
+            })
+            return header .. "." .. b64url(payload) .. ".NOT_A_VALID_SIGNATURE"
+          end
+        end
     }
 
     resolver      8.8.8.8;
@@ -109,12 +143,7 @@ JWT_VERIFY_SECRET]=]
 
         location /jwt {
             content_by_lua_block {
-                local jwt_content = {
-                  header = TOKEN_HEADER,
-                  payload = ACCESS_TOKEN
-                }
-                local jwt = require "resty.jwt"
-                local jwt_token = jwt:sign(secret, jwt_content)
+                local jwt_token = create_jwt(ACCESS_TOKEN, FAKE_ACCESS_TOKEN_SIGNATURE)
                 ngx.header.content_type = 'text/plain'
                 ngx.say(jwt_token)
             }
@@ -175,12 +204,7 @@ JWT_VERIFY_SECRET]=]
                   access_token = access_token .. "2"
                   refresh_token = refresh_token .. "2"
                 end
-                local jwt_content = {
-                  header = TOKEN_HEADER,
-                  payload = id_token
-                }
-                local jwt = require "resty.jwt"
-                local jwt_token = jwt:sign(secret, jwt_content)
+                local jwt_token = create_jwt(id_token, FAKE_ID_TOKEN_SIGNATURE)
                 local token_response = {
                   access_token = access_token,
                   expires_in = TOKEN_RESPONSE_EXPIRES_IN,
@@ -323,7 +347,6 @@ local function write_config(out, custom_config)
   end
   local config = DEFAULT_CONFIG_TEMPLATE
     :gsub("OIDC_CONFIG", serpent.block(oidc_config, {comment = false }))
-    :gsub("ID_TOKEN", serpent.block(id_token, {comment = false }))
     :gsub("TOKEN_HEADER", serpent.block(token_header, {comment = false }))
     :gsub("JWT_VERIFY_SECRET", custom_config["jwt_verify_secret"] or DEFAULT_JWT_VERIFY_SECRET)
     :gsub("VERIFY_OPTS", serpent.block(verify_opts, {comment = false }))
@@ -333,7 +356,6 @@ local function write_config(out, custom_config)
     :gsub("TOKEN_RESPONSE_CONTAINS_REFRESH_TOKEN", token_response_contains_refresh_token)
     :gsub("REFRESHING_TOKEN_FAILS", refreshing_token_fails)
     :gsub("ACCESS_TOKEN_OPTS", serpent.block(access_token_opts, {comment = false }))
-    :gsub("ACCESS_TOKEN", serpent.block(access_token, {comment = false }))
     :gsub("JWK_DELAY_RESPONSE", ((custom_config["delay_response"] or {}).jwk or DEFAULT_DELAY_RESPONSE))
     :gsub("TOKEN_DELAY_RESPONSE", ((custom_config["delay_response"] or {}).token or DEFAULT_DELAY_RESPONSE))
     :gsub("DISCOVERY_DELAY_RESPONSE", ((custom_config["delay_response"] or {}).discovery or DEFAULT_DELAY_RESPONSE))
@@ -341,6 +363,10 @@ local function write_config(out, custom_config)
     :gsub("INTROSPECTION_DELAY_RESPONSE", ((custom_config["delay_response"] or {}).introspection or DEFAULT_DELAY_RESPONSE))
     :gsub("JWK", custom_config["jwk"] or DEFAULT_JWK)
     :gsub("USERINFO", serpent.block(userinfo, {comment = false }))
+    :gsub("FAKE_ACCESS_TOKEN_SIGNATURE", custom_config["fake_access_token_signature"] or DEFAULT_FAKE_ACCESS_TOKEN_SIGNATURE)
+    :gsub("FAKE_ID_TOKEN_SIGNATURE", custom_config["fake_id_token_signature"] or DEFAULT_FAKE_ID_TOKEN_SIGNATURE)
+    :gsub("ID_TOKEN", serpent.block(id_token, {comment = false }))
+    :gsub("ACCESS_TOKEN", serpent.block(access_token, {comment = false }))
   out:write(config)
 end
 
@@ -370,6 +396,10 @@ end
 -- - delay_response is a table specifying a delay for the response of various endpoint in ms
 --   { jwk = 1, token = 1, discovery = 1, userinfo = 1, introspection = 1}
 -- - refreshing_token_fails whether to grant an access token via the refresh token grant
+-- - fake_access_token_signature whether to fake a JWT signature with unknown algorithm for the
+--   JWT returned by /jwt
+-- - fake_id_token_signature whether to fake a JWT signature with unknown algorithm for the
+--   id_token
 function test_support.start_server(custom_config)
   assert(os.execute("rm -rf /tmp/server"), "failed to remove old server dir")
   assert(os.execute("mkdir -p /tmp/server/conf"), "failed to create server dir")
