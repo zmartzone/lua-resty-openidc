@@ -51,7 +51,6 @@ local require = require
 local cjson   = require "cjson"
 local cjson_s = require "cjson.safe"
 local http    = require "resty.http"
-local jwt     = require "resty.jwt"
 local string  = string
 local ipairs  = ipairs
 local pairs   = pairs
@@ -625,6 +624,7 @@ end
 
 -- parse a JWT and verify its signature (if present)
 local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, asymmetric_secret, symmetric_secret, ...)
+  local jwt = require "resty.jwt"
   local enc_hdr, enc_payload, enc_sign = string.match(jwt_string, '^(.+)%.(.+)%.(.*)$')
   if enc_payload and (not enc_sign or enc_sign == "") then
     local jwt = openidc_load_jwt_none_alg(enc_hdr, enc_payload)
