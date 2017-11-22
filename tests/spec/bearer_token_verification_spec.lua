@@ -468,3 +468,70 @@ describe("when jwks endpoint doesn't return proper JSON", function()
     assert.error_log_contains("Invalid token: JSON decoding failed")
   end)
 end)
+
+-- see https://github.com/zmartzone/lua-resty-openidc/issues/124
+describe("when the token is signed by an RSA key but discovery doesn't contain jwks_uri", function()
+  test_support.start_server({
+    verify_opts = {
+      discovery = { }
+    }
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/verify_bearer_token",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("Invalid token:.*jwks_uri is not present or not a string")
+  end)
+end)
+
+-- see https://github.com/zmartzone/lua-resty-openidc/issues/124
+describe("when the token is signed by an RSA key but jwks_uri is not a string", function()
+  test_support.start_server({
+    verify_opts = {
+      discovery = {
+        jwks_uri = { }
+      }
+    }
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/verify_bearer_token",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("Invalid token:.*jwks_uri is not present or not a string")
+  end)
+end)
+
+-- see https://github.com/zmartzone/lua-resty-openidc/issues/124
+describe("when the token is signed by an RSA key but jwks_uri is empty", function()
+  test_support.start_server({
+    verify_opts = {
+      discovery = {
+        jwks_uri = ""
+      }
+    }
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/verify_bearer_token",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("Invalid token:.*jwks_uri is not present or not a string")
+  end)
+end)
