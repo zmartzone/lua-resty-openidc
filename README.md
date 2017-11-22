@@ -38,12 +38,14 @@ to install two extra pure-Lua dependencies that implement session management and
 - [`lua-resty-http`](https://github.com/pintsized/lua-resty-http)
 - [`lua-resty-session`](https://github.com/bungle/lua-resty-session)
 
-If you run as an OAuth 2.0 Resource Server and your access tokens are JWT bearer tokens and you want to
-verify those tokens locally (no external callouts required, see 2nd configuration example below), you need
-to install two more pure-Lua dependencies:
+Typically - when running as an OpenID Connect RP or an OAuth 2.0 server that consumes JWT
+access tokens - you'll also need to install two more dependencies:
 
 - [`lua-resty-jwt`](https://github.com/SkyLothar/lua-resty-jwt)
 - [`lua-resty-hmac`](https://github.com/jkeys089/lua-resty-hmac)
+
+The extra dependencies above are *not* required when running as an OAuth 2.0 Resource Server (only) using remote
+introspection for access token validation.
 
 ## Installation
 
