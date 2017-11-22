@@ -1,3 +1,8 @@
+11/22/2017
+- avoid that lua-resty-jwt is a dependency in an OAuth 2.0 RS remote validation setup; closes #124
+- correct README.md around lua-resty-jwt requirement
+- make handling of missing `jwks_uri` more robust
+
 11/17/2017
 - added support for verifying HMAC signatures on id tokens - it has
   already been supported for access tokens before
