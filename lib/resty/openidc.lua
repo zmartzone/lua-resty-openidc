@@ -567,6 +567,11 @@ local function openidc_pem_from_jwk(opts, kid)
   if err then
     return nil, err
   end
+  
+  if not opts.discovery.jwks_uri or not (type(opts.discovery.jwks_uri) == "string") or (opts.discovery.jwks_uri == "") then
+    return nil, "opts.discovery.jwks_uri is not present or not a string"
+  end
+  
   local cache_id = opts.discovery.jwks_uri .. '#' .. (kid or '')
   local v = openidc_cache_get("jwks", cache_id)
 
