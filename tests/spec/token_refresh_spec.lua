@@ -21,7 +21,11 @@ end)
 
 -- see https://github.com/zmartzone/lua-resty-openidc/issues/121
 describe("if there is an active non-expired login and renew is disabled explicitly", function()
-  test_support.start_server()
+  test_support.start_server({
+    oidc_opts = {
+      renew_access_token_on_expiry = false
+    }
+  })
   teardown(test_support.stop_server)
   local _, _, cookies = test_support.login()
   local _, status = http.request({
