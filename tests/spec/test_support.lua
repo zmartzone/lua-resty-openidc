@@ -82,6 +82,8 @@ local DEFAULT_REFRESHING_TOKEN_FAILS = "false"
 local DEFAULT_FAKE_ACCESS_TOKEN_SIGNATURE = "false"
 local DEFAULT_FAKE_ID_TOKEN_SIGNATURE = "false"
 
+local DEFAULT_UNAUTH_ACTION = "nil"
+
 local DEFAULT_DELAY_RESPONSE = "0"
 
 local DEFAULT_CONFIG_TEMPLATE = [[
@@ -166,7 +168,7 @@ JWT_VERIFY_SECRET]=]
             access_by_lua_block {
               local opts = OIDC_CONFIG
               local oidc = require "resty.openidc"
-              local res, err, target, session = oidc.authenticate(opts)
+              local res, err, target, session = oidc.authenticate(opts, nil, UNAUTH_ACTION)
               if err then
                 ngx.status = 401
                 ngx.log(ngx.ERR, "authenticate failed: " .. err)
@@ -368,6 +370,7 @@ local function write_config(out, custom_config)
     :gsub("FAKE_ID_TOKEN_SIGNATURE", custom_config["fake_id_token_signature"] or DEFAULT_FAKE_ID_TOKEN_SIGNATURE)
     :gsub("ID_TOKEN", serpent.block(id_token, {comment = false }))
     :gsub("ACCESS_TOKEN", serpent.block(access_token, {comment = false }))
+    :gsub("UNAUTH_ACTION", custom_config["unauth_action"] and ('"' .. custom_config["unauth_action"] .. '"') or DEFAULT_UNAUTH_ACTION)
   out:write(config)
 end
 
@@ -401,6 +404,7 @@ end
 --   JWT returned by /jwt
 -- - fake_id_token_signature whether to fake a JWT signature with unknown algorithm for the
 --   id_token
+-- - unauth_action value to pass as unauth_action parameter to authenticate
 function test_support.start_server(custom_config)
   assert(os.execute("rm -rf /tmp/server"), "failed to remove old server dir")
   assert(os.execute("mkdir -p /tmp/server/conf"), "failed to create server dir")
