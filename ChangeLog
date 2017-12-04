@@ -1,3 +1,6 @@
+12/04/2017
+- allow setting ssl_verify to "false" on userinfo endpoint call; closes #125; thanks @hugomcfonseca
+
 11/22/2017
 - avoid that lua-resty-jwt is a dependency in an OAuth 2.0 RS remote validation setup; closes #124
 - correct README.md around lua-resty-jwt requirement
