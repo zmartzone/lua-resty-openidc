@@ -326,7 +326,8 @@ local function openidc_call_userinfo_endpoint(opts, access_token)
   local httpc = http.new()
   openidc_configure_timeouts(httpc, opts.timeout)
   local res, err = httpc:request_uri(opts.discovery.userinfo_endpoint, {
-    headers = headers
+    headers = headers,
+    ssl_verify = (opts.ssl_verify ~= "no")
   })
   if not res then
     err = "accessing ("..opts.discovery.userinfo_endpoint..") failed: "..err
