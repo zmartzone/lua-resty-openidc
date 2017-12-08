@@ -81,7 +81,7 @@ end
 -- set value in server-wide cache if available
 local function openidc_cache_set(type, key, value, exp)
   local dict = ngx.shared[type]
-  if dict then
+  if dict and (exp > 0) then
     local success, err, forcible = dict:set(key, value, exp)
     ngx.log(ngx.DEBUG, "cache set: success=", success, " err=", err, " forcible=", forcible)
   end
