@@ -354,6 +354,10 @@ local function openidc_authorize(opts, session, target_url, prompt)
     params.code_challenge = openidc_s256(code_verifier)
   end
 
+  if opts.response_mode then
+    params.response_mode = opts.response_mode
+  end
+
   -- merge any provided extra parameters
   if opts.authorization_params then
     for k, v in pairs(opts.authorization_params) do params[k] = v end
@@ -1076,8 +1080,14 @@ end
 
 -- handle a "code" authorization response from the OP
 local function openidc_authorization_response(opts, session)
-  local args = ngx.req.get_uri_args()
-  local err, log_err, client_err
+  local args, err, log_err, client_err
+
+  if opts.response_mode and opts.response_mode == "form_post" then
+    ngx.req.read_body()
+    args = ngx.req.get_post_args()
+  else
+    args = ngx.req.get_uri_args()
+  end
 
   if not args.code or not args.state then
     err = "unhandled request to the redirect_uri: " .. ngx.var.request_uri
