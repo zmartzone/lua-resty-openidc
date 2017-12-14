@@ -1,3 +1,9 @@
+12/14/2017
+- release 1.5.2
+
+12/13/2017
+- ensure we don't log nil if initial JWT verification fails
+
 12/08/2017
 - avoid putting a negative TTL into the cache; closes #127; thanks @ChristianCiach and @gwkunze
 
