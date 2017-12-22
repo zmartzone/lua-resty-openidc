@@ -165,14 +165,23 @@ local function openidc_validate_id_token(opts, id_token, nonce)
   return true
 end
 
+local function get_scheme()
+  return ngx.req.get_headers()['X-Forwarded-Proto'] or ngx.var.scheme
+end
+
+local function get_host_name()
+  return ngx.req.get_headers()['X-Forwarded-Host'] or ngx.var.http_host
+end
+
 -- assemble the redirect_uri
 local function openidc_get_redirect_uri(opts)
-  local scheme = opts.redirect_uri_scheme or ngx.req.get_headers()['X-Forwarded-Proto'] or ngx.var.scheme
-  if not ngx.var.http_host then
+  local scheme = opts.redirect_uri_scheme or get_scheme()
+  local host = get_host_name()
+  if not host then
     -- possibly HTTP 1.0 and no Host header
     ngx.exit(ngx.HTTP_BAD_REQUEST)
   end
-  return scheme.."://"..ngx.var.http_host ..opts.redirect_uri_path
+  return scheme.."://"..host..opts.redirect_uri_path
 end
 
 -- perform base64url decoding

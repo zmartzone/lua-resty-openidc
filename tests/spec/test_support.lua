@@ -17,8 +17,7 @@ local DEFAULT_OIDC_CONFIG = {
    },
    client_id = "client_id",
    client_secret = "client_secret",
-   ssl_verify = "no",
-   redirect_uri_scheme = 'http',
+   ssl_verify = "no"
 }
 
 local DEFAULT_ID_TOKEN = {

@@ -245,3 +245,40 @@ describe("when discovery endpoint doesn't return proper JSON", function()
   end)
 end)
 
+describe("when accessing the protected resource without token and forwarded headers exist", function()
+  test_support.start_server()
+  teardown(test_support.stop_server)
+  local _, status, headers = http.request({
+    url = "http://127.0.0.1/default/t",
+    headers = {
+      ["x-forwarded-proto"] = "https",
+      ["x-forwarded-host"] = "example.org",
+    },
+    redirect = false
+  })
+  it("the configured forwarded information is used in redirect uri", function()
+    assert.are.equals(302, status)
+    local redir_escaped = test_support.urlescape_for_regex("https://example.org/default/redirect_uri")
+    assert.truthy(string.match(string.lower(headers["location"]),
+                               ".*redirect_uri=" .. string.lower(redir_escaped) .. ".*"))
+  end)
+end)
+
+describe("when redir scheme is configured explicitly", function()
+  test_support.start_server({
+    oidc_opts = {
+      redirect_uri_scheme = 'https',
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, status, headers = http.request({
+    url = "http://127.0.0.1/default/t",
+    redirect = false
+  })
+  it("it overrides the scheme actually used", function()
+    assert.are.equals(302, status)
+    local redir_escaped = test_support.urlescape_for_regex("https://127.0.0.1/default/redirect_uri")
+    assert.truthy(string.match(string.lower(headers["location"]),
+                               ".*redirect_uri=" .. string.lower(redir_escaped) .. ".*"))
+  end)
+end)
