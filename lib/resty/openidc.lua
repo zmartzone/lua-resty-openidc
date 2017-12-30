@@ -165,12 +165,25 @@ local function openidc_validate_id_token(opts, id_token, nonce)
   return true
 end
 
+local function get_first_header_and_strip_whitespace(header_name)
+  local header = ngx.req.get_headers()[header_name]
+  if header and type(header) == 'table' then
+    header = header[1]
+  end
+  return header and header:gsub('%s', '')
+end
+
 local function get_scheme()
-  return ngx.req.get_headers()['X-Forwarded-Proto'] or ngx.var.scheme
+  return get_first_header_and_strip_whitespace('X-Forwarded-Proto') or ngx.var.scheme
+end
+
+local function get_host_name_from_x_header()
+  local header = get_first_header_and_strip_whitespace('X-Forwarded-Host')
+  return header and header:gsub('^([^,]+),?.*$', '%1')
 end
 
 local function get_host_name()
-  return ngx.req.get_headers()['X-Forwarded-Host'] or ngx.var.http_host
+  return get_host_name_from_x_header() or ngx.var.http_host
 end
 
 -- assemble the redirect_uri
