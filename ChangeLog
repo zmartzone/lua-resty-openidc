@@ -1,3 +1,6 @@
+12/30/2017
+- use X-Forwarded-Host header when building the redirect URI if present. See #128
+
 12/14/2017
 - release 1.5.2
 
