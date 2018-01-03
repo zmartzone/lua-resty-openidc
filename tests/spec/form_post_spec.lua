@@ -41,13 +41,15 @@ describe("when a form_post is received", function()
   test_support.register_nonce(headers)
   local cookie_header = test_support.extract_cookies(headers)
   describe("without an active user session", function()
+    local body = "code=foo&state=" .. state
     local _, redirStatus = http.request({
         method = 'POST',
         url = "http://localhost/default/redirect_uri",
         headers = {
           ["Content-Type"] = "application/x-www-form-urlencoded",
+          ["Content-Length"] = string.len(body),
         },
-        source = ltn12.source.string("code=foo&state=" .. state)
+        source = ltn12.source.string(body)
     })
     it("should be rejected", function()
        assert.are.equals(401, redirStatus)
