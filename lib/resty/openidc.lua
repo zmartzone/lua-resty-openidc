@@ -165,16 +165,50 @@ local function openidc_validate_id_token(opts, id_token, nonce)
   return true
 end
 
-local function get_first_header_and_strip_whitespace(header_name)
+local function get_first_header(header_name)
   local header = ngx.req.get_headers()[header_name]
   if header and type(header) == 'table' then
     header = header[1]
   end
+  return header
+end
+
+local function get_first_header_and_strip_whitespace(header_name)
+  local header = get_first_header(header_name)
   return header and header:gsub('%s', '')
 end
 
+local function get_forwarded_parameter(param_name)
+  local forwarded = get_first_header("Forwarded")
+  local params = {}
+  if forwarded then
+    local function parse_parameter(pv)
+      local name, value = pv:match("^%s*([^=]+)%s*=%s*(.-)%s*$")
+      if name and value then
+        if value:sub(1, 1) == '"' then
+          value = value:sub(2, -2)
+        end
+        params[name:lower()] = value
+      end
+    end
+    -- this assumes there is no quoted comma inside the header's value
+    -- which should be fine as comma is not legal inside a node name,
+    -- a URI scheme or a host name. The only thing that might bite us
+    -- are extensions.
+    local first_part = forwarded
+    local first_comma = forwarded:find("%s*,%s*")
+    if first_comma then
+      first_part = forwarded:sub(1, first_comma - 1)
+    end
+    first_part:gsub("[^;]+", parse_parameter)
+  end
+  return params[param_name:gsub("^%s*(.-)%s*$", "%1"):lower()]
+end
+
 local function get_scheme()
-  return get_first_header_and_strip_whitespace('X-Forwarded-Proto') or ngx.var.scheme
+  return get_forwarded_parameter("proto")
+    or get_first_header_and_strip_whitespace('X-Forwarded-Proto')
+    or ngx.var.scheme
 end
 
 local function get_host_name_from_x_header()
@@ -183,7 +217,9 @@ local function get_host_name_from_x_header()
 end
 
 local function get_host_name()
-  return get_host_name_from_x_header() or ngx.var.http_host
+  return get_forwarded_parameter("host")
+    or get_host_name_from_x_header()
+    or ngx.var.http_host
 end
 
 -- assemble the redirect_uri

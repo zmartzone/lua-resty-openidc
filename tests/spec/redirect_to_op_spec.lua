@@ -336,3 +336,74 @@ describe("when accessing the protected resource without token and multiple x-for
                                ".*location: %S+redirect_uri=" .. string.lower(redir_escaped) .. ".*"))
   end)
 end)
+
+describe("when accessing the protected resource without token and a forwarded header exists", function()
+  test_support.start_server()
+  teardown(test_support.stop_server)
+  local _, status, headers = http.request({
+    url = "http://127.0.0.1/default/t",
+    headers = {
+      ["forwarded"] = "proto=https;Host=example.org",
+    },
+    redirect = false
+  })
+  it("the configured forwarded information is used in redirect uri", function()
+    assert.are.equals(302, status)
+    local redir_escaped = test_support.urlescape_for_regex("https://example.org/default/redirect_uri")
+    assert.truthy(string.match(string.lower(headers["location"]),
+                               ".*redirect_uri=" .. string.lower(redir_escaped) .. ".*"))
+  end)
+end)
+
+describe("when accessing the protected resource without token and a forwarded header values are quoted", function()
+  test_support.start_server()
+  teardown(test_support.stop_server)
+  local _, status, headers = http.request({
+    url = "http://127.0.0.1/default/t",
+    headers = {
+      ["forwarded"] = 'proTo="https";Host="example.org"',
+    },
+    redirect = false
+  })
+  it("the configured forwarded information is used unquoted in redirect uri", function()
+    assert.are.equals(302, status)
+    local redir_escaped = test_support.urlescape_for_regex("https://example.org/default/redirect_uri")
+    assert.truthy(string.match(string.lower(headers["location"]),
+                               ".*redirect_uri=" .. string.lower(redir_escaped) .. ".*"))
+  end)
+end)
+
+describe("when accessing the protected resource without token and a forwarded header has multiple fields", function()
+  test_support.start_server()
+  teardown(test_support.stop_server)
+  local _, status, headers = http.request({
+    url = "http://127.0.0.1/default/t",
+    headers = {
+      ["forwarded"] = 'proTo="https";Host="example.org",host=example.com',
+    },
+    redirect = false
+  })
+  it("the configured forwarded information is used unquoted in redirect uri", function()
+    assert.are.equals(302, status)
+    local redir_escaped = test_support.urlescape_for_regex("https://example.org/default/redirect_uri")
+    assert.truthy(string.match(string.lower(headers["location"]),
+                               ".*redirect_uri=" .. string.lower(redir_escaped) .. ".*"))
+  end)
+end)
+
+describe("when accessing the protected resource without token and multiple forwarded headers", function()
+  test_support.start_server()
+  teardown(test_support.stop_server)
+  -- the http module doesn't support specifying multiple headers
+  local r = io.popen("curl -H 'Forwarded: host=example.org' -H 'Forwarded: host=example.com'"
+                       .. " -o /dev/null -v --max-redirs 0 http://127.0.0.1/default/t 2>&1")
+  local o = r:read("*a")
+  r:close()
+  it("the first header is used", function()
+    assert.truthy(string.match(string.lower(o), ".*http/.* 302"))
+    local redir_escaped = test_support.urlescape_for_regex("http://example.org/default/redirect_uri")
+    assert.truthy(string.match(string.lower(o),
+                               ".*location: %S+redirect_uri=" .. string.lower(redir_escaped) .. ".*"))
+  end)
+end)
+
