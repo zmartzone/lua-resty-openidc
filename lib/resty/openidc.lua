@@ -69,7 +69,8 @@ local WARN = ngx.WARN
 local supported_token_auth_methods = {
   client_secret_basic = true,
   client_secret_post = true,
-  private_key_jwt = true
+  private_key_jwt = true,
+  client_secret_jwt = true
 }
 
 local openidc = {
@@ -426,6 +427,24 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, 
       local r_jwt = require("resty.jwt")
       body.client_assertion=r_jwt:sign(opts.client_rsa_private_key, { header = assertion_header, payload = assertion_payload })
       log(DEBUG, "private_key_jwt: client_id, client_assertion_type and client_assertion being sent in POST body")
+    elseif auth == "client_secret_jwt" then
+      body.client_assertion_type = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+      local client_secret_jwt = {
+        header = {
+          typ = "JWT",
+          alg = "HS256",
+        },
+        payload = {
+          iss = opts.client_id,
+          sub = opts.client_id,
+          aud = endpoint,
+          jti = ngx.var.request_id,
+          exp = ngx.time() + (opts.iat_slack and opts.iat_slack or 120),
+        }
+      }
+      local jwt = require "resty.jwt"
+      body.client_assertion = jwt:sign(opts.client_secret, client_secret_jwt)
+      ngx.log(ngx.DEBUG, "client_secret_jwt: client_id and client_secret being sent in JWT " .. body.client_assertion)
     end
   end
 
