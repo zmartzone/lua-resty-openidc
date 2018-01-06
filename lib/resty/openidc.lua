@@ -1064,6 +1064,16 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
     end
   end
 
+  ngx.log(ngx.DEBUG,
+    "session.present=", session.present,
+    ", session.data.id_token=", session.data.id_token ~= nil,
+    ", session.data.authenticated=", session.data.authenticated,
+    ", opts.force_reauthorize=", opts.force_reauthorize,
+    ", opts.renew_access_token_on_expiry=", opts.renew_access_token_on_expiry,
+    ", try_to_renew=", try_to_renew,
+    ", token_expired=", token_expired
+  )
+
   -- if we are not authenticated then redirect to the OP for authentication
   -- the presence of the id_token is check for backwards compatibility
   if not session.present
