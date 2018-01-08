@@ -439,7 +439,7 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, 
           sub = opts.client_id,
           aud = endpoint,
           jti = ngx.var.request_id,
-          exp = ngx.time() + (opts.iat_slack and opts.iat_slack or 120),
+          exp = ngx.time() + 10
         }
       }
       local jwt = require "resty.jwt"
