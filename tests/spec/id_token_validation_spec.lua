@@ -85,11 +85,11 @@ describe("when the id_token obtained from the token endpoint doesn't contain an 
     assert.error_log_contains("no \"iat\" claim found in id_token")
   end)
 end)
-
-describe("when the id_token obtained from the token endpoint contains a very old iat claim",
+ 
+describe("when the id_token obtained from the token endpoint contains an iat claim in the future",
          function()
   test_support.start_server({
-    id_token = { iat = os.time() - 3600 }
+    id_token = { iat = os.time() + 3600 }
   })
   teardown(test_support.stop_server)
   local _, status = test_support.login()
@@ -97,15 +97,15 @@ describe("when the id_token obtained from the token endpoint contains a very old
     assert.are.equals(401, status)
   end)
   it("an error message has been logged", function()
-    assert.error_log_contains("token has been issued too long ago")
+    assert.error_log_contains("id_token not yet valid")
   end)
 end)
 
-describe("when the id_token obtained from the token endpoint contains a very old iat claim but slack is big enough",
+describe("when the id_token obtained from the token endpoint contains an iat claim in the future but slack is big enough",
          function()
   test_support.start_server({
-    id_token = { iat = os.time() - 3600 },
-    oidc_opts = { iat_slack = 3700 }
+    id_token = { iat = os.time() + 120 },
+    oidc_opts = { iat_slack = 300 }
   })
   teardown(test_support.stop_server)
   local _, status = test_support.login()
