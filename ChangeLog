@@ -1,3 +1,6 @@
+01/28/2018
+- correct iat checks: make sure it is not in the future rather than being too old; see #137
+
 01/06/2018
 - add support for Forwarded header; see #128
 - add debug info about reasons for re-authentication; see #130
