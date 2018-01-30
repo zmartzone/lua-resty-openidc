@@ -1,3 +1,7 @@
+01/30/2018
+- add support for configuring an outgoing proxy; see #139
+- release 1.5.3
+
 01/28/2018
 - correct iat checks: make sure it is not in the future rather than being too old; see #137
 

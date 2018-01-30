@@ -131,7 +131,8 @@ http {
              -- timeout = 1000
              -- timeout = { connect = 500, send = 1000, read = 1000 }
              
-             -- Optionnal : use outgoing proxy to the OpenID Connect provider endpoints with the proxy_opts table : 
+             -- Optional : use outgoing proxy to the OpenID Connect provider endpoints with the proxy_opts table : 
+             -- this requires lua-resty-http >= 0.12
              -- proxy_opts = {
              --    http_proxy  = "http://<proxy_host>:<proxy_port>/",
              --    https_proxy = "http://<proxy_host>:<proxy_port>/"
