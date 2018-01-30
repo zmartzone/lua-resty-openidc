@@ -130,6 +130,13 @@ http {
              -- You can specify timeouts for connect/send/read as a single number (setting all timeouts) or as a table. Values are in milliseconds
              -- timeout = 1000
              -- timeout = { connect = 500, send = 1000, read = 1000 }
+             
+             -- Optionnal : use outgoing proxy to the OpenID Connect provider endpoints with the proxy_opts table : 
+             -- proxy_opts = {
+             --    http_proxy  = "http://<proxy_host>:<proxy_port>/",
+             --    https_proxy = "http://<proxy_host>:<proxy_port>/"
+             -- }
+
           }
 
           -- call authenticate for OpenID Connect user authentication
