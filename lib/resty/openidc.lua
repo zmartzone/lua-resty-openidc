@@ -483,6 +483,16 @@ local function openidc_ensure_discovered_data(opts)
   return err
 end
 
+-- query for discovery endpoint data
+function openidc.discover(opts)
+    local err = openidc_ensure_discovered_data (opts)
+    if err then
+      ngx.log(ngx.ERR, "error getting enpoints definition using discovery endpoint")
+    end
+
+    return opts.discovery, err
+end
+
 local function openidc_jwks(url, force, ssl_verify, timeout, proxy_opts)
   ngx.log(ngx.DEBUG, "openidc_jwks: URL is: "..url.. " (force=" .. force .. ")")
 
