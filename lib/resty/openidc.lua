@@ -484,10 +484,10 @@ local function openidc_ensure_discovered_data(opts)
 end
 
 -- query for discovery endpoint data
-function openidc.discover(opts)
+function openidc.get_discovery_doc(opts)
     local err = openidc_ensure_discovered_data (opts)
     if err then
-      ngx.log(ngx.ERR, "error getting enpoints definition using discovery endpoint")
+      ngx.log(ngx.ERR, "error getting endpoints definition using discovery endpoint")
     end
 
     return opts.discovery, err
