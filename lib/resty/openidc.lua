@@ -98,6 +98,23 @@ local function openidc_cache_get(type, key)
   return value
 end
 
+-- invalidate values of server-wide cache
+local function openidc_cache_invalidate(type)
+    local dict = ngx.shared[type]
+    if dict then
+        ngx.log(ngx.DEBUG, "flushing cache for "..type)
+        dict.flush_all(dict)
+        local nbr = dict.flush_expired(dict)
+    end
+end
+
+-- invalidate all server-wide caches
+function openidc.invalidate_caches()
+    openidc_cache_invalidate("discovery")
+    openidc_cache_invalidate("jwks")
+    openidc_cache_invalidate("introspection")
+end
+
 -- validate the contents of and id_token
 local function openidc_validate_id_token(opts, id_token, nonce)
 
