@@ -1,3 +1,6 @@
+02/08/2018
+- added functions to manually request the invalidation of the caches; see #142
+
 02/06/2018
 - added more logging that may help debugging configuration; see #140; thanks @pamiel
 
