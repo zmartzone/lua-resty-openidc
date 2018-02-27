@@ -246,3 +246,21 @@ describe("when the id claims to be signed by an unsupported algorithm", function
     assert.error_log_contains("ignored id_token signature as algorithm 'AB256' is not supported")
   end)
 end)
+
+describe("when the id token signature is invalid", function()
+  test_support.start_server({
+    break_id_token_signature = "true"
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login has failed", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error message has been logged", function()
+    assert.error_log_contains("id_token 'RS256' signature verification failed")
+  end)
+  it("authenticate returns an error", function()
+    assert.error_log_contains("authenticate failed: jwt signature verification failed")
+  end)
+end)
+
