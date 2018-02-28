@@ -264,3 +264,38 @@ describe("when the id token signature is invalid", function()
   end)
 end)
 
+describe("when the id token signature uses the 'none' alg", function()
+  describe("and we are not willing to accept the none alg", function()
+    test_support.start_server({
+      none_alg_id_token_signature = "true",
+    })
+    teardown(test_support.stop_server)
+    local _, status = test_support.login()
+    it("login has failed", function()
+      assert.are.equals(401, status)
+    end)
+    it("an error message has been logged", function()
+      assert.error_log_contains("id_token 'none' signature verification failed")
+    end)
+    it("authenticate returns an error", function()
+      assert.error_log_contains("authenticate failed: token uses \"none\" alg but accept_none_alg is not enabled")
+    end)
+  end)
+  describe("and we are willing to accept the none alg", function()
+    test_support.start_server({
+      none_alg_id_token_signature = "true",
+      oidc_opts = {
+        accept_none_alg = true,
+      }
+    })
+    teardown(test_support.stop_server)
+    local _, status = test_support.login()
+    it("login succeeds", function()
+      assert.are.equals(302, status)
+    end)
+    it("an message has been logged", function()
+      assert.error_log_contains("accept JWT with alg \"none\" and no signature")
+    end)
+  end)
+end)
+

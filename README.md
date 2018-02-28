@@ -111,6 +111,10 @@ http {
              --token_endpoint_auth_method = ["client_secret_basic"|"client_secret_post"],
              --ssl_verify = "no"
 
+             --accept_none_alg = false
+             -- if your OpenID Connect Provider doesn't sign its id tokens
+             -- (uses the "none" signature algorithm) then set this to true.
+
              --renew_access_token_on_expiry = true
              -- whether this plugin shall try to silently renew the access token once it is expired if a refresh token is available.
              -- if it fails to renew the token, the user will be redirected to the authorization endpoint.
@@ -233,6 +237,11 @@ lAc5Csj0o5Q+oEhPUAVBIF07m4rd0OvAVPOCQ2NJhQSL1oWASbf+fg==
             -- contains "jwks_uri" entry; the jwks endpoint must provide either an "x5c" entry
             -- or both the "n" modulus and "e" exponent entries for RSA signature verification
             -- discovery = "https://accounts.google.com/.well-known/openid-configuration",
+
+             --accept_none_alg = false
+             -- if you want to accept unsigned tokens (using the
+             -- "none" signature algorithm) then set this to true.
+
           }
 
           -- call bearer_jwt_verify for OAuth 2.0 JWT validation

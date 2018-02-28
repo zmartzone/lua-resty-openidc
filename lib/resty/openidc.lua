@@ -451,7 +451,6 @@ local function openidc_load_jwt_none_alg(enc_hdr, enc_payload)
   local header = cjson_s.decode(openidc_base64_url_decode(enc_hdr))
   local payload = cjson_s.decode(openidc_base64_url_decode(enc_payload))
   if header and payload and header.alg == "none" then
-    ngx.log(ngx.DEBUG, "accept JWT with alg \"none\" and no signature from \"code\" flow")
     return {
       raw_header = enc_hdr,
       raw_payload = enc_payload,
@@ -748,7 +747,14 @@ local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, asymmetric_s
   local enc_hdr, enc_payload, enc_sign = string.match(jwt_string, '^(.+)%.(.+)%.(.*)$')
   if enc_payload and (not enc_sign or enc_sign == "") then
     local jwt = openidc_load_jwt_none_alg(enc_hdr, enc_payload)
-    if jwt then return jwt end -- otherwise the JWT is invalid and load_jwt produces an error
+    if jwt then
+      if opts.accept_none_alg then
+        ngx.log(ngx.DEBUG, "accept JWT with alg \"none\" and no signature")
+        return jwt
+      else
+        return jwt, "token uses \"none\" alg but accept_none_alg is not enabled"
+      end
+    end -- otherwise the JWT is invalid and load_jwt produces an error
   end
 
   local jwt_obj = jwt:load_jwt(jwt_string, nil)
