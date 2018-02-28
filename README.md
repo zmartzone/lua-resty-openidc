@@ -238,9 +238,16 @@ lAc5Csj0o5Q+oEhPUAVBIF07m4rd0OvAVPOCQ2NJhQSL1oWASbf+fg==
             -- or both the "n" modulus and "e" exponent entries for RSA signature verification
             -- discovery = "https://accounts.google.com/.well-known/openid-configuration",
 
-             --accept_none_alg = false
+             -- the signature algorithm that you expect has been used;
+             -- can be a single string or a table.
+             -- You should set this for security reasons in order to
+             -- avoid accepting a token claiming to be signed by HMAC
+             -- using a public RSA key.
+             --token_signing_alg_values_expected = { "RS256" }
+
              -- if you want to accept unsigned tokens (using the
              -- "none" signature algorithm) then set this to true.
+             --accept_none_alg = false
 
           }
 

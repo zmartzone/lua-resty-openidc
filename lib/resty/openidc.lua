@@ -741,8 +741,25 @@ local function uses_asymmetric_algorithm(jwt_header)
   return string.sub(jwt_header.alg, 1, 2) == "RS"
 end
 
+-- is the JWT signing algorithm one that has been expected?
+local function is_algorithm_expected(jwt_header, expected_algs)
+  if expected_algs == nil or not jwt_header or not jwt_header.alg then
+    return true
+  end
+  if type(expected_algs) == 'string' then
+    expected_algs = { expected_algs }
+  end
+  for _, alg in ipairs(expected_algs) do
+    if alg == jwt_header.alg then
+      return true
+    end
+  end
+  return false
+end
+
 -- parse a JWT and verify its signature (if present)
-local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, asymmetric_secret, symmetric_secret, ...)
+local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, asymmetric_secret,
+  symmetric_secret, expected_algs, ...)
   local jwt = require "resty.jwt"
   local enc_hdr, enc_payload, enc_sign = string.match(jwt_string, '^(.+)%.(.+)%.(.*)$')
   if enc_payload and (not enc_sign or enc_sign == "") then
@@ -764,6 +781,11 @@ local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, asymmetric_s
       reason = reason .. ": " .. jwt_obj.reason
     end
     return nil, reason
+  end
+
+  if not is_algorithm_expected(jwt_obj.header, expected_algs) then
+    local alg = jwt_obj.header and jwt_obj.header.alg or "no algorithm at all"
+    return nil, "token is signed by unexpected algorithm \"" .. alg .. "\""
   end
 
   local secret
@@ -859,7 +881,8 @@ local function openidc_authorization_response(opts, session)
   end
 
   local jwt_obj
-  jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, json.id_token, opts.secret, opts.client_secret)
+  jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, json.id_token, opts.secret, opts.client_secret,
+      opts.discovery.id_token_signing_alg_values_supported)
   if err then
     local is_unsupported_signature_error = jwt_obj and not jwt_obj.verified and not is_algorithm_supported(jwt_obj.header)
     if is_unsupported_signature_error then
@@ -1358,7 +1381,8 @@ function openidc.jwt_verify(access_token, opts, ...)
   local v = openidc_cache_get("introspection", access_token)
   if not v then
     local jwt_obj
-    jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, access_token, opts.secret, opts.secret, ...)
+    jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, access_token, opts.secret, opts.secret,
+        opts.token_signing_alg_values_expected, ...)
     if not err then
       json = jwt_obj.payload
       ngx.log(ngx.DEBUG, "jwt: ", cjson.encode(json))

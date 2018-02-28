@@ -14,6 +14,7 @@ local DEFAULT_OIDC_CONFIG = {
       issuer = "http://127.0.0.1/",
       jwks_uri = "http://127.0.0.1/jwk",
       userinfo_endpoint = "http://127.0.0.1/user-info",
+      id_token_signing_alg_values_supported = { "RS256", "HS256" },
    },
    client_id = "client_id",
    client_secret = "client_secret",
