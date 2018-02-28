@@ -235,22 +235,22 @@ end)
 
 describe("when the id claims to be signed by an unsupported algorithm", function()
   describe("and accept_unsupported_alg is not set", function()
-  test_support.start_server({
-    fake_id_token_signature = "true",
-    oidc_opts = {
-      discovery = {
-        id_token_signing_alg_values_supported = { "AB256" }
+    test_support.start_server({
+      fake_id_token_signature = "true",
+      oidc_opts = {
+        discovery = {
+          id_token_signing_alg_values_supported = { "AB256" }
+        }
       }
-    }
-  })
-  teardown(test_support.stop_server)
-  local _, status = test_support.login()
-  it("login succeeds", function()
-    assert.are.equals(302, status)
-  end)
-  it("an error is logged", function()
-    assert.error_log_contains("ignored id_token signature as algorithm 'AB256' is not supported")
-  end)
+    })
+    teardown(test_support.stop_server)
+    local _, status = test_support.login()
+    it("login succeeds", function()
+      assert.are.equals(302, status)
+    end)
+    it("an error is logged", function()
+      assert.error_log_contains("ignored id_token signature as algorithm 'AB256' is not supported")
+    end)
   end)
   describe("and accept_unsupported_alg is true", function()
     test_support.start_server({

@@ -216,26 +216,26 @@ end)
 
 describe("when using a JWT not signed but using the 'none' alg", function()
   describe("and we are willing to accept the none alg", function()
-  test_support.start_server({
-    verify_opts = {
-      discovery = {
-        jwks_uri = "http://127.0.0.1/jwk",
+    test_support.start_server({
+      verify_opts = {
+        discovery = {
+          jwks_uri = "http://127.0.0.1/jwk",
+        },
+        accept_none_alg = true,
       },
-      accept_none_alg = true,
-    },
-    jwk = test_support.load("/spec/jwks_with_two_keys.json"),
-  })
-  teardown(test_support.stop_server)
-  local jwt = test_support.self_signed_jwt({
-      exp = os.time() + 3600,
-  })
-  local _, status = http.request({
-      url = "http://127.0.0.1/verify_bearer_token",
-      headers = { authorization = "Bearer " .. jwt }
-  })
-  it("the token is valid", function()
-    assert.are.equals(204, status)
-  end)
+      jwk = test_support.load("/spec/jwks_with_two_keys.json"),
+    })
+    teardown(test_support.stop_server)
+    local jwt = test_support.self_signed_jwt({
+        exp = os.time() + 3600,
+    })
+    local _, status = http.request({
+        url = "http://127.0.0.1/verify_bearer_token",
+        headers = { authorization = "Bearer " .. jwt }
+    })
+    it("the token is valid", function()
+      assert.are.equals(204, status)
+    end)
   end)
   describe("and we are not willing to accept the none alg", function()
     test_support.start_server({

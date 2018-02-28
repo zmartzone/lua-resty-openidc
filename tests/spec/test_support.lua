@@ -218,9 +218,9 @@ JWT_VERIFY_SECRET]=]
                   jwt_token = header .. "." .. b64url(id_token) .. "."
                 else
                   jwt_token = create_jwt(id_token, FAKE_ID_TOKEN_SIGNATURE)
-                if BREAK_ID_TOKEN_SIGNATURE then
-                  jwt_token = jwt_token:sub(1, -6) .. "XXXXX"
-                end
+                  if BREAK_ID_TOKEN_SIGNATURE then
+                    jwt_token = jwt_token:sub(1, -6) .. "XXXXX"
+                  end
                 end
                 local token_response = {
                   access_token = access_token,
