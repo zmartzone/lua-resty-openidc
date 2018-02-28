@@ -115,6 +115,12 @@ http {
              -- if your OpenID Connect Provider doesn't sign its id tokens
              -- (uses the "none" signature algorithm) then set this to true.
 
+             --accept_unsupported_alg = true
+             -- if you want to reject tokens signed using an algorithm
+             -- not supported by lua-resty-jwt set this to false. If
+             -- you leave it unset, the token signature will not be
+             -- verified at all.
+
              --renew_access_token_on_expiry = true
              -- whether this plugin shall try to silently renew the access token once it is expired if a refresh token is available.
              -- if it fails to renew the token, the user will be redirected to the authorization endpoint.
@@ -248,6 +254,12 @@ lAc5Csj0o5Q+oEhPUAVBIF07m4rd0OvAVPOCQ2NJhQSL1oWASbf+fg==
              -- if you want to accept unsigned tokens (using the
              -- "none" signature algorithm) then set this to true.
              --accept_none_alg = false
+
+             -- if you want to reject tokens signed using an algorithm
+             -- not supported by lua-resty-jwt set this to false. If
+             -- you leave it unset, the token signature will not be
+             -- verified at all.
+             --accept_unsupported_alg = true
 
           }
 

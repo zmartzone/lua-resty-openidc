@@ -6,6 +6,7 @@
 - you can now specify which signing algorithm you expect a bearer token to
   use in order to avoid being tricked into accepting a rogue token signed
   with a symmetric key when expecting an asymmetric cypher.
+- added an option to reject tokens signed by an algorithm not supported by lua-resty-jwt
 
 04/19/2018
 - added support for passing bearer token as cookie

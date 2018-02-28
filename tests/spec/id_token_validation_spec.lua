@@ -234,6 +234,7 @@ describe("when the id token signature uses a symmetric algorithm", function()
 end)
 
 describe("when the id claims to be signed by an unsupported algorithm", function()
+  describe("and accept_unsupported_alg is not set", function()
   test_support.start_server({
     fake_id_token_signature = "true",
     oidc_opts = {
@@ -249,6 +250,48 @@ describe("when the id claims to be signed by an unsupported algorithm", function
   end)
   it("an error is logged", function()
     assert.error_log_contains("ignored id_token signature as algorithm 'AB256' is not supported")
+  end)
+  end)
+  describe("and accept_unsupported_alg is true", function()
+    test_support.start_server({
+      fake_id_token_signature = "true",
+      oidc_opts = {
+        discovery = {
+          id_token_signing_alg_values_supported = { "AB256" }
+        },
+        accept_unsupported_alg = true
+      }
+    })
+    teardown(test_support.stop_server)
+    local _, status = test_support.login()
+    it("login succeeds", function()
+      assert.are.equals(302, status)
+    end)
+    it("an error is logged", function()
+      assert.error_log_contains("ignored id_token signature as algorithm 'AB256' is not supported")
+    end)
+  end)
+  describe("and accept_unsupported_alg is false", function()
+    test_support.start_server({
+      fake_id_token_signature = "true",
+      oidc_opts = {
+        discovery = {
+          id_token_signing_alg_values_supported = { "AB256" }
+        },
+        accept_unsupported_alg = false
+      }
+    })
+    teardown(test_support.stop_server)
+    local _, status = test_support.login()
+    it("login has failed", function()
+      assert.are.equals(401, status)
+    end)
+    it("an error message has been logged", function()
+      assert.error_log_contains("token is signed using algorithm \"AB256\" which is not supported by lua%-resty%-jwt")
+    end)
+    it("authenticate returns an error", function()
+      assert.error_log_contains("authenticate failed: token is signed using algorithm \"AB256\" which is not supported by lua%-resty%-jwt")
+    end)
   end)
 end)
 

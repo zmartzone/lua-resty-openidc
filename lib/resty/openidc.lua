@@ -884,11 +884,17 @@ local function openidc_authorization_response(opts, session)
   jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, json.id_token, opts.secret, opts.client_secret,
       opts.discovery.id_token_signing_alg_values_supported)
   if err then
+    local alg = (jwt_obj and jwt_obj.header and jwt_obj.header.alg) or ''
     local is_unsupported_signature_error = jwt_obj and not jwt_obj.verified and not is_algorithm_supported(jwt_obj.header)
     if is_unsupported_signature_error then
-      ngx.log(ngx.WARN, "ignored id_token signature as algorithm '" .. jwt_obj.header.alg .. "' is not supported")
+      if opts.accept_unsupported_alg == nil or opts.accept_unsupported_alg then
+        ngx.log(ngx.WARN, "ignored id_token signature as algorithm '" .. alg .. "' is not supported")
+      else
+        err = "token is signed using algorithm \"" .. alg .. "\" which is not supported by lua-resty-jwt"
+        ngx.log(ngx.ERR, err)
+        return nil, err, session.data.original_url, session
+      end
     else
-      local alg = (jwt_obj and jwt_obj.header and jwt_obj.header.alg) or ''
       ngx.log(ngx.ERR, "id_token '" .. alg .. "' signature verification failed")
       return nil, err, session.data.original_url, session
     end
