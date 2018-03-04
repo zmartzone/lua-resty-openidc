@@ -130,7 +130,7 @@ http {
              -- You can specify timeouts for connect/send/read as a single number (setting all timeouts) or as a table. Values are in milliseconds
              -- timeout = 1000
              -- timeout = { connect = 500, send = 1000, read = 1000 }
-             
+
              -- Optional : use outgoing proxy to the OpenID Connect provider endpoints with the proxy_opts table : 
              -- this requires lua-resty-http >= 0.12
              -- proxy_opts = {
@@ -229,7 +229,8 @@ lAc5Csj0o5Q+oEhPUAVBIF07m4rd0OvAVPOCQ2NJhQSL1oWASbf+fg==
 -----END CERTIFICATE-----]],
 
             -- 3. alternatively one can point to a so-called Discovery document that
-            -- contains "jwks_uri" entry; the jwks endpoint must provide a x5c entry
+            -- contains "jwks_uri" entry; the jwks endpoint must provide either an "x5c" entry
+            -- or an "n" module and "e" exponent entries for RSA signature verification
             -- discovery = "https://accounts.google.com/.well-known/openid-configuration",
           }
 
@@ -348,10 +349,10 @@ as the second command
 
 ## Support
 
-See the Wiki pages with Frequently Asked Questions at:  
-  https://github.com/zmartzone/lua-resty-openidc/wiki  
-For commercial support and consultancy you can contact:  
-  [info@zmartzone.eu](mailto:info@zmartzone.eu)  
+See the Wiki pages with Frequently Asked Questions at:
+  https://github.com/zmartzone/lua-resty-openidc/wiki
+For commercial support and consultancy you can contact:
+  [info@zmartzone.eu](mailto:info@zmartzone.eu)
 
 Any questions/issues should go to issues tracker or the primary author
 [hans.zandbelt@zmartzone.eu](mailto:hans.zandbelt@zmartzone.eu)
