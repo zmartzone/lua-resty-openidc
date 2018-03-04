@@ -230,7 +230,7 @@ lAc5Csj0o5Q+oEhPUAVBIF07m4rd0OvAVPOCQ2NJhQSL1oWASbf+fg==
 
             -- 3. alternatively one can point to a so-called Discovery document that
             -- contains "jwks_uri" entry; the jwks endpoint must provide either an "x5c" entry
-            -- or an "n" module and "e" exponent entries for RSA signature verification
+            -- or both the "n" modulus and "e" exponent entries for RSA signature verification
             -- discovery = "https://accounts.google.com/.well-known/openid-configuration",
           }
 
