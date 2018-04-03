@@ -80,6 +80,7 @@ local DEFAULT_TOKEN_RESPONSE_CONTAINS_REFRESH_TOKEN = "true"
 local DEFAULT_REFRESHING_TOKEN_FAILS = "false"
 local DEFAULT_FAKE_ACCESS_TOKEN_SIGNATURE = "false"
 local DEFAULT_FAKE_ID_TOKEN_SIGNATURE = "false"
+local DEFAULT_BREAK_ID_TOKEN_SIGNATURE = "false"
 
 local DEFAULT_UNAUTH_ACTION = "nil"
 
@@ -207,6 +208,9 @@ JWT_VERIFY_SECRET]=]
                   refresh_token = refresh_token .. "2"
                 end
                 local jwt_token = create_jwt(id_token, FAKE_ID_TOKEN_SIGNATURE)
+                if BREAK_ID_TOKEN_SIGNATURE then
+                  jwt_token = jwt_token:sub(1, -6) .. "XXXXX"
+                end
                 local token_response = {
                   access_token = access_token,
                   expires_in = TOKEN_RESPONSE_EXPIRES_IN,
@@ -367,6 +371,7 @@ local function write_config(out, custom_config)
     :gsub("USERINFO", serpent.block(userinfo, {comment = false }))
     :gsub("FAKE_ACCESS_TOKEN_SIGNATURE", custom_config["fake_access_token_signature"] or DEFAULT_FAKE_ACCESS_TOKEN_SIGNATURE)
     :gsub("FAKE_ID_TOKEN_SIGNATURE", custom_config["fake_id_token_signature"] or DEFAULT_FAKE_ID_TOKEN_SIGNATURE)
+    :gsub("BREAK_ID_TOKEN_SIGNATURE", custom_config["break_id_token_signature"] or DEFAULT_BREAK_ID_TOKEN_SIGNATURE)
     :gsub("ID_TOKEN", serpent.block(id_token, {comment = false }))
     :gsub("ACCESS_TOKEN", serpent.block(access_token, {comment = false }))
     :gsub("UNAUTH_ACTION", custom_config["unauth_action"] and ('"' .. custom_config["unauth_action"] .. '"') or DEFAULT_UNAUTH_ACTION)
@@ -404,6 +409,7 @@ end
 -- - fake_id_token_signature whether to fake a JWT signature with unknown algorithm for the
 --   id_token
 -- - unauth_action value to pass as unauth_action parameter to authenticate
+-- - break_id_token_signature whether to create an id token with an invalid signature
 function test_support.start_server(custom_config)
   assert(os.execute("rm -rf /tmp/server"), "failed to remove old server dir")
   assert(os.execute("mkdir -p /tmp/server/conf"), "failed to create server dir")

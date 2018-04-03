@@ -98,6 +98,23 @@ local function openidc_cache_get(type, key)
   return value
 end
 
+-- invalidate values of server-wide cache
+local function openidc_cache_invalidate(type)
+    local dict = ngx.shared[type]
+    if dict then
+        ngx.log(ngx.DEBUG, "flushing cache for "..type)
+        dict.flush_all(dict)
+        local nbr = dict.flush_expired(dict)
+    end
+end
+
+-- invalidate all server-wide caches
+function openidc.invalidate_caches()
+    openidc_cache_invalidate("discovery")
+    openidc_cache_invalidate("jwks")
+    openidc_cache_invalidate("introspection")
+end
+
 -- validate the contents of and id_token
 local function openidc_validate_id_token(opts, id_token, nonce)
 
@@ -483,6 +500,16 @@ local function openidc_ensure_discovered_data(opts)
   return err
 end
 
+-- query for discovery endpoint data
+function openidc.get_discovery_doc(opts)
+    local err = openidc_ensure_discovered_data (opts)
+    if err then
+      ngx.log(ngx.ERR, "error getting endpoints definition using discovery endpoint")
+    end
+
+    return opts.discovery, err
+end
+
 local function openidc_jwks(url, force, ssl_verify, timeout, proxy_opts)
   ngx.log(ngx.DEBUG, "openidc_jwks: URL is: "..url.. " (force=" .. force .. ")")
 
@@ -800,6 +827,8 @@ local function openidc_authorization_response(opts, session)
     state = session.data.state
   }
 
+  ngx.log(ngx.DEBUG, "Authentication with OP done -> Calling OP Token Endpoint to obtain tokens")
+
   local current_time = ngx.time()
   -- make the call to the token endpoint
   local json
@@ -877,6 +906,7 @@ local function openidc_authorization_response(opts, session)
   session:save()
 
   -- redirect to the URL that was accessed originally
+  ngx.log(ngx.DEBUG, "OIDC Authorization Code Flow completed -> Redirecting to original URL ("..session.data.original_url..")")
   ngx.redirect(session.data.original_url)
   return nil, nil, session.data.original_url, session
 
@@ -1048,6 +1078,8 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
   -- see if this is a request to the redirect_uri i.e. an authorization response
   local path = target_url:match("(.-)%?") or target_url
   if path == opts.redirect_uri_path then
+    ngx.log(ngx.DEBUG, "Redirect URI path ("..path..") is currently navigated -> Processing authorization response coming from OP")
+
     if not session.present then
       err = "request to the redirect_uri_path but there's no session state found"
       ngx.log(ngx.ERR, err)
@@ -1058,6 +1090,8 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
 
   -- see if this is a request to logout
   if path == (opts.logout_path and opts.logout_path or "/logout") then
+    ngx.log(ngx.DEBUG, "Logout path ("..path..") is currently navigated -> Processing local session removal before redirecting to next step of logout process")
+
     openidc_logout(opts, session)
     return nil, nil, target_url, session
   end
@@ -1102,6 +1136,8 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
         target_url,
         session
     end
+
+    ngx.log(ngx.DEBUG, "Authentication is required - Redirecting to OP Authorization endpoint")
     openidc_authorize(opts, session, target_url, opts.prompt)
     return nil, nil, target_url, session
   end
@@ -1109,6 +1145,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
   -- silently reauthenticate if necessary (mainly used for session refresh/getting updated id_token data)
   if opts.refresh_session_interval ~= nil then
     if session.data.last_authenticated == nil or (session.data.last_authenticated+opts.refresh_session_interval) < ngx.time() then
+      ngx.log(ngx.DEBUG, "Silent authentication is required - Redirecting to OP Authorization endpoint")
       openidc_authorize(opts, session, target_url, "none")
       return nil, nil, target_url, session
     end

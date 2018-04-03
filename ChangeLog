@@ -1,3 +1,9 @@
+02/08/2018
+- added functions to manually request the invalidation of the caches; see #142
+
+02/06/2018
+- added more logging that may help debugging configuration; see #140; thanks @pamiel
+
 01/30/2018
 - add support for configuring an outgoing proxy; see #139
 - release 1.5.3
