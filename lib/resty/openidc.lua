@@ -1089,7 +1089,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
   end
 
   -- see if this is a request to logout
-  if path == (opts.logout_path and opts.logout_path or "/logout") then
+  if path == (opts.logout_path or "/logout") then
     ngx.log(ngx.DEBUG, "Logout path ("..path..") is currently navigated -> Processing local session removal before redirecting to next step of logout process")
 
     openidc_logout(opts, session)
