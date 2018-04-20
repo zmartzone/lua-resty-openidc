@@ -1,3 +1,9 @@
+04/19/2018
+- added support for passing bearer token as cookie
+- added support introspection interval
+- added support for passing request cookies on introspection call
+- added passing introspection endpoint authorization method into openidc_call_token_endpoint call 
+
 04/11/2018
 - bugfix rare case where OP public key is starting with 0x80 byte, and thus resulting in
   systematic token signature verification error with message "too long"
