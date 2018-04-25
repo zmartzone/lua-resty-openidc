@@ -354,29 +354,6 @@ local function openidc_configure_proxy(httpc, proxy_opts)
     end
 end
 
-
--- get value of the specified cookie 
-local function openidc_get_cookie_value(cookies, cookie_name)
-
-  local cookie_table
-  if type(cookies) == "string" then 
-    cookie_table = {cookies}
-  else 
-    cookie_table = cookies
-  end  
-  
-  for i,cookie in ipairs(cookie_table) do
-    for v in string.gmatch(cookie, "([^;]+)") do
-      if v:find(cookie_name .. '=') ~= nil then
-        local divider = v:find('=')
-        return v:sub(divider+1)
-      end
-    end
-  end
-
-  return nil   
-end
-
 -- make a call to the token endpoint
 local function openidc_call_token_endpoint(opts, endpoint, body, auth, endpoint_name)
 
@@ -403,7 +380,7 @@ local function openidc_call_token_endpoint(opts, endpoint, body, auth, endpoint_
     if cookies ~= nil then 
       local t = {}
       for cookie_name in string.gmatch(pass_cookies, "%S+") do
-	local cookie_value = openidc_get_cookie_value(cookies, cookie_name)
+	local cookie_value = ngx.var["cookie_"..cookie_name]
         if cookie_value ~= nil then 
           table.insert(t, cookie_name.."="..cookie_value)
         end
@@ -1248,7 +1225,7 @@ local function openidc_get_bearer_access_token_from_cookie(opts)
     return nil, err
   end 
   
-  local cookie_value = openidc_get_cookie_value(cookies, cookie_name)
+  local cookie_value = ngx.var["cookie_"..cookie_name]
   if cookie_value == nil then 
     err = "no Cookie "..cookie_name.." found"
     ngx.log(ngx.ERR, err)
