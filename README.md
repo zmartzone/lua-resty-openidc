@@ -361,7 +361,6 @@ http {
 
              -- Defines the interval in seconds after which a cached and introspected access token needs
              -- to be refreshed by introspecting (and validating) it again against the Authorization Server.
-             -- (can be configured on a per-path basis)
              -- When not defined the value is 0, which means it only expires after the `exp` (or alternative,
              -- see introspection_expiry_claim) hint as returned by the Authorization Server
              -- introspection_interval = 60, 
