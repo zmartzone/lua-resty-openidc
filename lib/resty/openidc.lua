@@ -374,6 +374,21 @@ local function openidc_call_token_endpoint(opts, endpoint, body, auth, endpoint_
     end
   end
 
+  local pass_cookies = opts.pass_cookies or nil
+  if pass_cookies ~= nil then 
+    local cookies = ngx.req.get_headers()["Cookie"]	
+    if cookies ~= nil then 
+      local t = {}
+      for cookie_name in string.gmatch(pass_cookies, "%S+") do
+	local cookie_value = ngx.var["cookie_"..cookie_name]
+        if cookie_value ~= nil then 
+          table.insert(t, cookie_name.."="..cookie_value)
+        end
+      end
+      headers.Cookie = table.concat(t, "; ")
+    end
+  end 
+  
   ngx.log(ngx.DEBUG, "request body for "..ep_name.." endpoint call: ", ngx.encode_args(body))
 
   local httpc = http.new()
@@ -1177,10 +1192,61 @@ function openidc.access_token(opts, session_opts)
 
 end
 
+
+-- get an OAuth 2.0 bearer access token from the HTTP request cookies
+local function openidc_get_bearer_access_token_from_cookie(opts)
+  
+  local err
+
+  ngx.log(ngx.DEBUG, "getting bearer access token from Cookie")
+
+  local accept_token_as = opts.auth_accept_token_as or "header"
+
+  local default_cookie_name = "PA.global"
+  local cookie_name 
+
+  local divider = accept_token_as:find(':') 
+
+  if divider ~= nil then 
+    cookie_name = accept_token_as:sub(divider+1)
+  end
+  
+  if cookie_name == nil then 
+    cookie_name = default_cookie_name
+  end
+
+  ngx.log(ngx.DEBUG, "bearer access token from cookie named: "..cookie_name)
+
+  local cookies = ngx.req.get_headers()["Cookie"]	
+
+  if cookies == nil then 
+    err = "no Cookie header found"
+    ngx.log(ngx.ERR, err)
+    return nil, err
+  end 
+  
+  local cookie_value = ngx.var["cookie_"..cookie_name]
+  if cookie_value == nil then 
+    err = "no Cookie "..cookie_name.." found"
+    ngx.log(ngx.ERR, err)
+    
+  end
+
+  return cookie_value, err
+
+end
+
+
 -- get an OAuth 2.0 bearer access token from the HTTP request
 local function openidc_get_bearer_access_token(opts)
 
   local err
+
+  local accept_token_as = opts.auth_accept_token_as or "header"
+
+  if accept_token_as:find("cookie") ~= nil then 
+    return openidc_get_bearer_access_token_from_cookie(opts)
+  end 
 
   -- get the access token from the Authorization header
   local headers = ngx.req.get_headers()
@@ -1243,16 +1309,22 @@ function openidc.introspect(opts)
     end
 
     -- call the introspection endpoint
-    json, err = openidc_call_token_endpoint(opts, opts.introspection_endpoint, body, nil, "introspection")
+    json, err = openidc_call_token_endpoint(opts, opts.introspection_endpoint, body, opts.introspection_endpoint_auth_method, "introspection")
 
     -- cache the results
     if json then
       if json.active then
         local expiry_claim = opts.introspection_expiry_claim or "exp"
+        local introspection_interval = opts.introspection_interval or 0
         if json[expiry_claim] then
           local ttl = json[expiry_claim]
           if expiry_claim == "exp" then --https://tools.ietf.org/html/rfc7662#section-2.2
             ttl = ttl - ngx.time()
+          end
+          if introspection_interval > 0 then
+            if ttl > introspection_interval then
+               ttl = introspection_interval
+            end
           end
           ngx.log(ngx.DEBUG, "cache token ttl: "..ttl)
           openidc_cache_set("introspection", access_token, cjson.encode(json), ttl)

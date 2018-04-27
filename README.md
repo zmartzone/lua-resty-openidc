@@ -325,6 +325,93 @@ http {
   }
 }
 ```
+## Sample Configuration for passing bearer OAuth 2.0 access tokens as cookie
+
+Sample `nginx.conf` configuration for validating Bearer Access Tokens passed as cookie against a ORY/Hydra Authorization Server.
+
+```
+events {
+  worker_connections 128;
+}
+
+http {
+
+  lua_package_path '~/lua/?.lua;;';
+
+  resolver 8.8.8.8;
+
+  lua_ssl_trusted_certificate /opt/local/etc/openssl/cert.pem;
+  lua_ssl_verify_depth 5;
+
+  # cache for validation results
+  lua_shared_dict introspection 10m;
+
+  server {
+    listen 8080;
+
+    location /api {
+
+      access_by_lua '
+
+          local opts = {
+             introspection_endpoint="https://localhost:9031/oauth2/introspect",
+             client_id="admin",
+             client_secret="demo-password",
+             ssl_verify = "no",
+
+             -- Defines the interval in seconds after which a cached and introspected access token needs
+             -- to be refreshed by introspecting (and validating) it again against the Authorization Server.
+             -- (can be configured on a per-path basis)
+             -- When not defined the value is 0, which means it only expires after the `exp` (or alternative,
+             -- see introspection_expiry_claim) hint as returned by the Authorization Server
+             -- introspection_interval = 60, 
+  
+             -- Defines the way in which bearer OAuth 2.0 access tokens can be passed to this Resource Server. 
+             -- "cookie" as a cookie header called "PA.global" or using the name specified after ":"
+             -- "header" "Authorization: bearer" header
+             -- When not defined the default "Authorization: bearer" header is used
+             -- auth_accept_token_as = "cookie:PA",
+       
+             -- Authentication method for the OAuth 2.0 Authorization Server introspection endpoint,
+             -- Used to authenticate the client to the introspection endpoint with a client_id/client_secret
+             -- Defaults to "client_secret_post"
+             -- introspection_endpoint_auth_method = "client_secret_basic",
+
+             -- Specify the names of cookies separated by whitespace to pickup from the browser and send along on backchannel
+             -- calls to the OP and AS endpoints. 
+             -- When not defined, no such cookies are sent.
+             -- pass_cookies = "JSESSION"
+
+             -- Defaults to "exp" - Controls the TTL of the introspection cache
+             -- https://tools.ietf.org/html/rfc7662#section-2.2
+             -- introspection_expiry_claim = "exp"
+          }
+
+          -- call introspect for OAuth 2.0 Bearer Access Token validation
+          local res, err = require("resty.openidc").introspect(opts)
+
+          if err then
+            ngx.status = 403
+            ngx.say(err)
+            ngx.exit(ngx.HTTP_FORBIDDEN)
+          end
+
+          -- at this point res is a Lua table that represents the JSON
+          -- object returned from the introspection/validation endpoint
+
+          --if res.scope ~= "edit" then
+          --  ngx.exit(ngx.HTTP_FORBIDDEN)
+          --end
+
+          --if res.client_id ~= "ro_client" then
+          --  ngx.exit(ngx.HTTP_FORBIDDEN)
+          --end
+      ';
+    }
+  }
+}
+```
+
 
 ## Running Tests
 
