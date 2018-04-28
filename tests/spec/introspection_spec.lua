@@ -36,6 +36,9 @@ describe("when the introspection endpoint is invoked", function()
     it("the request contains the token parameter", function()
       assert_introspection_endpoint_call_contains("token=" .. jwt:gsub("%-", "%%%-"))
     end)
+    it("no cookies are sent with the introspecion request", function()
+      assert.error_log_contains("no cookie in introspecion call")
+    end)
     it("the response is valid", function()
       assert.are.equals(200, status)
     end)
@@ -83,6 +86,59 @@ describe("when additional parameters have been configured", function()
   it("the request contains the parameters", function()
     assert_introspection_endpoint_call_contains("x=y")
     assert_introspection_endpoint_call_contains("z=a")
+  end)
+end)
+
+describe("when cookies shall be sent with the introspection call", function()
+  test_support.start_server({
+    introspection_opts = {
+      pass_cookies = "foo bar"
+    }
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  describe("but no cookies are included in request", function()
+    local _, status = http.request({
+      url = "http://127.0.0.1/introspect",
+      headers = {
+        authorization = "Bearer " .. jwt,
+      }
+    })
+    it("the response is valid", function()
+      assert.are.equals(200, status)
+    end)
+    it("the request doesn't contain any cookies", function()
+      assert.error_log_contains("no cookie in introspecion call")
+    end)
+  end)
+  describe("a cookie is included in request", function()
+    local _, status = http.request({
+      url = "http://127.0.0.1/introspect",
+      headers = {
+        authorization = "Bearer " .. jwt,
+        cookie = "foo=x; baz=y"
+      }
+    })
+    it("the response is valid", function()
+      assert.are.equals(200, status)
+    end)
+    it("the request contains the cookie", function()
+      assert.error_log_contains("cookie foo=x in introspecion call")
+    end)
+  end)
+  describe("multiple cookie headers are included in request", function()
+    -- the http module doesn't support specifying multiple headers
+             local r = io.popen("curl -H 'Authorization: Bearer " .. jwt .. "' -H 'Cookie: foo=x'"
+                         .. " -H 'Cookie: baz=y'"
+                         .. " -o /dev/null -v --max-redirs 0 http://127.0.0.1/introspect 2>&1")
+    local o = r:read("*a")
+    r:close()
+    it("the response is valid", function()
+      assert.truthy(string.match(string.lower(o), ".*http/.* 200"))
+    end)
+    it("the request contains the cookie", function()
+      assert.error_log_contains("cookie foo=x in introspecion call")
+    end)
   end)
 end)
 

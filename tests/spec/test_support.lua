@@ -276,6 +276,17 @@ JWT_VERIFY_SECRET]=]
                 ngx.log(ngx.ERR, "Received introspection request: " .. ngx.req.get_body_data())
                 local auth = ngx.req.get_headers()["Authorization"]
                 ngx.log(ngx.ERR, "introspection authorization header: " .. (auth and auth or ""))
+                local cookie = ngx.req.get_headers()["Cookie"]
+                if cookie then
+                  if type(cookie) == "string" then
+                    cookie = { cookie }
+                  end
+                  for _, c in ipairs(cookie) do
+                    ngx.log(ngx.ERR, "cookie " .. c .. " in introspecion call")
+                  end
+                else
+                  ngx.log(ngx.ERR, "no cookie in introspecion call")
+                end
                 ngx.header.content_type = 'application/json;charset=UTF-8'
                 delay(INTROSPECTION_DELAY_RESPONSE)
                 ngx.say(cjson.encode(INTROSPECTION_RESPONSE))
