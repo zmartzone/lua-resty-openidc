@@ -1279,7 +1279,7 @@ local function openidc_get_bearer_access_token(opts)
 
   local accept_token_as = opts.auth_accept_token_as or "header"
 
-  if accept_token_as:find("cookie") ~= nil then
+  if accept_token_as:find("cookie") == 1 then
     return openidc_get_bearer_access_token_from_cookie(opts)
   end
 
