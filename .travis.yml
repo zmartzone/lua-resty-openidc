@@ -7,7 +7,7 @@ services:
 
 env:
   global:
-    - VERSION=1.5.3-1
+    - VERSION=1.5.4-1
     - NAME=lua-resty-openidc
     - ROCKSPEC=$NAME-$VERSION.rockspec
     - LUAROCKS=2.3.0

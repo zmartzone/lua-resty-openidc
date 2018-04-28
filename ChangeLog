@@ -1,3 +1,6 @@
+04/28/2018
+- release 1.5.4
+
 04/27/2018
 - disabled support for "none" alg tokens introduced with 1.5.2 by default.
   If you want to enable it, you will now have to explicitly set the accept_none_alg
