@@ -142,6 +142,156 @@ describe("when cookies shall be sent with the introspection call", function()
   end)
 end)
 
+describe("when auth_accept_token_as is header", function()
+  test_support.start_server({
+    introspection_opts = {
+      auth_accept_token_as = "header"
+    }
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  describe("without any Authorization header", function()
+    local _, status = http.request({
+      url = "http://127.0.0.1/introspect"
+    })
+    it("the token is invalid", function()
+      assert.are.equals(401, status)
+    end)
+    it("an error is logged", function()
+      assert.error_log_contains("no Authorization header found")
+    end)
+  end)
+  describe("with a bearer token", function()
+    local _, status = http.request({
+      url = "http://127.0.0.1/introspect",
+      headers = { authorization = "Bearer " .. jwt }
+    })
+    it("the request contains the client_id parameter", function()
+      assert_introspection_endpoint_call_contains("client_id=client_id")
+    end)
+    it("the request contains the client_secret parameter", function()
+      assert_introspection_endpoint_call_contains("client_secret=client_secret")
+    end)
+    it("the request contains the token parameter", function()
+      assert_introspection_endpoint_call_contains("token=" .. jwt:gsub("%-", "%%%-"))
+    end)
+    it("no cookies are sent with the introspecion request", function()
+      assert.error_log_contains("no cookie in introspecion call")
+    end)
+    it("the response is valid", function()
+      assert.are.equals(200, status)
+    end)
+  end)
+end)
+
+describe("when auth_accept_token_as is cookie and default cookie name is used", function()
+  test_support.start_server({
+    introspection_opts = {
+      auth_accept_token_as = "cookie"
+    }
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  describe("without any cookie", function()
+    local _, status = http.request({
+      url = "http://127.0.0.1/introspect"
+    })
+    it("the token is invalid", function()
+      assert.are.equals(401, status)
+    end)
+    it("an error is logged", function()
+      assert.error_log_contains("no Cookie header found")
+    end)
+  end)
+  describe("without default cookie", function()
+    local _, status = http.request({
+      url = "http://127.0.0.1/introspect",
+      headers = { cookie = "token=" .. jwt }
+    })
+    it("the token is invalid", function()
+      assert.are.equals(401, status)
+    end)
+    it("an error is logged", function()
+      assert.error_log_contains("no Cookie PA.global found")
+    end)
+  end)
+  describe("with proper cookie", function()
+    local _, status = http.request({
+      url = "http://127.0.0.1/introspect",
+      headers = { cookie = "PA.global=" .. jwt }
+    })
+    it("the request contains the client_id parameter", function()
+      assert_introspection_endpoint_call_contains("client_id=client_id")
+    end)
+    it("the request contains the client_secret parameter", function()
+      assert_introspection_endpoint_call_contains("client_secret=client_secret")
+    end)
+    it("the request contains the token parameter", function()
+      assert_introspection_endpoint_call_contains("token=" .. jwt:gsub("%-", "%%%-"))
+    end)
+    it("no cookies are sent with the introspecion request", function()
+      assert.error_log_contains("no cookie in introspecion call")
+    end)
+    it("the response is valid", function()
+      assert.are.equals(200, status)
+    end)
+  end)
+end)
+
+describe("when auth_accept_token_as is cookie:foo", function()
+  test_support.start_server({
+    introspection_opts = {
+      auth_accept_token_as = "cookie:foo"
+    }
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  describe("without any cookie", function()
+    local _, status = http.request({
+      url = "http://127.0.0.1/introspect"
+    })
+    it("the token is invalid", function()
+      assert.are.equals(401, status)
+    end)
+    it("an error is logged", function()
+      assert.error_log_contains("no Cookie header found")
+    end)
+  end)
+  describe("without foo cookie", function()
+    local _, status = http.request({
+      url = "http://127.0.0.1/introspect",
+      headers = { cookie = "token=" .. jwt }
+    })
+    it("the token is invalid", function()
+      assert.are.equals(401, status)
+    end)
+    it("an error is logged", function()
+      assert.error_log_contains("no Cookie foo found")
+    end)
+  end)
+  describe("with proper cookie", function()
+    local _, status = http.request({
+      url = "http://127.0.0.1/introspect",
+      headers = { cookie = "foo=" .. jwt }
+    })
+    it("the request contains the client_id parameter", function()
+      assert_introspection_endpoint_call_contains("client_id=client_id")
+    end)
+    it("the request contains the client_secret parameter", function()
+      assert_introspection_endpoint_call_contains("client_secret=client_secret")
+    end)
+    it("the request contains the token parameter", function()
+      assert_introspection_endpoint_call_contains("token=" .. jwt:gsub("%-", "%%%-"))
+    end)
+    it("no cookies are sent with the introspecion request", function()
+      assert.error_log_contains("no cookie in introspecion call")
+    end)
+    it("the response is valid", function()
+      assert.are.equals(200, status)
+    end)
+  end)
+end)
+
 describe("when the response is inactive", function()
   test_support.start_server({
     introspection_response = {
