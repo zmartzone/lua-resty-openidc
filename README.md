@@ -111,6 +111,16 @@ http {
              --token_endpoint_auth_method = ["client_secret_basic"|"client_secret_post"],
              --ssl_verify = "no"
 
+             --accept_none_alg = false
+             -- if your OpenID Connect Provider doesn't sign its id tokens
+             -- (uses the "none" signature algorithm) then set this to true.
+
+             --accept_unsupported_alg = true
+             -- if you want to reject tokens signed using an algorithm
+             -- not supported by lua-resty-jwt set this to false. If
+             -- you leave it unset or set it to true, the token signature will not be
+             -- verified when an unsupported algorithm is used.
+
              --renew_access_token_on_expiry = true
              -- whether this plugin shall try to silently renew the access token once it is expired if a refresh token is available.
              -- if it fails to renew the token, the user will be redirected to the authorization endpoint.
@@ -233,6 +243,24 @@ lAc5Csj0o5Q+oEhPUAVBIF07m4rd0OvAVPOCQ2NJhQSL1oWASbf+fg==
             -- contains "jwks_uri" entry; the jwks endpoint must provide either an "x5c" entry
             -- or both the "n" modulus and "e" exponent entries for RSA signature verification
             -- discovery = "https://accounts.google.com/.well-known/openid-configuration",
+
+             -- the signature algorithm that you expect has been used;
+             -- can be a single string or a table.
+             -- You should set this for security reasons in order to
+             -- avoid accepting a token claiming to be signed by HMAC
+             -- using a public RSA key.
+             --token_signing_alg_values_expected = { "RS256" }
+
+             -- if you want to accept unsigned tokens (using the
+             -- "none" signature algorithm) then set this to true.
+             --accept_none_alg = false
+
+             -- if you want to reject tokens signed using an algorithm
+             -- not supported by lua-resty-jwt set this to false. If
+             -- you leave it unset, the token signature will not be
+             -- verified at all.
+             --accept_unsupported_alg = true
+
           }
 
           -- call bearer_jwt_verify for OAuth 2.0 JWT validation

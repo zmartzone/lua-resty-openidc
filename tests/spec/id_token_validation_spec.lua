@@ -234,16 +234,64 @@ describe("when the id token signature uses a symmetric algorithm", function()
 end)
 
 describe("when the id claims to be signed by an unsupported algorithm", function()
-  test_support.start_server({
-    fake_id_token_signature = "true"
-  })
-  teardown(test_support.stop_server)
-  local _, status = test_support.login()
-  it("login succeeds", function()
-    assert.are.equals(302, status)
+  describe("and accept_unsupported_alg is not set", function()
+    test_support.start_server({
+      fake_id_token_signature = "true",
+      oidc_opts = {
+        discovery = {
+          id_token_signing_alg_values_supported = { "AB256" }
+        }
+      }
+    })
+    teardown(test_support.stop_server)
+    local _, status = test_support.login()
+    it("login succeeds", function()
+      assert.are.equals(302, status)
+    end)
+    it("an error is logged", function()
+      assert.error_log_contains("ignored id_token signature as algorithm 'AB256' is not supported")
+    end)
   end)
-  it("an error is logged", function()
-    assert.error_log_contains("ignored id_token signature as algorithm 'AB256' is not supported")
+  describe("and accept_unsupported_alg is true", function()
+    test_support.start_server({
+      fake_id_token_signature = "true",
+      oidc_opts = {
+        discovery = {
+          id_token_signing_alg_values_supported = { "AB256" }
+        },
+        accept_unsupported_alg = true
+      }
+    })
+    teardown(test_support.stop_server)
+    local _, status = test_support.login()
+    it("login succeeds", function()
+      assert.are.equals(302, status)
+    end)
+    it("an error is logged", function()
+      assert.error_log_contains("ignored id_token signature as algorithm 'AB256' is not supported")
+    end)
+  end)
+  describe("and accept_unsupported_alg is false", function()
+    test_support.start_server({
+      fake_id_token_signature = "true",
+      oidc_opts = {
+        discovery = {
+          id_token_signing_alg_values_supported = { "AB256" }
+        },
+        accept_unsupported_alg = false
+      }
+    })
+    teardown(test_support.stop_server)
+    local _, status = test_support.login()
+    it("login has failed", function()
+      assert.are.equals(401, status)
+    end)
+    it("an error message has been logged", function()
+      assert.error_log_contains("token is signed using algorithm \"AB256\" which is not supported by lua%-resty%-jwt")
+    end)
+    it("authenticate returns an error", function()
+      assert.error_log_contains("authenticate failed: token is signed using algorithm \"AB256\" which is not supported by lua%-resty%-jwt")
+    end)
   end)
 end)
 
@@ -261,6 +309,62 @@ describe("when the id token signature is invalid", function()
   end)
   it("authenticate returns an error", function()
     assert.error_log_contains("authenticate failed: jwt signature verification failed")
+  end)
+end)
+
+describe("when the id token signature uses the 'none' alg", function()
+  describe("and we are not willing to accept the none alg", function()
+    test_support.start_server({
+      none_alg_id_token_signature = "true",
+    })
+    teardown(test_support.stop_server)
+    local _, status = test_support.login()
+    it("login has failed", function()
+      assert.are.equals(401, status)
+    end)
+    it("an error message has been logged", function()
+      assert.error_log_contains("id_token 'none' signature verification failed")
+    end)
+    it("authenticate returns an error", function()
+      assert.error_log_contains("authenticate failed: token uses \"none\" alg but accept_none_alg is not enabled")
+    end)
+  end)
+  describe("and we are willing to accept the none alg", function()
+    test_support.start_server({
+      none_alg_id_token_signature = "true",
+      oidc_opts = {
+        accept_none_alg = true,
+      }
+    })
+    teardown(test_support.stop_server)
+    local _, status = test_support.login()
+    it("login succeeds", function()
+      assert.are.equals(302, status)
+    end)
+    it("an message has been logged", function()
+      assert.error_log_contains("accept JWT with alg \"none\" and no signature")
+    end)
+  end)
+end)
+
+describe("when the id token is signed by an algorithm not announced by discovery endpoint", function()
+  test_support.start_server({
+    oidc_opts = {
+      discovery = {
+        id_token_signing_alg_values_supported = { "HS256" }
+      }
+    }
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login has failed", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error message has been logged", function()
+    assert.error_log_contains("token is signed by unexpected algorithm \"RS256\"")
+  end)
+  it("authenticate returns an error", function()
+    assert.error_log_contains("authenticate failed: token is signed by unexpected algorithm \"RS256\"")
   end)
 end)
 

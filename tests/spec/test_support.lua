@@ -14,6 +14,7 @@ local DEFAULT_OIDC_CONFIG = {
       issuer = "http://127.0.0.1/",
       jwks_uri = "http://127.0.0.1/jwk",
       userinfo_endpoint = "http://127.0.0.1/user-info",
+      id_token_signing_alg_values_supported = { "RS256", "HS256" },
    },
    client_id = "client_id",
    client_secret = "client_secret",
@@ -81,6 +82,7 @@ local DEFAULT_REFRESHING_TOKEN_FAILS = "false"
 local DEFAULT_FAKE_ACCESS_TOKEN_SIGNATURE = "false"
 local DEFAULT_FAKE_ID_TOKEN_SIGNATURE = "false"
 local DEFAULT_BREAK_ID_TOKEN_SIGNATURE = "false"
+local DEFAULT_NONE_ALG_ID_TOKEN_SIGNATURE = "false"
 
 local DEFAULT_UNAUTH_ACTION = "nil"
 
@@ -113,6 +115,9 @@ JWT_VERIFY_SECRET]=]
             ngx.sleep(delay_response / 1000)
           end
         end
+        b64url = function(s)
+          return ngx.encode_base64(cjson.encode(s)):gsub('+','-'):gsub('/','_')
+        end
         create_jwt = function(payload, fake_signature)
           if not fake_signature then
             local jwt_content = {
@@ -122,9 +127,6 @@ JWT_VERIFY_SECRET]=]
             local jwt = require "resty.jwt"
             return jwt:sign(secret, jwt_content)
           else
-            local function b64url(s)
-              return ngx.encode_base64(cjson.encode(s)):gsub('+','-'):gsub('/','_')
-            end
             local header = b64url({
                 typ = "JWT",
                 alg = "AB256"
@@ -207,9 +209,18 @@ JWT_VERIFY_SECRET]=]
                   access_token = access_token .. "2"
                   refresh_token = refresh_token .. "2"
                 end
-                local jwt_token = create_jwt(id_token, FAKE_ID_TOKEN_SIGNATURE)
-                if BREAK_ID_TOKEN_SIGNATURE then
-                  jwt_token = jwt_token:sub(1, -6) .. "XXXXX"
+                local jwt_token
+                if NONE_ALG_ID_TOKEN_SIGNATURE then
+                  local header = b64url({
+                      typ = "JWT",
+                      alg = "none"
+                  })
+                  jwt_token = header .. "." .. b64url(id_token) .. "."
+                else
+                  jwt_token = create_jwt(id_token, FAKE_ID_TOKEN_SIGNATURE)
+                  if BREAK_ID_TOKEN_SIGNATURE then
+                    jwt_token = jwt_token:sub(1, -6) .. "XXXXX"
+                  end
                 end
                 local token_response = {
                   access_token = access_token,
@@ -372,6 +383,7 @@ local function write_config(out, custom_config)
     :gsub("FAKE_ACCESS_TOKEN_SIGNATURE", custom_config["fake_access_token_signature"] or DEFAULT_FAKE_ACCESS_TOKEN_SIGNATURE)
     :gsub("FAKE_ID_TOKEN_SIGNATURE", custom_config["fake_id_token_signature"] or DEFAULT_FAKE_ID_TOKEN_SIGNATURE)
     :gsub("BREAK_ID_TOKEN_SIGNATURE", custom_config["break_id_token_signature"] or DEFAULT_BREAK_ID_TOKEN_SIGNATURE)
+    :gsub("NONE_ALG_ID_TOKEN_SIGNATURE", custom_config["none_alg_id_token_signature"] or DEFAULT_NONE_ALG_ID_TOKEN_SIGNATURE)
     :gsub("ID_TOKEN", serpent.block(id_token, {comment = false }))
     :gsub("ACCESS_TOKEN", serpent.block(access_token, {comment = false }))
     :gsub("UNAUTH_ACTION", custom_config["unauth_action"] and ('"' .. custom_config["unauth_action"] .. '"') or DEFAULT_UNAUTH_ACTION)
@@ -410,6 +422,7 @@ end
 --   id_token
 -- - unauth_action value to pass as unauth_action parameter to authenticate
 -- - break_id_token_signature whether to create an id token with an invalid signature
+-- - none_alg_id_token_signature whether to use the "none" alg when signing the id token
 function test_support.start_server(custom_config)
   assert(os.execute("rm -rf /tmp/server"), "failed to remove old server dir")
   assert(os.execute("mkdir -p /tmp/server/conf"), "failed to create server dir")

@@ -215,24 +215,48 @@ describe("when the access token doesn't contain the exp claim at all", function(
 end)
 
 describe("when using a JWT not signed but using the 'none' alg", function()
-  test_support.start_server({
-    verify_opts = {
-      discovery = {
-        jwks_uri = "http://127.0.0.1/jwk",
-      }
-    },
-    jwk = test_support.load("/spec/jwks_with_two_keys.json"),
-  })
-  teardown(test_support.stop_server)
-  local jwt = test_support.self_signed_jwt({
-      exp = os.time() + 3600,
-  })
-  local _, status = http.request({
-      url = "http://127.0.0.1/verify_bearer_token",
-      headers = { authorization = "Bearer " .. jwt }
-  })
-  it("the token is valid", function()
-    assert.are.equals(204, status)
+  describe("and we are willing to accept the none alg", function()
+    test_support.start_server({
+      verify_opts = {
+        discovery = {
+          jwks_uri = "http://127.0.0.1/jwk",
+        },
+        accept_none_alg = true,
+      },
+      jwk = test_support.load("/spec/jwks_with_two_keys.json"),
+    })
+    teardown(test_support.stop_server)
+    local jwt = test_support.self_signed_jwt({
+        exp = os.time() + 3600,
+    })
+    local _, status = http.request({
+        url = "http://127.0.0.1/verify_bearer_token",
+        headers = { authorization = "Bearer " .. jwt }
+    })
+    it("the token is valid", function()
+      assert.are.equals(204, status)
+    end)
+  end)
+  describe("and we are not willing to accept the none alg", function()
+    test_support.start_server({
+      verify_opts = {
+        discovery = {
+          jwks_uri = "http://127.0.0.1/jwk",
+        },
+      },
+      jwk = test_support.load("/spec/jwks_with_two_keys.json"),
+    })
+    teardown(test_support.stop_server)
+    local jwt = test_support.self_signed_jwt({
+        exp = os.time() + 3600,
+    })
+    local _, status = http.request({
+        url = "http://127.0.0.1/verify_bearer_token",
+        headers = { authorization = "Bearer " .. jwt }
+    })
+    it("the token is invalid", function()
+      assert.are.equals(401, status)
+    end)
   end)
 end)
 
@@ -535,3 +559,29 @@ describe("when the token is signed by an RSA key but jwks_uri is empty", functio
     assert.error_log_contains("Invalid token:.*jwks_uri is not present or not a string")
   end)
 end)
+
+describe("when expecting an RSA signature but token uses HMAC", function()
+  test_support.start_server({
+    verify_opts = {
+      secret = test_support.load("/spec/public_rsa_key.pem"),
+      token_signing_alg_values_expected = "RS256"
+    },
+    jwt_verify_secret = test_support.load("/spec/public_rsa_key.pem"),
+    token_header = {
+      alg = "HS256",
+    }
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/verify_bearer_token",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("Invalid token:.*token is signed by unexpected algorithm \"HS256\"")
+  end)
+end)
+
