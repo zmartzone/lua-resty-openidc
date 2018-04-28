@@ -374,14 +374,13 @@ local function openidc_call_token_endpoint(opts, endpoint, body, auth, endpoint_
     end
   end
 
-  local pass_cookies = opts.pass_cookies or nil
-  if pass_cookies ~= nil then
-    local cookies = ngx.req.get_headers()["Cookie"]
-    if cookies ~= nil then
+  local pass_cookies = opts.pass_cookies
+  if pass_cookies then
+    if ngx.req.get_headers()["Cookie"] then
       local t = {}
       for cookie_name in string.gmatch(pass_cookies, "%S+") do
         local cookie_value = ngx.var["cookie_"..cookie_name]
-        if cookie_value ~= nil then
+        if cookie_value then
           table.insert(t, cookie_name.."="..cookie_value)
         end
       end
@@ -1236,39 +1235,29 @@ local function openidc_get_bearer_access_token_from_cookie(opts)
   ngx.log(ngx.DEBUG, "getting bearer access token from Cookie")
 
   local accept_token_as = opts.auth_accept_token_as or "header"
-
-  local default_cookie_name = "PA.global"
-  local cookie_name
-
+  if accept_token_as:find("cookie") ~= 1 then
+    return nul, "openidc_get_bearer_access_token_from_cookie called but auth_accept_token_as wants "
+      .. opts.auth_accept_token_as
+  end
   local divider = accept_token_as:find(':')
-
-  if divider ~= nil then
-    cookie_name = accept_token_as:sub(divider+1)
-  end
-
-  if cookie_name == nil then
-    cookie_name = default_cookie_name
-  end
+  local cookie_name = divider and accept_token_as:sub(divider+1) or "PA.global"
 
   ngx.log(ngx.DEBUG, "bearer access token from cookie named: "..cookie_name)
 
   local cookies = ngx.req.get_headers()["Cookie"]
-
-  if cookies == nil then
+  if not cookies then
     err = "no Cookie header found"
     ngx.log(ngx.ERR, err)
     return nil, err
   end
 
   local cookie_value = ngx.var["cookie_"..cookie_name]
-  if cookie_value == nil then
+  if not cookie_value then
     err = "no Cookie "..cookie_name.." found"
     ngx.log(ngx.ERR, err)
-
   end
 
   return cookie_value, err
-
 end
 
 
