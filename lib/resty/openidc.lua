@@ -829,6 +829,44 @@ local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, asymmetric_s
   return jwt_obj
 end
 
+--
+-- Load and validate id token from the id_token properties of the token endpoint response
+-- Parameters :
+--     - opts the openidc module options
+--     - jwt_id_token the id_token from the id_token properties of the token endpoint response
+--     - session the current session
+-- Return the id_token, nil if valid
+-- Return nil, the error if invalid
+--
+local function openidc_load_and_validate_jwt_id_token(opts, jwt_id_token, session)
+
+  local jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, jwt_id_token, opts.secret, opts.client_secret)
+  if err then
+    local is_unsupported_signature_error = jwt_obj and not jwt_obj.verified and not is_algorithm_supported(jwt_obj.header)
+    if is_unsupported_signature_error then
+      ngx.log(ngx.WARN, "ignored id_token signature as algorithm '" .. jwt_obj.header.alg .. "' is not supported")
+    else
+      local alg = (jwt_obj and jwt_obj.header and jwt_obj.header.alg) or ''
+      ngx.log(ngx.ERR, "id_token '" .. alg .. "' signature verification failed")
+      return nil, err
+    end
+  end
+  local id_token = jwt_obj.payload
+
+  ngx.log(ngx.DEBUG, "id_token header: ", cjson.encode(jwt_obj.header))
+  ngx.log(ngx.DEBUG, "id_token payload: ", cjson.encode(jwt_obj.payload))
+
+  -- validate the id_token contents
+  if openidc_validate_id_token(opts, id_token, session.data.nonce) == false then
+    err = "id_token validation failed"
+    ngx.log(ngx.ERR, err)
+    return nil, err
+  end
+
+  return id_token
+
+end
+
 -- handle a "code" authorization response from the OP
 local function openidc_authorization_response(opts, session)
   local args = ngx.req.get_uri_args()
@@ -879,34 +917,8 @@ local function openidc_authorization_response(opts, session)
     return nil, err, session.data.original_url, session
   end
 
-  local jwt_obj
-  jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, json.id_token, opts.secret, opts.client_secret,
-      opts.discovery.id_token_signing_alg_values_supported)
+  local id_token, err = openidc_load_and_validate_jwt_id_token(opts, json.id_token, session);
   if err then
-    local alg = (jwt_obj and jwt_obj.header and jwt_obj.header.alg) or ''
-    local is_unsupported_signature_error = jwt_obj and not jwt_obj.verified and not is_algorithm_supported(jwt_obj.header)
-    if is_unsupported_signature_error then
-      if opts.accept_unsupported_alg == nil or opts.accept_unsupported_alg then
-        ngx.log(ngx.WARN, "ignored id_token signature as algorithm '" .. alg .. "' is not supported")
-      else
-        err = "token is signed using algorithm \"" .. alg .. "\" which is not supported by lua-resty-jwt"
-        ngx.log(ngx.ERR, err)
-        return nil, err, session.data.original_url, session
-      end
-    else
-      ngx.log(ngx.ERR, "id_token '" .. alg .. "' signature verification failed")
-      return nil, err, session.data.original_url, session
-    end
-  end
-  local id_token = jwt_obj.payload
-
-  ngx.log(ngx.DEBUG, "id_token header: ", cjson.encode(jwt_obj.header))
-  ngx.log(ngx.DEBUG, "id_token payload: ", cjson.encode(jwt_obj.payload))
-
-  -- validate the id_token contents
-  if openidc_validate_id_token(opts, id_token, session.data.nonce) == false then
-    err = "id_token validation failed"
-    ngx.log(ngx.ERR, err)
     return nil, err, session.data.original_url, session
   end
 
@@ -1096,6 +1108,15 @@ local function openidc_access_token(opts, session, try_to_renew)
   session.data.access_token_expiration = current_time + openidc_access_token_expires_in(opts, json.expires_in)
   if json.refresh_token ~= nil then
     session.data.refresh_token = json.refresh_token
+  end
+
+  if json.id_token ~= nil then
+    local id_token, err = openidc_load_and_validate_jwt_id_token(opts, json.id_token, session)
+    if err then
+      session:save()
+      return nil, err
+    end
+    session.data.id_token = id_token
   end
 
   -- save the session with the new access_token and optionally the new refresh_token
