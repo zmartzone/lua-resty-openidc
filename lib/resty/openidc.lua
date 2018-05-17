@@ -1117,13 +1117,21 @@ local function openidc_access_token(opts, session, try_to_renew)
     session.data.refresh_token = json.refresh_token
   end
 
-  if json.id_token ~= nil then
-    local id_token, err = openidc_load_and_validate_jwt_id_token(opts, json.id_token, session)
-    if err then
-      session:save()
-      return nil, err
+  if store_in_session(opts, 'enc_id_token') then
+    if json.id_token ~= nil then
+      session.data.enc_id_token = json.id_token
     end
-    session.data.id_token = id_token
+  end
+
+  if store_in_session(opts, 'id_token') then
+    if json.id_token ~= nil then
+      local id_token, err = openidc_load_and_validate_jwt_id_token(opts, json.id_token, session)
+      if err then
+        session:save()
+        return nil, err
+      end
+      session.data.id_token = id_token
+    end
   end
 
   -- save the session with the new access_token and optionally the new refresh_token
