@@ -49,6 +49,10 @@ introspection for access token validation.
 
 ## Installation
 
+If you're using `opm` execute the following:
+
+     opm install zmartzone/lua-resty-openid
+
 If you're using `luarocks` execute the following:
 
      luarocks install lua-resty-openidc
