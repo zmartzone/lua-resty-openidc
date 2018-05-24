@@ -1,3 +1,7 @@
+05/24/2018
+- add Cache-Control no-cache header to authorization requests to avoid replays of state/nonce;
+  see https://github.com/zmartzone/mod_auth_openidc/issues/321
+
 04/28/2018
 - release 1.5.4
 
