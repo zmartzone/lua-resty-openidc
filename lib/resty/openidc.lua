@@ -1113,7 +1113,7 @@ local function openidc_access_token(opts, session, try_to_renew)
   session:start()
   session.data.access_token = json.access_token
   session.data.access_token_expiration = current_time + openidc_access_token_expires_in(opts, json.expires_in)
-  if json.refresh_token ~= nil then
+  if json.refresh_token then
     session.data.refresh_token = json.refresh_token
   end
 
