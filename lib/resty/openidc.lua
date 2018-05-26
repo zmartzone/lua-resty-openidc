@@ -1131,8 +1131,6 @@ local function openidc_access_token(opts, session, try_to_renew)
         session.data.access_token = nil
         session.data.access_token_expiration = nil
         session.data.refresh_token = nil
-        session.data.enc_id_token = nil
-        session.data.id_token = nil
         session:save()
         return nil, err
       end
