@@ -194,8 +194,8 @@ describe("if refresh contains an invalid id_token", function()
     redirect = false,
     headers = { cookie = cookies },
   })
-  it ("the id token gets refreshed", function()
-    assert.error_log_contains("id_token refreshed")
+  it ("the id token doesn't get refreshed", function()
+    assert.is_not.error_log_contains("id_token refreshed")
   end)
   it("the tokens are rejected", function()
     assert.error_log_contains("invalid id token, discarding tokens returned while refreshing")

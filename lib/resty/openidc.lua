@@ -1108,6 +1108,14 @@ local function openidc_access_token(opts, session, try_to_renew)
   if err then
     return nil, err
   end
+  local id_token
+  if json.id_token then
+    id_token, err = openidc_load_and_validate_jwt_id_token(opts, json.id_token, session)
+    if err then
+      ngx.log(ngx.ERR, "invalid id token, discarding tokens returned while refreshing")
+      return nil, err
+    end
+  end
   ngx.log(ngx.DEBUG, "access_token refreshed: ", json.access_token, " updated refresh_token: ", json.refresh_token)
 
   session:start()
@@ -1119,21 +1127,11 @@ local function openidc_access_token(opts, session, try_to_renew)
 
   if json.id_token and
     (store_in_session(opts, 'enc_id_token') or store_in_session(opts, 'id_token')) then
-
     ngx.log(ngx.DEBUG, "id_token refreshed: ", json.id_token)
     if store_in_session(opts, 'enc_id_token') then
       session.data.enc_id_token = json.id_token
     end
     if store_in_session(opts, 'id_token') then
-      local id_token, err = openidc_load_and_validate_jwt_id_token(opts, json.id_token, session)
-      if err then
-        ngx.log(ngx.ERR, "invalid id token, discarding tokens returned while refreshing")
-        session.data.access_token = nil
-        session.data.access_token_expiration = nil
-        session.data.refresh_token = nil
-        session:save()
-        return nil, err
-      end
       session.data.id_token = id_token
     end
   end
