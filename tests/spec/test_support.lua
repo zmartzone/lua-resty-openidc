@@ -83,6 +83,7 @@ local DEFAULT_FAKE_ACCESS_TOKEN_SIGNATURE = "false"
 local DEFAULT_FAKE_ID_TOKEN_SIGNATURE = "false"
 local DEFAULT_BREAK_ID_TOKEN_SIGNATURE = "false"
 local DEFAULT_NONE_ALG_ID_TOKEN_SIGNATURE = "false"
+local DEFAULT_REFRESH_RESPONSE_CONTAINS_ID_TOKEN = "true"
 
 local DEFAULT_UNAUTH_ACTION = "nil"
 
@@ -192,8 +193,13 @@ JWT_VERIFY_SECRET]=]
                 local auth = ngx.req.get_headers()["Authorization"]
                 ngx.log(ngx.ERR, "token authorization header: " .. (auth and auth or ""))
                 ngx.header.content_type = 'application/json;charset=UTF-8'
-                local id_token = ID_TOKEN
                 local args = ngx.req.get_post_args()
+                local id_token
+                if args.grant_type == "authorization_code" then
+                  id_token = ID_TOKEN
+                else
+                  id_token = REFRESH_ID_TOKEN
+                end
                 local access_token = "a_token"
                 local refresh_token = "r_token"
                 if args.grant_type == "authorization_code" then
@@ -226,8 +232,10 @@ JWT_VERIFY_SECRET]=]
                   access_token = access_token,
                   expires_in = TOKEN_RESPONSE_EXPIRES_IN,
                   refresh_token = TOKEN_RESPONSE_CONTAINS_REFRESH_TOKEN and refresh_token or nil,
-                  id_token = jwt_token
                 }
+                if args.grant_type == "authorization_code" or REFRESH_RESPONSE_CONTAINS_ID_TOKEN then
+                  token_response.id_token = jwt_token
+                end
                 delay(TOKEN_DELAY_RESPONSE)
                 ngx.say(cjson.encode(token_response))
             }
@@ -348,6 +356,7 @@ local function write_config(out, custom_config)
   custom_config = custom_config or {}
   local oidc_config = merge(merge({}, DEFAULT_OIDC_CONFIG), custom_config["oidc_opts"] or {})
   local id_token = merge(merge({}, DEFAULT_ID_TOKEN), custom_config["id_token"] or {})
+  local refresh_id_token = merge({}, id_token)
   local verify_opts = merge(merge({}, DEFAULT_VERIFY_OPTS), custom_config["verify_opts"] or {})
   local access_token = merge(merge({}, DEFAULT_ACCESS_TOKEN), custom_config["access_token"] or {})
   local token_header = merge(merge({}, DEFAULT_TOKEN_HEADER), custom_config["token_header"] or {})
@@ -360,9 +369,13 @@ local function write_config(out, custom_config)
   local token_response_contains_refresh_token = custom_config["token_response_contains_refresh_token"]
     or DEFAULT_TOKEN_RESPONSE_CONTAINS_REFRESH_TOKEN
   local refreshing_token_fails = custom_config["refreshing_token_fails"] or DEFAULT_REFRESHING_TOKEN_FAILS
+  local refresh_response_contains_id_token = custom_config["refresh_response_contains_id_token"] or DEFAULT_REFRESH_RESPONSE_CONTAINS_ID_TOKEN
   local access_token_opts = merge(merge({}, DEFAULT_OIDC_CONFIG), custom_config["access_token_opts"] or {})
   for _, k in ipairs(custom_config["remove_id_token_claims"] or {}) do
     id_token[k] = nil
+  end
+  for _, k in ipairs(custom_config["remove_refresh_id_token_claims"] or {}) do
+    refresh_id_token[k] = nil
   end
   for _, k in ipairs(custom_config["remove_access_token_claims"] or {}) do
     access_token[k] = nil
@@ -383,6 +396,7 @@ local function write_config(out, custom_config)
     :gsub("TOKEN_RESPONSE_EXPIRES_IN", token_response_expires_in)
     :gsub("TOKEN_RESPONSE_CONTAINS_REFRESH_TOKEN", token_response_contains_refresh_token)
     :gsub("REFRESHING_TOKEN_FAILS", refreshing_token_fails)
+    :gsub("REFRESH_RESPONSE_CONTAINS_ID_TOKEN", refresh_response_contains_id_token)
     :gsub("ACCESS_TOKEN_OPTS", serpent.block(access_token_opts, {comment = false }))
     :gsub("JWK_DELAY_RESPONSE", ((custom_config["delay_response"] or {}).jwk or DEFAULT_DELAY_RESPONSE))
     :gsub("TOKEN_DELAY_RESPONSE", ((custom_config["delay_response"] or {}).token or DEFAULT_DELAY_RESPONSE))
@@ -395,6 +409,7 @@ local function write_config(out, custom_config)
     :gsub("FAKE_ID_TOKEN_SIGNATURE", custom_config["fake_id_token_signature"] or DEFAULT_FAKE_ID_TOKEN_SIGNATURE)
     :gsub("BREAK_ID_TOKEN_SIGNATURE", custom_config["break_id_token_signature"] or DEFAULT_BREAK_ID_TOKEN_SIGNATURE)
     :gsub("NONE_ALG_ID_TOKEN_SIGNATURE", custom_config["none_alg_id_token_signature"] or DEFAULT_NONE_ALG_ID_TOKEN_SIGNATURE)
+    :gsub("REFRESH_ID_TOKEN", serpent.block(refresh_id_token, {comment = false }))
     :gsub("ID_TOKEN", serpent.block(id_token, {comment = false }))
     :gsub("ACCESS_TOKEN", serpent.block(access_token, {comment = false }))
     :gsub("UNAUTH_ACTION", custom_config["unauth_action"] and ('"' .. custom_config["unauth_action"] .. '"') or DEFAULT_UNAUTH_ACTION)
