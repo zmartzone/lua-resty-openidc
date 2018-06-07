@@ -1,10 +1,14 @@
+06/07/2018
+- refer to updated lua-resty-jwt that supports OpenSSL 1.1.x ; see: #162; thanks @cdbattags
+- release 1.6.0
+
 05/29/2018
 - when refreshing tokens the id token is now refreshed as well (if
   included inside the token response); see #158; thanks @grrolland
 
 05/24/2018
 - add Cache-Control no-cache header to authorization requests to avoid replays of state/nonce;
-  see https://github.com/zmartzone/mod_auth_openidc/issues/321
+  see zmartzone/mod_auth_openidc#321
 
 04/28/2018
 - release 1.5.4
