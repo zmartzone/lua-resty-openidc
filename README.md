@@ -42,7 +42,7 @@ to install two extra pure-Lua dependencies that implement session management and
 Typically - when running as an OpenID Connect RP or an OAuth 2.0 server that consumes JWT
 access tokens - you'll also need to install the following dependency:
 
-- [`lua-resty-jwt`](https://github.com/SkyLothar/lua-resty-jwt)
+- [`lua-resty-jwt`](https://github.com/cdbattags/lua-resty-jwt)
 
 The `lua-resty-jwt` dependency above is *not* required when running as an OAuth 2.0 Resource Server (only) using remote
 introspection for access token validation.
