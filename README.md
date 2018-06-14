@@ -112,6 +112,7 @@ http {
              --logout_path = "/logout",
              --redirect_after_logout_uri = "/",
              --redirect_after_logout_with_id_token_hint = true,
+             --post_logout_redirect_uri = "https://www.zmartzone.eu/logoutSuccessful",
              --token_endpoint_auth_method = ["client_secret_basic"|"client_secret_post"],
              --ssl_verify = "no"
 

@@ -1003,14 +1003,24 @@ local function openidc_logout(opts, session)
     ngx.print(openidc_transparent_pixel)
     ngx.exit(ngx.OK)
     return
+  elseif opts.redirect_after_logout_uri and opts.redirect_after_logout_with_id_token_hint and session_token and opts.post_logout_redirect_uri then
+    return ngx.redirect(openidc_combine_uri(opts.redirect_after_logout_uri, {post_logout_redirect_uri=opts.post_logout_redirect_uri,id_token_hint=session_token}))
   elseif opts.redirect_after_logout_uri and opts.redirect_after_logout_with_id_token_hint and session_token then
     return ngx.redirect(openidc_combine_uri(opts.redirect_after_logout_uri, {id_token_hint=session_token}))
+  elseif opts.redirect_after_logout_uri and opts.post_logout_redirect_uri then
+    return ngx.redirect(openidc_combine_uri(opts.redirect_after_logout_uri, {post_logout_redirect_uri=opts.post_logout_redirect_uri}))
   elseif opts.redirect_after_logout_uri then
     return ngx.redirect(opts.redirect_after_logout_uri)
+  elseif opts.discovery.end_session_endpoint and opts.post_logout_redirect_uri and session_token then
+    return ngx.redirect(openidc_combine_uri(opts.discovery.end_session_endpoint, {post_logout_redirect_uri=opts.post_logout_redirect_uri,id_token_hint=session_token}))
   elseif opts.discovery.end_session_endpoint and session_token then
     return ngx.redirect(openidc_combine_uri(opts.discovery.end_session_endpoint, {id_token_hint=session_token}))
+  elseif opts.discovery.end_session_endpoint and opts.post_logout_redirect_uri then
+    return ngx.redirect(openidc_combine_uri(opts.discovery.end_session_endpoint, {post_logout_redirect_uri=opts.post_logout_redirect_uri}))
   elseif opts.discovery.end_session_endpoint then
     return ngx.redirect(opts.discovery.end_session_endpoint)
+  elseif opts.discovery.ping_end_session_endpoint and opts.post_logout_redirect_uri then
+    return ngx.redirect(openidc_combine_uri(opts.discovery.ping_end_session_endpoint, {TargetResource=opts.post_logout_redirect_uri}))
   elseif opts.discovery.ping_end_session_endpoint then
     return ngx.redirect(opts.discovery.ping_end_session_endpoint)
   end
