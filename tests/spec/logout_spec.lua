@@ -14,7 +14,7 @@ describe("when the configured logout uri is invoked with a non-image request", f
   it("the response contains a default HTML-page", function()
     assert.are.equals(200, status)
     assert.are.equals("text/html", headers["content-type"])
-    -- TODO should there be a Cache-Control header
+    -- TODO should there be a Cache-Control header?
   end)
   it("the session cookie has been revoked", function()
     assert.truthy(string.match(headers["set-cookie"],
@@ -260,3 +260,108 @@ describe("when logout is invoked and discovery contains ping_end_session_endpoin
                                "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
   end)
 end)
+
+describe("when logout is invoked and a callback with hint and a post_logout_uri have been configured", function()
+  test_support.start_server({
+      oidc_opts = {
+        discovery = {
+          end_session_endpoint = "http://127.0.0.1/end-session",
+          ping_end_session_endpoint = "http://127.0.0.1/ping-end-session",
+        },
+        redirect_after_logout_uri = "http://127.0.0.1/after-logout",
+        redirect_after_logout_with_id_token_hint = true,
+        post_logout_redirect_uri = "http://www.example.org/",
+      }
+  })
+  teardown(test_support.stop_server)
+  local _, _, cookie = test_support.login()
+  local _, status, headers = http.request({
+      url = "http://127.0.0.1/default/logout",
+      headers = { cookie = cookie },
+      redirect = false
+  })
+  it("the response redirects to the callback", function()
+    assert.are.equals(302, status)
+    assert.truthy(string.match(headers["location"], "http://127.0.0.1/after%-logout.*"))
+  end)
+  it("the redirect contains the id_token_hint", function()
+    assert.truthy(string.match(headers["location"], ".*id_token_hint=.*"))
+  end)
+  it("the redirect contains the post_logout_redirect_uri", function()
+    local u = string.lower(test_support.urlescape_for_regex("http://www.example.org/"))
+    assert.truthy(string.match(string.lower(headers["location"]),
+                               ".*post_logout_redirect_uri=" .. u))
+  end)
+  it("the session cookie has been revoked", function()
+    assert.truthy(string.match(headers["set-cookie"],
+                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+  end)
+end)
+
+describe("when logout is invoked and discovery contains end_session_endpoint and a post_logout_uri have been configured", function()
+  test_support.start_server({
+      oidc_opts = {
+        discovery = {
+          end_session_endpoint = "http://127.0.0.1/end-session",
+          ping_end_session_endpoint = "http://127.0.0.1/ping-end-session",
+        },
+        redirect_after_logout_with_id_token_hint = true,
+        post_logout_redirect_uri = "http://www.example.org/",
+      }
+  })
+  teardown(test_support.stop_server)
+  local _, _, cookie = test_support.login()
+  local _, status, headers = http.request({
+      url = "http://127.0.0.1/default/logout",
+      headers = { cookie = cookie },
+      redirect = false
+  })
+  it("the response redirects to the callback", function()
+    assert.are.equals(302, status)
+    assert.truthy(string.match(headers["location"], "http://127.0.0.1/end%-session.*"))
+  end)
+  it("the redirect contains the id_token_hint", function()
+    assert.truthy(string.match(headers["location"], ".*%id_token_hint=.*"))
+  end)
+  it("the redirect contains the post_logout_redirect_uri", function()
+    local u = string.lower(test_support.urlescape_for_regex("http://www.example.org/"))
+    assert.truthy(string.match(string.lower(headers["location"]),
+                               ".*post_logout_redirect_uri=" .. u))
+  end)
+  it("the session cookie has been revoked", function()
+    assert.truthy(string.match(headers["set-cookie"],
+                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+  end)
+end)
+
+describe("when logout is invoked and discovery contains ping_end_session_endpoint and a post_logout_uri have been configured", function()
+  test_support.start_server({
+      oidc_opts = {
+        discovery = {
+          ping_end_session_endpoint = "http://127.0.0.1/ping-end-session",
+        },
+        post_logout_redirect_uri = "http://www.example.org/",
+      }
+  })
+  teardown(test_support.stop_server)
+  local _, _, cookie = test_support.login()
+  local _, status, headers = http.request({
+      url = "http://127.0.0.1/default/logout",
+      headers = { cookie = cookie },
+      redirect = false
+  })
+  it("the response redirects to the callback", function()
+    assert.are.equals(302, status)
+    assert.truthy(string.match(headers["location"], "http://127.0.0.1/ping%-end%-session.*"))
+  end)
+  it("the redirect contains the post_logout_redirect_uri", function()
+    local u = string.lower(test_support.urlescape_for_regex("http://www.example.org/"))
+    assert.truthy(string.match(string.lower(headers["location"]),
+                               ".*targetresource=" .. u))
+  end)
+  it("the session cookie has been revoked", function()
+    assert.truthy(string.match(headers["set-cookie"],
+                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+  end)
+end)
+
