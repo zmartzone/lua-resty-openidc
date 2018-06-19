@@ -111,8 +111,11 @@ http {
              --redirect_uri_scheme = "https",
              --logout_path = "/logout",
              --redirect_after_logout_uri = "/",
+             -- Where should the user be redirected after logout from the RP. This option overides any end_session_endpoint that the OP may have provided in the discovery response.
              --redirect_after_logout_with_id_token_hint = true,
+             -- Whether the redirection after logout should include the id token as an hint (if available). This option is used only if redirect_after_logout_uri is set.
              --post_logout_redirect_uri = "https://www.zmartzone.eu/logoutSuccessful",
+             -- Where does the RP requests that the OP redirects the user after logout. If this option is set to a relative URI, it will be relative to the OP's logout endpoint, not the RP's.
              --token_endpoint_auth_method = ["client_secret_basic"|"client_secret_post"],
              --ssl_verify = "no"
 
