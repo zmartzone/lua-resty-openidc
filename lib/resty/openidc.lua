@@ -262,6 +262,9 @@ local function openidc_base64_url_decode(input)
 end
 
 local function openidc_combine_uri(uri, params)
+  if params == nil or next(params) == nil then
+    return uri
+  end
   local sep = "?"
   if string.find(uri, "?", 1, true) then
     sep = "&"
@@ -1003,16 +1006,27 @@ local function openidc_logout(opts, session)
     ngx.print(openidc_transparent_pixel)
     ngx.exit(ngx.OK)
     return
-  elseif opts.redirect_after_logout_uri and opts.redirect_after_logout_with_id_token_hint and session_token then
-    return ngx.redirect(openidc_combine_uri(opts.redirect_after_logout_uri, {id_token_hint=session_token}))
-  elseif opts.redirect_after_logout_uri then
-    return ngx.redirect(opts.redirect_after_logout_uri)
-  elseif opts.discovery.end_session_endpoint and session_token then
-    return ngx.redirect(openidc_combine_uri(opts.discovery.end_session_endpoint, {id_token_hint=session_token}))
-  elseif opts.discovery.end_session_endpoint then
-    return ngx.redirect(opts.discovery.end_session_endpoint)
+  elseif opts.redirect_after_logout_uri or opts.discovery.end_session_endpoint then
+    local uri
+    if opts.redirect_after_logout_uri then
+       uri = opts.redirect_after_logout_uri
+    else
+       uri = opts.discovery.end_session_endpoint
+    end
+    local params = {}
+    if (opts.redirect_after_logout_with_id_token_hint or not opts.redirect_after_logout_uri) and session_token then
+      params["id_token_hint"] = session_token
+    end
+    if opts.post_logout_redirect_uri then
+      params["post_logout_redirect_uri"] = opts.post_logout_redirect_uri
+    end
+    return ngx.redirect(openidc_combine_uri(uri, params))
   elseif opts.discovery.ping_end_session_endpoint then
-    return ngx.redirect(opts.discovery.ping_end_session_endpoint)
+    local params = {}
+    if opts.post_logout_redirect_uri then
+      params["TargetResource"] = opts.post_logout_redirect_uri
+    end
+    return ngx.redirect(openidc_combine_uri(opts.discovery.ping_end_session_endpoint, params))
   end
 
   ngx.header.content_type = "text/html"
