@@ -42,7 +42,7 @@ to install two extra pure-Lua dependencies that implement session management and
 Typically - when running as an OpenID Connect RP or an OAuth 2.0 server that consumes JWT
 access tokens - you'll also need to install the following dependency:
 
-- [`lua-resty-jwt`](https://github.com/SkyLothar/lua-resty-jwt)
+- [`lua-resty-jwt`](https://github.com/cdbattags/lua-resty-jwt)
 
 The `lua-resty-jwt` dependency above is *not* required when running as an OAuth 2.0 Resource Server (only) using remote
 introspection for access token validation.
@@ -111,7 +111,11 @@ http {
              --redirect_uri_scheme = "https",
              --logout_path = "/logout",
              --redirect_after_logout_uri = "/",
+             -- Where should the user be redirected after logout from the RP. This option overides any end_session_endpoint that the OP may have provided in the discovery response.
              --redirect_after_logout_with_id_token_hint = true,
+             -- Whether the redirection after logout should include the id token as an hint (if available). This option is used only if redirect_after_logout_uri is set.
+             --post_logout_redirect_uri = "https://www.zmartzone.eu/logoutSuccessful",
+             -- Where does the RP requests that the OP redirects the user after logout. If this option is set to a relative URI, it will be relative to the OP's logout endpoint, not the RP's.
              --token_endpoint_auth_method = ["client_secret_basic"|"client_secret_post"],
              --ssl_verify = "no"
 
