@@ -473,8 +473,7 @@ See the Wiki pages with Frequently Asked Questions at:
 For commercial support and consultancy you can contact:
   [info@zmartzone.eu](mailto:info@zmartzone.eu)
 
-Any questions/issues should go to issues tracker or the primary author
-[hans.zandbelt@zmartzone.eu](mailto:hans.zandbelt@zmartzone.eu)
+Any questions/issues should go to issues tracker.
 
 Disclaimer
 ----------
