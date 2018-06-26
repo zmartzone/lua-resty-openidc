@@ -602,16 +602,10 @@ local wrap = ('.'):rep(64)
 
 local envelope = "-----BEGIN %s-----\n%s\n-----END %s-----\n"
 
-local function der2pem(data, header, typ)
+local function der2pem(data, typ)
   typ = typ:upper() or "CERTIFICATE"
-  if header == nil then
-    data = b64(data)
-    return string.format(envelope, typ, data:gsub(wrap, '%0\n', (#data-1)/64), typ)
-  else
-    -- ADDING b64 RSA HEADER WITH OID
-    data = header .. b64(data)
-    return string.format(envelope, typ,  data:gsub(wrap, '%0\n', (#data-1)/64), typ)
-  end
+  data = b64(data)
+  return string.format(envelope, typ, data:gsub(wrap, '%0\n', (#data-1)/64), typ)
 end
 
 
@@ -654,6 +648,11 @@ local function encode_sequence_of_integer(array)
   return encode_sequence(array,encode_binary_integer)
 end
 
+local function encode_bit_string(array)
+  local s = "\0" .. array -- first octet holds the number of unused bits
+  return "\3" .. encode_length(#s) .. s
+end
+
 local function openidc_pem_from_x5c(x5c)
   -- TODO check x5c length
   ngx.log(ngx.DEBUG, "Found x5c, getting PEM public key from x5c entry of json public key")
@@ -672,9 +671,13 @@ local function openidc_pem_from_rsa_n_and_e(n, e)
     openidc_base64_url_decode(n), openidc_base64_url_decode(e)
   }
   local encoded_key = encode_sequence_of_integer(der_key)
-
-  --PEM KEY FROM PUBLIC KEYS, PASSING 64 BIT ENCODED RSA HEADER STRING WHICH IS SAME FOR ALL KEYS
-  local pem = der2pem(encoded_key,"MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A","PUBLIC KEY")
+  local pem = der2pem(encode_sequence({
+    encode_sequence({
+        "\6\9\42\134\72\134\247\13\1\1\1" -- OID :rsaEncryption
+        .. "\5\0" -- ASN.1 NULL of length 0
+    }),
+    encode_bit_string(encoded_key)
+  }), "PUBLIC KEY")
   ngx.log(ngx.DEBUG, "Generated pem key from n and e: ", pem)
   return pem
 end
