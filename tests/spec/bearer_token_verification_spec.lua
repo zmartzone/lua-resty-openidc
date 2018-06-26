@@ -585,3 +585,42 @@ describe("when expecting an RSA signature but token uses HMAC", function()
   end)
 end)
 
+describe("when using a statically configured 4k RSA public key", function()
+  test_support.start_server({
+    verify_opts = {
+      secret = test_support.load("/spec/public_longer_rsa_key.pem")
+    },
+    jwt_sign_secret = test_support.load("/spec/private_longer_rsa_key.pem")
+  })
+  teardown(test_support.stop_server)
+  base_checks()
+end)
+
+describe("when using a 4k RSA key from a JWK that contains the x5c claim", function()
+  test_support.start_server({
+    verify_opts = {
+      discovery = {
+        jwks_uri = "http://127.0.0.1/jwk",
+      }
+    },
+    jwk = test_support.load("/spec/longer_rsa_key_jwk_with_x5c.json"),
+    jwt_sign_secret = test_support.load("/spec/private_longer_rsa_key.pem")
+  })
+  teardown(test_support.stop_server)
+  base_checks()
+end)
+
+describe("when using a 4k RSA key from a JWK that doesn't contain the x5c claim", function()
+  test_support.start_server({
+    verify_opts = {
+      discovery = {
+        jwks_uri = "http://127.0.0.1/jwk",
+      }
+    },
+    jwk = test_support.load("/spec/longer_rsa_key_jwk_with_n_and_e.json"),
+    jwt_sign_secret = test_support.load("/spec/private_longer_rsa_key.pem")
+  })
+  teardown(test_support.stop_server)
+  base_checks()
+end)
+
