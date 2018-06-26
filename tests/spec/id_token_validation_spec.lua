@@ -204,7 +204,7 @@ end)
 
 describe("when the id token signature key isn't part of the JWK", function()
   test_support.start_server({
-    jwt_verify_secret = "secret",
+    jwt_sign_secret = "secret",
     token_header = {
       alg = "HS256",
     }
@@ -221,7 +221,7 @@ end)
 
 describe("when the id token signature uses a symmetric algorithm", function()
   test_support.start_server({
-    jwt_verify_secret = "client_secret",
+    jwt_sign_secret = "client_secret",
     token_header = {
       alg = "HS256",
     },

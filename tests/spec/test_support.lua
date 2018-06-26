@@ -62,7 +62,7 @@ function test_support.self_signed_jwt(payload, alg, signature)
   return header .. "." .. b64url(payload) .. "." .. (signature or "")
 end
 
-local DEFAULT_JWT_VERIFY_SECRET = test_support.load("/spec/private_rsa_key.pem")
+local DEFAULT_JWT_SIGN_SECRET = test_support.load("/spec/private_rsa_key.pem")
 
 local DEFAULT_JWK = test_support.load("/spec/rsa_key_jwk_with_x5c.json")
 
@@ -103,9 +103,8 @@ http {
     lua_package_path '~/lua/?.lua;;';
     lua_shared_dict discovery 1m;
     init_by_lua_block {
-        jwks = [=[JWK]=]
-        secret = [=[
-JWT_VERIFY_SECRET]=]
+        sign_secret = [=[
+JWT_SIGN_SECRET]=]
         if os.getenv('coverage') then
           require("luacov.runner")("/spec/luacov/settings.luacov")
         end
@@ -126,7 +125,7 @@ JWT_VERIFY_SECRET]=]
               payload = payload
             }
             local jwt = require "resty.jwt"
-            return jwt:sign(secret, jwt_content)
+            return jwt:sign(sign_secret, jwt_content)
           else
             local header = b64url({
                 typ = "JWT",
@@ -135,6 +134,7 @@ JWT_VERIFY_SECRET]=]
             return header .. "." .. b64url(payload) .. ".NOT_A_VALID_SIGNATURE"
           end
         end
+        jwks = [=[JWK]=]
     }
 
     resolver      8.8.8.8;
@@ -389,7 +389,7 @@ local function write_config(out, custom_config)
   local config = DEFAULT_CONFIG_TEMPLATE
     :gsub("OIDC_CONFIG", serpent.block(oidc_config, {comment = false }))
     :gsub("TOKEN_HEADER", serpent.block(token_header, {comment = false }))
-    :gsub("JWT_VERIFY_SECRET", custom_config["jwt_verify_secret"] or DEFAULT_JWT_VERIFY_SECRET)
+    :gsub("JWT_SIGN_SECRET", custom_config["jwt_sign_secret"] or DEFAULT_JWT_SIGN_SECRET)
     :gsub("VERIFY_OPTS", serpent.block(verify_opts, {comment = false }))
     :gsub("INTROSPECTION_RESPONSE", serpent.block(introspection_response, {comment = false }))
     :gsub("INTROSPECTION_OPTS", serpent.block(introspection_opts, {comment = false }))
@@ -423,7 +423,7 @@ end
 -- - remove_id_token_claims is an array of claims to remove from the id_token
 -- - verify_opts is a table containing options that are accepted by oidc.bearer_jwt_verify
 -- - jwt_signature_alg algorithm to use for signing JWTs
--- - jwt_verify_secret the secret to use when verifying the secret
+-- - jwt_sign_secret the secret to use when signing JWTs
 -- - access_token is a table containing claims for the access token provided by /jwt
 -- - token_header is a table containing claims for the header used by /jwt
 --   as well as the id token

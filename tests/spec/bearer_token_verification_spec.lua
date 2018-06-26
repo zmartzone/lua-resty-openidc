@@ -77,7 +77,7 @@ describe("when using a statically configured symmetric key for HMAC", function()
     verify_opts = {
       secret = "secret"
     },
-    jwt_verify_secret = "secret",
+    jwt_sign_secret = "secret",
     token_header = {
       alg = "HS256",
     }
@@ -566,7 +566,7 @@ describe("when expecting an RSA signature but token uses HMAC", function()
       secret = test_support.load("/spec/public_rsa_key.pem"),
       token_signing_alg_values_expected = "RS256"
     },
-    jwt_verify_secret = test_support.load("/spec/public_rsa_key.pem"),
+    jwt_sign_secret = test_support.load("/spec/public_rsa_key.pem"),
     token_header = {
       alg = "HS256",
     }
