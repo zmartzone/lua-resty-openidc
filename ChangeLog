@@ -1,3 +1,7 @@
+06/26/2018
+- signature verification failed for RSA keys of a length different
+  from 2048 bit when the JWK used a specific format ; see #170
+
 06/19/2018
 - added post_logout_redirect_uri parameter that can be used to set
   the target after logging out of the OpenID Connect Provider ; see #168;
