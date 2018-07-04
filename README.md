@@ -269,6 +269,9 @@ lAc5Csj0o5Q+oEhPUAVBIF07m4rd0OvAVPOCQ2NJhQSL1oWASbf+fg==
              -- verified at all.
              --accept_unsupported_alg = true
 
+             -- the expiration time in seconds for jwk cache, default is 1 day.
+             --jwk_expires_in = 24 * 60 * 60
+
           }
 
           -- call bearer_jwt_verify for OAuth 2.0 JWT validation
