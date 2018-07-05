@@ -1,11 +1,14 @@
+07/05/2018
+- add customized expiration time option for discovery and jwk cache; thanks @dhlin
+- release 1.6.1
+
 06/26/2018
 - signature verification failed for RSA keys of a length different
-  from 2048 bit when the JWK used a specific format ; see #170
+  from 2048 bit when the JWK used a specific format; see #170
 
 06/19/2018
 - added post_logout_redirect_uri parameter that can be used to set
-  the target after logging out of the OpenID Connect Provider ; see #168;
-  thanks @thomasleplus
+  the target after logging out of the OpenID Connect Provider ; see #168; thanks @thomasleplus
 
 06/07/2018
 - refer to updated lua-resty-jwt that supports OpenSSL 1.1.x ; see: #162; thanks @cdbattags
