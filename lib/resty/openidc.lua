@@ -368,12 +368,20 @@ local function openidc_call_token_endpoint(opts, endpoint, body, auth, endpoint_
 
   if auth then
     if auth == "client_secret_basic" then
-      headers.Authorization = "Basic "..b64( opts.client_id..":"..opts.client_secret)
+      if opts.client_secret then
+        headers.Authorization = "Basic " .. b64(opts.client_id .. ":" .. opts.client_secret)
+      else
+      -- client_secret must not be set if Windows Integrated Authentication (WIA) is used with
+      -- Active Directory Federation Services (AD FS) 4.0 (or newer) on Windows Server 2016 (or newer)
+        headers.Authorization = "Basic " .. b64(opts.client_id .. ":")
+      end
       ngx.log(ngx.DEBUG,"client_secret_basic: authorization header '"..headers.Authorization.."'")
     end
     if auth == "client_secret_post" then
       body.client_id=opts.client_id
-      body.client_secret=opts.client_secret
+      if opts.client_secret then
+        body.client_secret=opts.client_secret
+      end
       ngx.log(ngx.DEBUG, "client_secret_post: client_id and client_secret being sent in POST body")
     end
   end
