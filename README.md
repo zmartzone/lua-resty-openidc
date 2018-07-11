@@ -489,4 +489,4 @@ Disclaimer
 ----------
 
 *This software is open sourced by ZmartZone IAM. For commercial support
-you can contact [ZmartZone IAM](https://www.zmartzone.eu) as described above.*
+you can contact [ZmartZone IAM](https://www.zmartzone.eu) as described above in the [Support](#support) section.*
