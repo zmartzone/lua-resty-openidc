@@ -1,3 +1,6 @@
+07/18/2018
+- extract log function and log level constant to the module level to allow customization
+
 07/05/2018
 - add customized expiration time option for discovery and jwk cache; thanks @dhlin
 - release 1.6.1
