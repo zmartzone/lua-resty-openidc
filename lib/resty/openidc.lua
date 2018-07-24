@@ -1478,4 +1478,12 @@ function openidc.bearer_jwt_verify(opts, ...)
   return json, err, access_token
 end
 
+-- Passing nil to any of the arguments resets the configuration to default
+function openidc.set_logging(new_log, new_levels)
+  log = new_log and new_log or ngx.log
+  DEBUG = new_levels.DEBUG and new_levels.DEBUG or ngx.DEBUG
+  ERROR = new_levels.ERROR and new_levels.ERROR or ngx.ERR
+  WARN  = new_levels.WARN and new_levels.WARN or ngx.WARN
+end
+
 return openidc
