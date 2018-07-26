@@ -462,6 +462,15 @@ http {
 }
 ```
 
+## Logging
+
+Logging can be customized, including using custom logger and remapping OpenIDC's
+default log levels, e.g:
+
+```lua
+local openidc = require("resty.openidc")
+openidc.set_logging(nil, { DEBUG = ngx.INFO })
+```
 
 ## Running Tests
 
