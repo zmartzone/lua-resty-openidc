@@ -142,7 +142,7 @@ describe("when cookies shall be sent with the introspection call", function()
   end)
 end)
 
-describe("when auth_accept_token_as is header", function()
+describe("when auth_accept_token_as is header and default header name is used", function()
   test_support.start_server({
     introspection_opts = {
       auth_accept_token_as = "header"
@@ -165,6 +165,49 @@ describe("when auth_accept_token_as is header", function()
     local _, status = http.request({
       url = "http://127.0.0.1/introspect",
       headers = { authorization = "Bearer " .. jwt }
+    })
+    it("the request contains the client_id parameter", function()
+      assert_introspection_endpoint_call_contains("client_id=client_id")
+    end)
+    it("the request contains the client_secret parameter", function()
+      assert_introspection_endpoint_call_contains("client_secret=client_secret")
+    end)
+    it("the request contains the token parameter", function()
+      assert_introspection_endpoint_call_contains("token=" .. jwt:gsub("%-", "%%%-"))
+    end)
+    it("no cookies are sent with the introspection request", function()
+      assert.error_log_contains("no cookie in introspection call")
+    end)
+    it("the response is valid", function()
+      assert.are.equals(200, status)
+    end)
+  end)
+end)
+
+describe("when auth_accept_token_as is header and auth_accept_token_as_header_name is defined", function()
+  test_support.start_server({
+    introspection_opts = {
+      auth_accept_token_as = "header",
+      auth_accept_token_as_header_name="cf-Access-Jwt-Assertion"
+    }
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  describe("without any Authorization header", function()
+    local _, status = http.request({
+      url = "http://127.0.0.1/introspect"
+    })
+    it("the token is invalid", function()
+      assert.are.equals(401, status)
+    end)
+    it("an error is logged", function()
+      assert.error_log_contains("no Authorization header found")
+    end)
+  end)
+  describe("with a bearer token pattern1", function()
+    local _, status = http.request({
+      url = "http://127.0.0.1/introspect",
+      headers = { ["cf-Access-Jwt-Assertion"] = "Bearer " .. jwt }
     })
     it("the request contains the client_id parameter", function()
       assert_introspection_endpoint_call_contains("client_id=client_id")
