@@ -295,8 +295,10 @@ lAc5Csj0o5Q+oEhPUAVBIF07m4rd0OvAVPOCQ2NJhQSL1oWASbf+fg==
             ngx.exit(ngx.HTTP_FORBIDDEN)
           end
 
-          -- at this point res is a Lua table that represents the JSON
-          -- payload in the JWT token
+          -- at this point res is a Lua table that represents the (validated) JSON
+          -- payload in the JWT token; now we typically do not want to allow just any
+          -- token that was issued by the Authorization Server but we want to apply
+          -- some access restrictions via client IDs or scopes
 
           --if res.scope ~= "edit" then
           --  ngx.exit(ngx.HTTP_FORBIDDEN)
