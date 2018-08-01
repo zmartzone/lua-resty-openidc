@@ -48,9 +48,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 --]]
 
 local require = require
-local cjson = require "cjson"
-local cjson_s = require "cjson.safe"
-local http = require "resty.http"
+local cjson = require("cjson")
+local cjson_s = require("cjson.safe")
+local http = require("resty.http")
+local r_session = require("resty.session")
 local string = string
 local ipairs = ipairs
 local pairs = pairs
@@ -280,8 +281,8 @@ end
 
 -- send the browser of to the OP's authorization endpoint
 local function openidc_authorize(opts, session, target_url, prompt)
-  local resty_random = require "resty.random"
-  local resty_string = require "resty.string"
+  local resty_random = require("resty.random")
+  local resty_string = require("resty.string")
 
   -- generate state and nonce
   local state = resty_string.to_hex(resty_random.bytes(16))
@@ -521,6 +522,66 @@ local function openidc_ensure_discovered_data(opts)
     opts.discovery, err = openidc_discover(opts.discovery, opts.ssl_verify, opts.timeout, opts.jwk_expires_in, opts.proxy_opts)
   end
   return err
+end
+
+-- get the token endpoint authentication method
+local function openidc_get_token_auth_method(opts)
+
+  if opts.token_endpoint_auth_method ~= nil and not supported_token_auth_methods[opts.token_endpoint_auth_method] then
+    log(ERROR, "configured value for token_endpoint_auth_method (" .. opts.token_endpoint_auth_method .. ") is not supported, ignoring it")
+    opts.token_endpoint_auth_method = nil
+  end
+
+  local result
+  if opts.discovery.token_endpoint_auth_methods_supported ~= nil then
+    -- if set check to make sure the discovery data includes the selected client auth method
+    if opts.token_endpoint_auth_method ~= nil then
+      for index, value in ipairs(opts.discovery.token_endpoint_auth_methods_supported) do
+        log(DEBUG, index .. " => " .. value)
+        if value == opts.token_endpoint_auth_method then
+          log(DEBUG, "configured value for token_endpoint_auth_method (" .. opts.token_endpoint_auth_method .. ") found in token_endpoint_auth_methods_supported in metadata")
+          result = opts.token_endpoint_auth_method
+          break
+        end
+      end
+      if result == nil then
+        log(ERROR, "configured value for token_endpoint_auth_method (" .. opts.token_endpoint_auth_method .. ") NOT found in token_endpoint_auth_methods_supported in metadata")
+        return nil
+      end
+    else
+      for index, value in ipairs(opts.discovery.token_endpoint_auth_methods_supported) do
+        log(DEBUG, index .. " => " .. value)
+        if supported_token_auth_methods[value] then
+          result = value
+          log(DEBUG, "no configuration setting for option so select the first supported method specified by the OP: " .. result)
+          break
+        end
+      end
+    end
+  else
+    result = opts.token_endpoint_auth_method
+  end
+
+  -- set a sane default if auto-configuration failed
+  if result == nil then
+    result = "client_secret_basic"
+  end
+
+  log(DEBUG, "token_endpoint_auth_method result set to " .. result)
+
+  return result
+end
+
+-- ensure that discovery and token auth configuration is available in opts
+local function ensure_config(opts)
+  local err
+  err = openidc_ensure_discovered_data(opts)
+  if err then
+    return err
+  end
+
+  -- set the authentication method for the token endpoint
+  opts.token_endpoint_auth_method = openidc_get_token_auth_method(opts)
 end
 
 -- query for discovery endpoint data
@@ -770,7 +831,7 @@ end
 -- parse a JWT and verify its signature (if present)
 local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, asymmetric_secret,
 symmetric_secret, expected_algs, ...)
-  local jwt = require "resty.jwt"
+  local jwt = require("resty.jwt")
   local enc_hdr, enc_payload, enc_sign = string.match(jwt_string, '^(.+)%.(.+)%.(.*)$')
   if enc_payload and (not enc_sign or enc_sign == "") then
     local jwt = openidc_load_jwt_none_alg(enc_hdr, enc_payload)
@@ -822,7 +883,7 @@ symmetric_secret, expected_algs, ...)
     -- validators for the exp and nbf claims if they are
     -- present. These validators need to know the configured slack
     -- value
-    local jwt_validators = require "resty.jwt-validators"
+    local jwt_validators = require("resty.jwt-validators")
     jwt_validators.set_system_leeway(opts.iat_slack and opts.iat_slack or 120)
   end
 
@@ -913,6 +974,11 @@ local function openidc_authorization_response(opts, session)
   if args.client_id and args.client_id ~= opts.client_id then
     err = "client_id from argument: " .. args.client_id .. " does not match expected client_id: " .. opts.client_id
     log(ERROR, err)
+    return nil, err, session.data.original_url, session
+  end
+
+  err = ensure_config(opts)
+  if err then
     return nil, err, session.data.original_url, session
   end
 
@@ -1039,54 +1105,6 @@ local function openidc_logout(opts, session)
   ngx.exit(ngx.OK)
 end
 
--- get the token endpoint authentication method
-local function openidc_get_token_auth_method(opts)
-
-  if opts.token_endpoint_auth_method ~= nil and not supported_token_auth_methods[opts.token_endpoint_auth_method] then
-    log(ERROR, "configured value for token_endpoint_auth_method (" .. opts.token_endpoint_auth_method .. ") is not supported, ignoring it")
-    opts.token_endpoint_auth_method = nil
-  end
-
-  local result
-  if opts.discovery.token_endpoint_auth_methods_supported ~= nil then
-    -- if set check to make sure the discovery data includes the selected client auth method
-    if opts.token_endpoint_auth_method ~= nil then
-      for index, value in ipairs(opts.discovery.token_endpoint_auth_methods_supported) do
-        log(DEBUG, index .. " => " .. value)
-        if value == opts.token_endpoint_auth_method then
-          log(DEBUG, "configured value for token_endpoint_auth_method (" .. opts.token_endpoint_auth_method .. ") found in token_endpoint_auth_methods_supported in metadata")
-          result = opts.token_endpoint_auth_method
-          break
-        end
-      end
-      if result == nil then
-        log(ERROR, "configured value for token_endpoint_auth_method (" .. opts.token_endpoint_auth_method .. ") NOT found in token_endpoint_auth_methods_supported in metadata")
-        return nil
-      end
-    else
-      for index, value in ipairs(opts.discovery.token_endpoint_auth_methods_supported) do
-        log(DEBUG, index .. " => " .. value)
-        if supported_token_auth_methods[value] then
-          result = value
-          log(DEBUG, "no configuration setting for option so select the first supported method specified by the OP: " .. result)
-          break
-        end
-      end
-    end
-  else
-    result = opts.token_endpoint_auth_method
-  end
-
-  -- set a sane default if auto-configuration failed
-  if result == nil then
-    result = "client_secret_basic"
-  end
-
-  log(DEBUG, "token_endpoint_auth_method result set to " .. result)
-
-  return result
-end
-
 -- returns a valid access_token (eventually refreshing the token)
 local function openidc_access_token(opts, session, try_to_renew)
 
@@ -1109,13 +1127,11 @@ local function openidc_access_token(opts, session, try_to_renew)
   log(DEBUG, "refreshing expired access_token: ", session.data.access_token, " with: ", session.data.refresh_token)
 
   -- retrieve token endpoint URL from discovery endpoint if necessary
-  err = openidc_ensure_discovered_data(opts)
+  err = ensure_config(opts)
   if err then
     return nil, err
   end
 
-  -- set the authentication method for the token endpoint
-  opts.token_endpoint_auth_method = openidc_get_token_auth_method(opts)
   -- assemble the parameters to the token endpoint
   local body = {
     grant_type = "refresh_token",
@@ -1167,19 +1183,11 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
 
   local err
 
-  local session = require("resty.session").open(session_opts)
+  local session = r_session.open(session_opts)
 
   target_url = target_url or ngx.var.request_uri
 
   local access_token
-
-  err = openidc_ensure_discovered_data(opts)
-  if err then
-    return nil, err, target_url, session
-  end
-
-  -- set the authentication method for the token endpoint
-  opts.token_endpoint_auth_method = openidc_get_token_auth_method(opts)
 
   -- see if this is a request to the redirect_uri i.e. an authorization response
   local path = target_url:match("(.-)%?") or target_url
@@ -1191,12 +1199,18 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
       log(ERROR, err)
       return nil, err, target_url, session
     end
+
     return openidc_authorization_response(opts, session)
   end
 
   -- see if this is a request to logout
   if path == (opts.logout_path or "/logout") then
     log(DEBUG, "Logout path (" .. path .. ") is currently navigated -> Processing local session removal before redirecting to next step of logout process")
+
+    err = ensure_config(opts)
+    if err then
+      return nil, err, session.data.original_url, session
+    end
 
     openidc_logout(opts, session)
     return nil, nil, target_url, session
@@ -1206,6 +1220,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
   local try_to_renew = opts.renew_access_token_on_expiry == nil or opts.renew_access_token_on_expiry
   if session.present and session.data.authenticated
       and store_in_session(opts, 'access_token') then
+
     -- refresh access_token if necessary
     access_token, err = openidc_access_token(opts, session, try_to_renew)
     if err then
@@ -1240,6 +1255,11 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
       session
     end
 
+    err = ensure_config(opts)
+    if err then
+      return nil, err, session.data.original_url, session
+    end
+
     log(DEBUG, "Authentication is required - Redirecting to OP Authorization endpoint")
     openidc_authorize(opts, session, target_url, opts.prompt)
     return nil, nil, target_url, session
@@ -1248,6 +1268,11 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
   -- silently reauthenticate if necessary (mainly used for session refresh/getting updated id_token data)
   if opts.refresh_session_interval ~= nil then
     if session.data.last_authenticated == nil or (session.data.last_authenticated + opts.refresh_session_interval) < ngx.time() then
+      err = ensure_config(opts)
+      if err then
+        return nil, err, session.data.original_url, session
+      end
+
       log(DEBUG, "Silent authentication is required - Redirecting to OP Authorization endpoint")
       openidc_authorize(opts, session, target_url, "none")
       return nil, nil, target_url, session
@@ -1274,7 +1299,7 @@ end
 -- get a valid access_token (eventually refreshing the token), or nil if there's no valid access_token
 function openidc.access_token(opts, session_opts)
 
-  local session = require("resty.session").open(session_opts)
+  local session = r_session.open(session_opts)
 
   return openidc_access_token(opts, session, true)
 end
