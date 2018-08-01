@@ -424,6 +424,9 @@ http {
              -- When not defined the default "Authorization: bearer" header is used
              -- auth_accept_token_as = "cookie:PA",
        
+             -- If header is used header field is Authorization
+             -- auth_accept_token_as_header_name = "cf-Access-Jwt-Assertion"
+
              -- Authentication method for the OAuth 2.0 Authorization Server introspection endpoint,
              -- Used to authenticate the client to the introspection endpoint with a client_id/client_secret
              -- Defaults to "client_secret_post"

@@ -290,10 +290,10 @@ JWT_SIGN_SECRET]=]
                     cookie = { cookie }
                   end
                   for _, c in ipairs(cookie) do
-                    ngx.log(ngx.ERR, "cookie " .. c .. " in introspecion call")
+                    ngx.log(ngx.ERR, "cookie " .. c .. " in introspection call")
                   end
                 else
-                  ngx.log(ngx.ERR, "no cookie in introspecion call")
+                  ngx.log(ngx.ERR, "no cookie in introspection call")
                 end
                 ngx.header.content_type = 'application/json;charset=UTF-8'
                 delay(INTROSPECTION_DELAY_RESPONSE)
