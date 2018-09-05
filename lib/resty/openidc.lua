@@ -1390,9 +1390,9 @@ function openidc.introspect(opts)
   -- see if we've previously cached the introspection result for this access token
   local json
   local v
-  local ignore_cache = opts.ignore_cache or "no"
+  local introspection_cache_ignore = opts.introspection_cache_ignore or "no"
 
-  if ignore_cache == "no" then
+  if introspection_cache_ignore == "no" then
     v = openidc_cache_get("introspection", access_token)
   end
 
@@ -1423,7 +1423,7 @@ function openidc.introspect(opts)
     -- cache the results
     if json then
       if json.active then
-        if ignore_cache == "no" then
+        if introspection_cache_ignore == "no" then
           local expiry_claim = opts.introspection_expiry_claim or "exp"
           local introspection_interval = opts.introspection_interval or 0
           if json[expiry_claim] then

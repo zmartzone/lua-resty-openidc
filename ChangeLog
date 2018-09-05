@@ -1,7 +1,7 @@
 09/04/2018
 - bypass introspection cache on demand. 
   Sometimes it is necessary to force introspection call for token. If you want to force
-  introspection call, you need to set set the ignore_cache option to "yes".
+  introspection call, you need to set set the introspection_cache_ignore option to "yes".
 
 07/18/2018
 - extract log function and log level constant to the module level to allow customization
