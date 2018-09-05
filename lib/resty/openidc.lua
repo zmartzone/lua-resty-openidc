@@ -1389,7 +1389,12 @@ function openidc.introspect(opts)
 
   -- see if we've previously cached the introspection result for this access token
   local json
-  local v = openidc_cache_get("introspection", access_token)
+  local ignore_cache = opts.ignore_cache or "no"
+
+  if ignore_cache == "no" then
+    v = openidc_cache_get("introspection", access_token)
+  end
+
   if not v then
 
     -- assemble the parameters to the introspection (token) endpoint
@@ -1417,20 +1422,22 @@ function openidc.introspect(opts)
     -- cache the results
     if json then
       if json.active then
-        local expiry_claim = opts.introspection_expiry_claim or "exp"
-        local introspection_interval = opts.introspection_interval or 0
-        if json[expiry_claim] then
-          local ttl = json[expiry_claim]
-          if expiry_claim == "exp" then --https://tools.ietf.org/html/rfc7662#section-2.2
-            ttl = ttl - ngx.time()
-          end
-          if introspection_interval > 0 then
-            if ttl > introspection_interval then
-              ttl = introspection_interval
+        if ignore_cache == "no" then
+          local expiry_claim = opts.introspection_expiry_claim or "exp"
+          local introspection_interval = opts.introspection_interval or 0
+          if json[expiry_claim] then
+            local ttl = json[expiry_claim]
+            if expiry_claim == "exp" then --https://tools.ietf.org/html/rfc7662#section-2.2
+              ttl = ttl - ngx.time()
             end
+            if introspection_interval > 0 then
+              if ttl > introspection_interval then
+                ttl = introspection_interval
+              end
+            end
+            log(DEBUG, "cache token ttl: " .. ttl)
+            openidc_cache_set("introspection", access_token, cjson.encode(json), ttl)
           end
-          log(DEBUG, "cache token ttl: " .. ttl)
-          openidc_cache_set("introspection", access_token, cjson.encode(json), ttl)
         end
       else
         err = "invalid token"
