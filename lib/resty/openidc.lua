@@ -1389,6 +1389,7 @@ function openidc.introspect(opts)
 
   -- see if we've previously cached the introspection result for this access token
   local json
+  local v
   local ignore_cache = opts.ignore_cache or "no"
 
   if ignore_cache == "no" then
