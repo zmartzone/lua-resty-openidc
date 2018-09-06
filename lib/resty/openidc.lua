@@ -1390,9 +1390,9 @@ function openidc.introspect(opts)
   -- see if we've previously cached the introspection result for this access token
   local json
   local v
-  local introspection_cache_ignore = opts.introspection_cache_ignore or "no"
+  local introspection_cache_ignore = opts.introspection_cache_ignore or false
 
-  if introspection_cache_ignore == "no" then
+  if not introspection_cache_ignore then
     v = openidc_cache_get("introspection", access_token)
   end
 
@@ -1437,7 +1437,7 @@ function openidc.introspect(opts)
   local expiry_claim = opts.introspection_expiry_claim or "exp"
   local introspection_interval = opts.introspection_interval or 0
 
-  if introspection_cache_ignore == "no" and json[expiry_claim] then
+  if not introspection_cache_ignore and json[expiry_claim] then
     local ttl = json[expiry_claim]
     if expiry_claim == "exp" then --https://tools.ietf.org/html/rfc7662#section-2.2
       ttl = ttl - ngx.time()
