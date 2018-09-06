@@ -1389,59 +1389,71 @@ function openidc.introspect(opts)
 
   -- see if we've previously cached the introspection result for this access token
   local json
-  local v = openidc_cache_get("introspection", access_token)
-  if not v then
+  local v
+  local introspection_cache_ignore = opts.introspection_cache_ignore or false
 
-    -- assemble the parameters to the introspection (token) endpoint
-    local token_param_name = opts.introspection_token_param_name and opts.introspection_token_param_name or "token"
+  if not introspection_cache_ignore then
+    v = openidc_cache_get("introspection", access_token)
+  end
 
-    local body = {}
+  if v then
+    json = cjson.decode(v)
+    return json, err
+  end
 
-    body[token_param_name] = access_token
+  -- assemble the parameters to the introspection (token) endpoint
+  local token_param_name = opts.introspection_token_param_name and opts.introspection_token_param_name or "token"
 
-    if opts.client_id then
-      body.client_id = opts.client_id
+  local body = {}
+
+  body[token_param_name] = access_token
+
+  if opts.client_id then
+    body.client_id = opts.client_id
+  end
+  if opts.client_secret then
+    body.client_secret = opts.client_secret
+  end
+
+  -- merge any provided extra parameters
+  if opts.introspection_params then
+    for key, val in pairs(opts.introspection_params) do body[key] = val end
+  end
+
+  -- call the introspection endpoint
+  json, err = openidc_call_token_endpoint(opts, opts.introspection_endpoint, body, opts.introspection_endpoint_auth_method, "introspection")
+
+
+  if not json then
+    return json, err
+  end
+
+  if not json.active then
+    err = "invalid token"
+    return json, err
+  end
+
+  -- cache the results
+  local expiry_claim = opts.introspection_expiry_claim or "exp"
+  local introspection_interval = opts.introspection_interval or 0
+
+  if not introspection_cache_ignore and json[expiry_claim] then
+    local ttl = json[expiry_claim]
+    if expiry_claim == "exp" then --https://tools.ietf.org/html/rfc7662#section-2.2
+      ttl = ttl - ngx.time()
     end
-    if opts.client_secret then
-      body.client_secret = opts.client_secret
-    end
-
-    -- merge any provided extra parameters
-    if opts.introspection_params then
-      for key, val in pairs(opts.introspection_params) do body[key] = val end
-    end
-
-    -- call the introspection endpoint
-    json, err = openidc_call_token_endpoint(opts, opts.introspection_endpoint, body, opts.introspection_endpoint_auth_method, "introspection")
-
-    -- cache the results
-    if json then
-      if json.active then
-        local expiry_claim = opts.introspection_expiry_claim or "exp"
-        local introspection_interval = opts.introspection_interval or 0
-        if json[expiry_claim] then
-          local ttl = json[expiry_claim]
-          if expiry_claim == "exp" then --https://tools.ietf.org/html/rfc7662#section-2.2
-            ttl = ttl - ngx.time()
-          end
-          if introspection_interval > 0 then
-            if ttl > introspection_interval then
-              ttl = introspection_interval
-            end
-          end
-          log(DEBUG, "cache token ttl: " .. ttl)
-          openidc_cache_set("introspection", access_token, cjson.encode(json), ttl)
-        end
-      else
-        err = "invalid token"
+    if introspection_interval > 0 then
+      if ttl > introspection_interval then
+        ttl = introspection_interval
       end
     end
+    log(DEBUG, "cache token ttl: " .. ttl)
+    openidc_cache_set("introspection", access_token, cjson.encode(json), ttl)
 
-  else
-    json = cjson.decode(v)
   end
 
   return json, err
+
 end
 
 -- main routine for OAuth 2.0 JWT token validation

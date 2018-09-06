@@ -440,6 +440,10 @@ http {
              -- Defaults to "exp" - Controls the TTL of the introspection cache
              -- https://tools.ietf.org/html/rfc7662#section-2.2
              -- introspection_expiry_claim = "exp"
+             
+             -- It may be necessary to force an introspection call for an access_token and ignore the existing cached
+             -- introspection results. If so you need to set set the introspection_cache_ignore option to true.
+             -- introspection_cache_ignore = true
           }
 
           -- call introspect for OAuth 2.0 Bearer Access Token validation
