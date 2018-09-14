@@ -62,7 +62,7 @@ local function base_checks()
   end)
 end
 
-describe("when using a statically configured RSA public key", function()
+describe("when using a statically configured RSA public key using secret opt", function()
   test_support.start_server({
     verify_opts = {
       secret = test_support.load("/spec/public_rsa_key.pem")
@@ -70,9 +70,25 @@ describe("when using a statically configured RSA public key", function()
   })
   teardown(test_support.stop_server)
   base_checks()
+  it("a deprecation warning is logged", function()
+    assert.error_log_contains("using deprecated option `opts.secret` for asymmetric key")
+  end)
 end)
 
-describe("when using a statically configured symmetric key for HMAC", function()
+describe("when using a statically configured RSA public key using public_key opt", function()
+  test_support.start_server({
+    verify_opts = {
+      public_key = test_support.load("/spec/public_rsa_key.pem")
+    }
+  })
+  teardown(test_support.stop_server)
+  base_checks()
+  it("no deprecation warning is logged", function()
+    assert.is_not.error_log_contains("using deprecated option `opts.secret` for asymmetric key")
+  end)
+end)
+
+describe("when using a statically configured symmetric key for HMAC using secret opt", function()
   test_support.start_server({
     verify_opts = {
       secret = "secret"
@@ -84,6 +100,26 @@ describe("when using a statically configured symmetric key for HMAC", function()
   })
   teardown(test_support.stop_server)
   base_checks()
+  it("a deprecation warning is logged", function()
+    assert.error_log_contains("using deprecated option `opts.secret` for symmetric key")
+  end)
+end)
+
+describe("when using a statically configured symmetric key for HMAC using symmetric_key opt", function()
+  test_support.start_server({
+    verify_opts = {
+      symmetric_key = "secret"
+    },
+    jwt_sign_secret = "secret",
+    token_header = {
+      alg = "HS256",
+    }
+  })
+  teardown(test_support.stop_server)
+  base_checks()
+  it("no deprecation warning is logged", function()
+    assert.is_not.error_log_contains("using deprecated option `opts.secret` for symmetric key")
+  end)
 end)
 
 describe("when using a RSA key from a JWK that contains the x5c claim", function()
