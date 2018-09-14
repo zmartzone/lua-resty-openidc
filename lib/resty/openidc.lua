@@ -862,7 +862,10 @@ symmetric_secret, expected_algs, ...)
   local secret
   if is_algorithm_supported(jwt_obj.header) then
     if uses_asymmetric_algorithm(jwt_obj.header) then
-      secret = asymmetric_secret
+      if opts.secret then
+        log(WARN, "using deprecated option `opts.secret` for asymmetric key; switch to `opts.public_key` instead")
+      end
+      secret = asymmetric_secret or opts.secret
       if not secret and opts.discovery then
         log(DEBUG, "using discovery to find key")
         local err
@@ -874,7 +877,10 @@ symmetric_secret, expected_algs, ...)
         end
       end
     else
-      secret = symmetric_secret
+      if opts.secret then
+        log(WARN, "using deprecated option `opts.secret` for symmetric key; switch to `opts.symmetric_key` instead")
+      end
+      secret = symmetric_secret or opts.secret
     end
   end
 
@@ -912,7 +918,7 @@ end
 --
 local function openidc_load_and_validate_jwt_id_token(opts, jwt_id_token, session)
 
-  local jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, jwt_id_token, opts.secret, opts.client_secret,
+  local jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, jwt_id_token, opts.public_key, opts.client_secret,
     opts.discovery.id_token_signing_alg_values_supported)
   if err then
     local alg = (jwt_obj and jwt_obj.header and jwt_obj.header.alg) or ''
@@ -1467,7 +1473,7 @@ function openidc.jwt_verify(access_token, opts, ...)
   local v = openidc_cache_get("introspection", access_token)
   if not v then
     local jwt_obj
-    jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, access_token, opts.secret, opts.secret,
+    jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, access_token, opts.public_key, opts.symmetric_key,
       opts.token_signing_alg_values_expected, ...)
     if not err then
       json = jwt_obj.payload
