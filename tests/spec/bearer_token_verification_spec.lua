@@ -189,7 +189,7 @@ end)
 describe("when the access token has expired", function()
   test_support.start_server({
     verify_opts = {
-      secret = test_support.load("/spec/public_rsa_key.pem")
+      public_key = test_support.load("/spec/public_rsa_key.pem")
     },
     access_token = {
       exp = os.time() - 300
@@ -214,7 +214,7 @@ end)
 describe("when the access token has expired but slack is big enough", function()
   test_support.start_server({
     verify_opts = {
-      secret = test_support.load("/spec/public_rsa_key.pem"),
+      public_key = test_support.load("/spec/public_rsa_key.pem"),
       iat_slack = 400
     },
     access_token = {
@@ -235,7 +235,7 @@ end)
 describe("when the access token doesn't contain the exp claim at all", function()
   test_support.start_server({
     verify_opts = {
-      secret = test_support.load("/spec/public_rsa_key.pem"),
+      public_key = test_support.load("/spec/public_rsa_key.pem"),
     },
     remove_access_token_claims = { "exp" },
   })
@@ -599,7 +599,7 @@ end)
 describe("when expecting an RSA signature but token uses HMAC", function()
   test_support.start_server({
     verify_opts = {
-      secret = test_support.load("/spec/public_rsa_key.pem"),
+      public_key = test_support.load("/spec/public_rsa_key.pem"),
       token_signing_alg_values_expected = "RS256"
     },
     jwt_sign_secret = test_support.load("/spec/public_rsa_key.pem"),
@@ -624,7 +624,7 @@ end)
 describe("when using a statically configured 4k RSA public key", function()
   test_support.start_server({
     verify_opts = {
-      secret = test_support.load("/spec/public_longer_rsa_key.pem")
+      public_key = test_support.load("/spec/public_longer_rsa_key.pem")
     },
     jwt_sign_secret = test_support.load("/spec/private_longer_rsa_key.pem")
   })
