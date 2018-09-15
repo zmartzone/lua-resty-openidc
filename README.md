@@ -258,10 +258,10 @@ http {
           local opts = {
 
             -- 1. example of a shared secret for HS??? signature verification
-            --secret = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            --symmetric_key = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 
             -- 2. another example of a public cert for RS??? signature verification
-            secret = [[-----BEGIN CERTIFICATE-----
+            public_key = [[-----BEGIN CERTIFICATE-----
 MIIC0DCCAbigAwIBAgIGAVSbMZs1MA0GCSqGSIb3DQEBCwUAMCkxCzAJBgNVBAYTAlVTMQwwCgYD
 VQQKEwNibGExDDAKBgNVBAMTA2JsYTAeFw0xNjA1MTAxNTAzMjBaFw0yNjA1MDgxNTAzMjBaMCkx
 CzAJBgNVBAYTAlVTMQwwCgYDVQQKEwNibGExDDAKBgNVBAMTA2JsYTCCASIwDQYJKoZIhvcNAQEB
