@@ -410,3 +410,26 @@ describe("when accessing the protected resource without token and multiple forwa
   end)
 end)
 
+describe("when explicitly setting the use_nonce option to true", function()
+  test_support.start_server({oidc_opts = {use_nonce = true}})
+  teardown(test_support.stop_server)
+  local _, status, headers = http.request({
+    url = "http://127.0.0.1/default/t",
+    redirect = false
+  })
+  it("uses a nonce parameter", function()
+    assert.truthy(string.match(headers["location"], ".*nonce=.*"))
+  end)
+end)
+
+describe("when setting the use_nonce option to false", function()
+  test_support.start_server({oidc_opts = {use_nonce = false}})
+  teardown(test_support.stop_server)
+  local _, status, headers = http.request({
+    url = "http://127.0.0.1/default/t",
+    redirect = false
+  })
+  it("doesn't use a nonce parameter", function()
+    assert.falsy(string.match(headers["location"], ".*nonce=.*"))
+  end)
+end)

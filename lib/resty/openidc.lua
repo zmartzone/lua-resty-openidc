@@ -286,7 +286,8 @@ local function openidc_authorize(opts, session, target_url, prompt)
 
   -- generate state and nonce
   local state = resty_string.to_hex(resty_random.bytes(16))
-  local nonce = resty_string.to_hex(resty_random.bytes(16))
+  local nonce = (opts.use_nonce == nil or opts.use_nonce)
+    and resty_string.to_hex(resty_random.bytes(16))
 
   -- assemble the parameters to the authentication request
   local params = {
@@ -295,8 +296,11 @@ local function openidc_authorize(opts, session, target_url, prompt)
     scope = opts.scope and opts.scope or "openid email profile",
     redirect_uri = openidc_get_redirect_uri(opts),
     state = state,
-    nonce = nonce,
   }
+
+  if nonce then
+    params.nonce = nonce
+  end
 
   if prompt then
     params.prompt = prompt
