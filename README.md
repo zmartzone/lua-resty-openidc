@@ -259,8 +259,8 @@ http {
 
             -- 1. example of a shared secret for HS??? signature verification
             --symmetric_key = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            -- in versions up to 1.6.1 this would have been
-            --secret = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            -- in versions up to 1.6.1 this option's key would have been secret
+            -- rather than symmetric_key
 
             -- 2. another example of a public cert for RS??? signature verification
             public_key = [[-----BEGIN CERTIFICATE-----
@@ -278,7 +278,7 @@ OcTuruRhqYOIJjiYZSgK/P0zUw1cjLwUJ9ig/O6ozYmof83974fygA/wK3SgFNEoFlTkTpOvZhVW
 9kLfCVA/CRBfJNKnz5PWBBxd/3XSEuP/fcWqKGTy7zZso4MTB0NKgWO4duGTgMyZbM4onJPyA0CY
 lAc5Csj0o5Q+oEhPUAVBIF07m4rd0OvAVPOCQ2NJhQSL1oWASbf+fg==
 -----END CERTIFICATE-----]],
-            -- in versions up to 1.6.1 this key would have been secret
+            -- in versions up to 1.6.1 this option's key would have been secret
             -- rather than public_key
 
             -- 3. alternatively one can point to a so-called Discovery document that
