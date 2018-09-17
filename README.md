@@ -178,7 +178,7 @@ http {
 
              -- Optional : add decorator for HTTP request that is
              -- applied when lua-resty-openidc talks to the OpenID Connect
-             -- provider directly. Can be used to provide extra HTPP headers
+             -- provider directly. Can be used to provide extra HTTP headers
              -- or add other similar behavior.
              -- http_request_decorator = function(req)
              --   local h = req.headers or {}
