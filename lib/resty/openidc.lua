@@ -605,7 +605,7 @@ function openidc.get_discovery_doc(opts)
 end
 
 local function openidc_jwks(url, force, ssl_verify, timeout, exptime, proxy_opts, http_request_decorator)
-  log(DEBUG, "openidc_jwks: URL is: "..url.. " (force=" .. force .. ") (decorator=" .. (http_request_decorator and type(http_request_decorator) or "nil"))
+  log(DEBUG, "openidc_jwks: URL is: " .. url .. " (force=" .. force .. ") (decorator=" .. (http_request_decorator and type(http_request_decorator) or "nil"))
 
   local json, err, v
 
