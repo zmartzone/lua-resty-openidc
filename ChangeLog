@@ -1,4 +1,7 @@
 09/17/2018
+- added an optional "request decorator" option that can be used to augment
+  the HTTP requests when lua-resty-openidc talks to the discovery,
+  token or jwks endpoints.
 - add support for Windows Integrated Authentication (WIA) with Active Directory
   Federation Services (AD FS) on Windows Server 2016 (or newer)
 

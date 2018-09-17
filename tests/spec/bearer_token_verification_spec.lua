@@ -624,3 +624,22 @@ describe("when using a 4k RSA key from a JWK that doesn't contain the x5c claim"
   base_checks()
 end)
 
+describe("when a request_decorator has been specified when calling the jwks endpoint", function()
+  test_support.start_server({
+    verify_opts = {
+      discovery = {
+        jwks_uri = "http://127.0.0.1/jwk",
+      },
+      decorate = true
+    },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  http.request({
+    url = "http://127.0.0.1/verify_bearer_token",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the request contains the additional parameter", function()
+    assert.error_log_contains('jwk uri_args:.*"foo"%s*:%s*"bar"')
+  end)
+end)

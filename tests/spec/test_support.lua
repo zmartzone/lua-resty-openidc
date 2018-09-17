@@ -134,6 +134,16 @@ JWT_SIGN_SECRET]=]
             return header .. "." .. b64url(payload) .. ".NOT_A_VALID_SIGNATURE"
           end
         end
+        query_decorator = function(req)
+          req.query = "foo=bar"
+          return req
+        end
+        body_decorator = function(req)
+          local body = ngx.decode_args(req.body)
+          body.foo = "bar"
+          req.body = ngx.encode_args(body)
+          return req
+        end
         jwks = [=[JWK]=]
     }
 
@@ -157,6 +167,7 @@ JWT_SIGN_SECRET]=]
 
         location /jwk {
             content_by_lua_block {
+                ngx.log(ngx.ERR, "jwk uri_args: " .. cjson.encode(ngx.req.get_uri_args()))
                 ngx.header.content_type = 'application/json;charset=UTF-8'
                 delay(JWK_DELAY_RESPONSE)
                 ngx.say(jwks)
@@ -170,7 +181,9 @@ JWT_SIGN_SECRET]=]
         location /default {
             access_by_lua_block {
               local opts = OIDC_CONFIG
-              local oidc = require "resty.openidc"
+              if opts.decorate then
+                opts.http_request_decorator = opts.decorate == "body" and body_decorator or query_decorator
+              end
               local res, err, target, session = oidc.authenticate(opts, nil, UNAUTH_ACTION)
               if err then
                 ngx.status = 401
@@ -243,7 +256,11 @@ JWT_SIGN_SECRET]=]
 
         location /verify_bearer_token {
             content_by_lua_block {
-                local json, err, token = oidc.bearer_jwt_verify(VERIFY_OPTS)
+                local opts = VERIFY_OPTS
+                if opts.decorate then
+                  opts.http_request_decorator = query_decorator
+                end
+                local json, err, token = oidc.bearer_jwt_verify(opts)
                 if err then
                   ngx.status = 401
                   ngx.log(ngx.ERR, "Invalid token: " .. err)
@@ -256,6 +273,7 @@ JWT_SIGN_SECRET]=]
 
         location /discovery {
             content_by_lua_block {
+                ngx.log(ngx.ERR, "discovery uri_args: " .. cjson.encode(ngx.req.get_uri_args()))
                 ngx.header.content_type = 'application/json;charset=UTF-8'
                 delay(DISCOVERY_DELAY_RESPONSE)
                 ngx.say([=[{
@@ -303,7 +321,11 @@ JWT_SIGN_SECRET]=]
 
         location /introspect {
             content_by_lua_block {
-                local json, err = oidc.introspect(INTROSPECTION_OPTS)
+                local opts = INTROSPECTION_OPTS
+                if opts.decorate then
+                  opts.http_request_decorator = body_decorator
+                end
+                local json, err = oidc.introspect(opts)
                 if err then
                   ngx.status = 401
                   ngx.log(ngx.ERR, "Introspection error: " .. err)

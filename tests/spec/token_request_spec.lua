@@ -200,3 +200,16 @@ describe("if token endpoint doesn't return proper JSON", function()
     assert.error_log_contains("authenticate failed: JSON decoding failed")
   end)
 end)
+
+describe("when a request_decorator has been specified when calling the token endpoint", function()
+  test_support.start_server({
+    oidc_opts = {
+      decorate = "body"
+    }
+  })
+  teardown(test_support.stop_server)
+  test_support.login()
+  it("the request contains the additional parameter", function()
+    assert_token_endpoint_call_contains("foo=bar")
+  end)
+end)
