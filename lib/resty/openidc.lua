@@ -389,9 +389,9 @@ local function openidc_call_token_endpoint(opts, endpoint, body, auth, endpoint_
       log(DEBUG, "client_secret_basic: authorization header '" .. headers.Authorization .. "'")
     end
     if auth == "client_secret_post" then
-      body.client_id=opts.client_id
+      body.client_id = opts.client_id
       if opts.client_secret then
-        body.client_secret=opts.client_secret
+        body.client_secret = opts.client_secret
       end
       log(DEBUG, "client_secret_post: client_id and client_secret being sent in POST body")
     end
