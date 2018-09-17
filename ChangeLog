@@ -1,3 +1,8 @@
+09/17/2019
+- added an optional "request decorator" option that can be used to augment
+  the HTTP requests when lua-resty-openidc talks to the discovery,
+  token or jwks endpoints.
+
 09/15/2019
 - add an option to disable nonce parameter for broken OpenID Connect providers
 

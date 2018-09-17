@@ -176,6 +176,17 @@ http {
              --    https_proxy = "http://<proxy_host>:<proxy_port>/"
              -- }
 
+             -- Optional : add decorator for HTTP request that is
+             -- applied when lua-resty-openidc talks to the OpenID Connect
+             -- provider directly. Can be used to provide extra HTPP headers
+             -- or add other similar behavior.
+             -- http_request_decorator = function(req)
+             --   local h = req.headers or {}
+             --   h[EXTRA_HEADER] = 'my extra header'
+             --   req.headers = h
+             --   return req
+             -- end,
+
           }
 
           -- call authenticate for OpenID Connect user authentication
