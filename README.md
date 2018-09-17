@@ -61,6 +61,18 @@ Otherwise copy `openidc.lua` somewhere in your `lua_package_path` under a direct
 If you are using [OpenResty](http://openresty.org/), the default location would be `/usr/local/openresty/lualib/resty`.
 
 
+## Support
+
+#### Community Support
+For generic questions, see the Wiki pages with Frequently Asked Questions at:  
+  [https://github.com/zmartzone/lua-resty-openidc/wiki](https://github.com/zmartzone/lua-resty-openidc/wiki)  
+Any questions/issues should go to issues tracker.
+
+#### Commercial Services
+For commercial Support contracts, Professional Services, Training and use-case specific support you can contact:  
+  [sales@zmartzone.eu](mailto:sales@zmartzone.eu)  
+
+
 ## Sample Configuration for Google+ Signin
 
 Sample `nginx.conf` configuration for authenticating users against Google+ Signin, protecting a reverse-proxied path.
@@ -149,6 +161,13 @@ http {
              -- You can specify timeouts for connect/send/read as a single number (setting all timeouts) or as a table. Values are in milliseconds
              -- timeout = 1000
              -- timeout = { connect = 500, send = 1000, read = 1000 }
+
+             --use_nonce = false
+             -- By default the authorization request includes the
+             -- nonce paramter. You can use this option to disable it
+             -- which may be necessary when talking to a broken OpenID
+             -- Connect provider that ignores the paramter as the
+             -- id_token will be rejected otherwise.
 
              -- Optional : use outgoing proxy to the OpenID Connect provider endpoints with the proxy_opts table : 
              -- this requires lua-resty-http >= 0.12
@@ -283,8 +302,10 @@ lAc5Csj0o5Q+oEhPUAVBIF07m4rd0OvAVPOCQ2NJhQSL1oWASbf+fg==
             ngx.exit(ngx.HTTP_FORBIDDEN)
           end
 
-          -- at this point res is a Lua table that represents the JSON
-          -- payload in the JWT token
+          -- at this point res is a Lua table that represents the (validated) JSON
+          -- payload in the JWT token; now we typically do not want to allow just any
+          -- token that was issued by the Authorization Server but we want to apply
+          -- some access restrictions via client IDs or scopes
 
           --if res.scope ~= "edit" then
           --  ngx.exit(ngx.HTTP_FORBIDDEN)
@@ -410,6 +431,9 @@ http {
              -- When not defined the default "Authorization: bearer" header is used
              -- auth_accept_token_as = "cookie:PA",
        
+             -- If header is used header field is Authorization
+             -- auth_accept_token_as_header_name = "cf-Access-Jwt-Assertion"
+
              -- Authentication method for the OAuth 2.0 Authorization Server introspection endpoint,
              -- Used to authenticate the client to the introspection endpoint with a client_id/client_secret
              -- Defaults to "client_secret_post"
@@ -423,6 +447,10 @@ http {
              -- Defaults to "exp" - Controls the TTL of the introspection cache
              -- https://tools.ietf.org/html/rfc7662#section-2.2
              -- introspection_expiry_claim = "exp"
+             
+             -- It may be necessary to force an introspection call for an access_token and ignore the existing cached
+             -- introspection results. If so you need to set set the introspection_cache_ignore option to true.
+             -- introspection_cache_ignore = true
           }
 
           -- call introspect for OAuth 2.0 Bearer Access Token validation
@@ -450,6 +478,15 @@ http {
 }
 ```
 
+## Logging
+
+Logging can be customized, including using custom logger and remapping OpenIDC's
+default log levels, e.g:
+
+```lua
+local openidc = require("resty.openidc")
+openidc.set_logging(nil, { DEBUG = ngx.INFO })
+```
 
 ## Running Tests
 
@@ -472,18 +509,9 @@ $ docker run -it --rm -e coverage=t lua-resty-openidc/test:latest
 ```
 
 as the second command
-
-## Support
-
-See the Wiki pages with Frequently Asked Questions at:
-  https://github.com/zmartzone/lua-resty-openidc/wiki
-For commercial support and consultancy you can contact:
-  [info@zmartzone.eu](mailto:info@zmartzone.eu)
-
-Any questions/issues should go to issues tracker.
-
+  
 Disclaimer
 ----------
 
 *This software is open sourced by ZmartZone IAM. For commercial support
-you can contact [ZmartZone IAM](https://www.zmartzone.eu) as described above.*
+you can contact [ZmartZone IAM](https://www.zmartzone.eu) as described above in the [Support](#support) section.*

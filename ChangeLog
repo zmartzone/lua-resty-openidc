@@ -1,3 +1,12 @@
+09/15/2019
+- add an option to disable nonce parameter for broken OpenID Connect providers
+
+09/06/2018
+- bypass introspection cache on demand with introspection_cache_ignore; thanks @dmitriyblok
+
+07/18/2018
+- extract log function and log level constant to the module level to allow customization
+
 07/05/2018
 - add customized expiration time option for discovery and jwk cache; thanks @dhlin
 - release 1.6.1
