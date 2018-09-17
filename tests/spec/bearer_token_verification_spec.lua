@@ -62,7 +62,7 @@ local function base_checks()
   end)
 end
 
-describe("when using a statically configured RSA public key", function()
+describe("when using a statically configured RSA public key using secret opt", function()
   test_support.start_server({
     verify_opts = {
       secret = test_support.load("/spec/public_rsa_key.pem")
@@ -70,9 +70,25 @@ describe("when using a statically configured RSA public key", function()
   })
   teardown(test_support.stop_server)
   base_checks()
+  it("a deprecation warning is logged", function()
+    assert.error_log_contains("using deprecated option `opts.secret` for asymmetric key")
+  end)
 end)
 
-describe("when using a statically configured symmetric key for HMAC", function()
+describe("when using a statically configured RSA public key using public_key opt", function()
+  test_support.start_server({
+    verify_opts = {
+      public_key = test_support.load("/spec/public_rsa_key.pem")
+    }
+  })
+  teardown(test_support.stop_server)
+  base_checks()
+  it("no deprecation warning is logged", function()
+    assert.is_not.error_log_contains("using deprecated option `opts.secret` for asymmetric key")
+  end)
+end)
+
+describe("when using a statically configured symmetric key for HMAC using secret opt", function()
   test_support.start_server({
     verify_opts = {
       secret = "secret"
@@ -84,6 +100,26 @@ describe("when using a statically configured symmetric key for HMAC", function()
   })
   teardown(test_support.stop_server)
   base_checks()
+  it("a deprecation warning is logged", function()
+    assert.error_log_contains("using deprecated option `opts.secret` for symmetric key")
+  end)
+end)
+
+describe("when using a statically configured symmetric key for HMAC using symmetric_key opt", function()
+  test_support.start_server({
+    verify_opts = {
+      symmetric_key = "secret"
+    },
+    jwt_sign_secret = "secret",
+    token_header = {
+      alg = "HS256",
+    }
+  })
+  teardown(test_support.stop_server)
+  base_checks()
+  it("no deprecation warning is logged", function()
+    assert.is_not.error_log_contains("using deprecated option `opts.secret` for symmetric key")
+  end)
 end)
 
 describe("when using a RSA key from a JWK that contains the x5c claim", function()
@@ -153,7 +189,7 @@ end)
 describe("when the access token has expired", function()
   test_support.start_server({
     verify_opts = {
-      secret = test_support.load("/spec/public_rsa_key.pem")
+      public_key = test_support.load("/spec/public_rsa_key.pem")
     },
     access_token = {
       exp = os.time() - 300
@@ -178,7 +214,7 @@ end)
 describe("when the access token has expired but slack is big enough", function()
   test_support.start_server({
     verify_opts = {
-      secret = test_support.load("/spec/public_rsa_key.pem"),
+      public_key = test_support.load("/spec/public_rsa_key.pem"),
       iat_slack = 400
     },
     access_token = {
@@ -199,7 +235,7 @@ end)
 describe("when the access token doesn't contain the exp claim at all", function()
   test_support.start_server({
     verify_opts = {
-      secret = test_support.load("/spec/public_rsa_key.pem"),
+      public_key = test_support.load("/spec/public_rsa_key.pem"),
     },
     remove_access_token_claims = { "exp" },
   })
@@ -563,7 +599,7 @@ end)
 describe("when expecting an RSA signature but token uses HMAC", function()
   test_support.start_server({
     verify_opts = {
-      secret = test_support.load("/spec/public_rsa_key.pem"),
+      public_key = test_support.load("/spec/public_rsa_key.pem"),
       token_signing_alg_values_expected = "RS256"
     },
     jwt_sign_secret = test_support.load("/spec/public_rsa_key.pem"),
@@ -588,7 +624,7 @@ end)
 describe("when using a statically configured 4k RSA public key", function()
   test_support.start_server({
     verify_opts = {
-      secret = test_support.load("/spec/public_longer_rsa_key.pem")
+      public_key = test_support.load("/spec/public_longer_rsa_key.pem")
     },
     jwt_sign_secret = test_support.load("/spec/private_longer_rsa_key.pem")
   })
