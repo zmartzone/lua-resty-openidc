@@ -92,11 +92,12 @@ describe("when the full login has been performed and the initial link is called"
   end)
 end)
 
-describe("when the redirect_uri is specified as absolute URI", function()
+describe("when the redirect_uri is specified as relative URI", function()
   test_support.start_server({
     oidc_opts = {
-      redirect_uri = 'https://example.com/default/redirect_uri',
+      redirect_uri_path = '/default/redirect_uri',
     },
+    remove_oidc_config_keys = { 'redirect_uri' },
   })
   teardown(test_support.stop_server)
   local _, _, headers = http.request({
@@ -116,6 +117,9 @@ describe("when the redirect_uri is specified as absolute URI", function()
        assert.are.equals(302, redirStatus)
        assert.are.equals("/default/t", h.location)
     end)
+  end)
+  it("a deprecation warning is logged", function()
+    assert.error_log_contains("using deprecated option `opts.redirect_uri_path` or `opts.redirect_uri_scheme`")
   end)
 end)
 

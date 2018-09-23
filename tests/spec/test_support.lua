@@ -5,7 +5,7 @@ local serpent = require("serpent")
 local test_support = {}
 
 local DEFAULT_OIDC_CONFIG = {
-   redirect_uri_path = "/default/redirect_uri",
+   redirect_uri = "http://localhost/default/redirect_uri",
    logout_path = "/default/logout",
    discovery = {
       authorization_endpoint = "http://127.0.0.1/authorize",
@@ -430,6 +430,9 @@ local function write_config(out, custom_config)
   for _, k in ipairs(custom_config["remove_introspection_claims"] or {}) do
     introspection_response[k] = nil
   end
+  for _, k in ipairs(custom_config["remove_oidc_config_keys"] or {}) do
+    oidc_config[k] = nil
+  end
   local config = DEFAULT_CONFIG_TEMPLATE
     :gsub("OIDC_CONFIG", serpent.block(oidc_config, {comment = false }))
     :gsub("TOKEN_HEADER", serpent.block(token_header, {comment = false }))
@@ -463,6 +466,7 @@ end
 -- starts a server instance with some customizations of the configuration.
 -- expects custom_config to be a table with:
 -- - oidc_opts is a table containing options that are accepted by oidc.authenticate
+-- - remove_oidc_config_keys is an array of keys to remove from the oidc configuration
 -- - id_token is a table containing id_token claims
 -- - remove_id_token_claims is an array of claims to remove from the id_token
 -- - verify_opts is a table containing options that are accepted by oidc.bearer_jwt_verify

@@ -1,3 +1,8 @@
+09/23/2018
+- added redirect_uri option that specifies an absolute URI for the
+  redirect URI. The existing redirect_uri_path and redirect_uri_scheme
+  options have been deprecated in favor of the new option.
+
 09/17/2018
 - added an optional "request decorator" option that can be used to augment
   the HTTP requests when lua-resty-openidc talks to the discovery,

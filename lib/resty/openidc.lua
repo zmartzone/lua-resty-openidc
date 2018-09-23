@@ -1218,6 +1218,10 @@ end
 -- main routine for OpenID Connect user authentication
 function openidc.authenticate(opts, target_url, unauth_action, session_opts)
 
+  if opts.redirect_uri_path or opts.redirect_uri_scheme then
+    log(WARN, "using deprecated option `opts.redirect_uri_path` or `opts.redirect_uri_scheme` for redirect_uri; switch to using an absolute URI and `opts.redirect_uri` instead")
+  end
+
   local err
 
   local session = r_session.open(session_opts)
