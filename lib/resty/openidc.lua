@@ -248,6 +248,9 @@ end
 
 -- assemble the redirect_uri
 local function openidc_get_redirect_uri(opts)
+  if opts.redirect_uri then
+    return opts.redirect_uri
+  end
   local scheme = opts.redirect_uri_scheme or get_scheme()
   local host = get_host_name()
   if not host then
@@ -1203,6 +1206,15 @@ local function openidc_access_token(opts, session, try_to_renew)
   return session.data.access_token, err
 end
 
+function openidc_get_path(uri)
+  local without_query = uri:match("(.-)%?") or uri
+  return without_query:match(".-//[^/]+(/.*)") or without_query
+end
+
+function openidc_get_redirect_uri_path(opts)
+  return opts.redirect_uri and openidc_get_path(opts.redirect_uri) or opts.redirect_uri_path
+end
+
 -- main routine for OpenID Connect user authentication
 function openidc.authenticate(opts, target_url, unauth_action, session_opts)
 
@@ -1215,12 +1227,12 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
   local access_token
 
   -- see if this is a request to the redirect_uri i.e. an authorization response
-  local path = target_url:match("(.-)%?") or target_url
-  if path == opts.redirect_uri_path then
+  local path = openidc_get_path(target_url)
+  if path == openidc_get_redirect_uri_path(opts) then
     log(DEBUG, "Redirect URI path (" .. path .. ") is currently navigated -> Processing authorization response coming from OP")
 
     if not session.present then
-      err = "request to the redirect_uri_path but there's no session state found"
+      err = "request to the redirect_uri path but there's no session state found"
       log(ERROR, err)
       return nil, err, target_url, session
     end

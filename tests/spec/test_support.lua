@@ -199,6 +199,28 @@ JWT_SIGN_SECRET]=]
             proxy_pass http://localhost:80;
         }
 
+        location /default-absolute {
+            access_by_lua_block {
+              local opts = OIDC_CONFIG
+              if opts.decorate then
+                opts.http_request_decorator = opts.decorate == "body" and body_decorator or query_decorator
+              end
+              local uri = ngx.var.scheme .. "://" .. ngx.var.host .. ngx.var.request_uri
+              local res, err, target, session = oidc.authenticate(opts, uri, UNAUTH_ACTION)
+              if err then
+                ngx.status = 401
+                ngx.log(ngx.ERR, "authenticate failed: " .. err)
+                ngx.say("authenticate failed: " .. err)
+                ngx.exit(ngx.HTTP_UNAUTHORIZED)
+              end
+              if not res or not res.access_token then
+                ngx.log(ngx.ERR, "authenticate didn't return any access token")
+              end
+            }
+            rewrite ^/default-absolute/(.*)$ /$1  break;
+            proxy_pass http://localhost:80;
+        }
+
         location /token {
             content_by_lua_block {
                 ngx.req.read_body()

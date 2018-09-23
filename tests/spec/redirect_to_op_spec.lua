@@ -286,6 +286,25 @@ describe("when redir scheme is configured explicitly", function()
   end)
 end)
 
+describe("when accessing the protected resource without token and the redirect_uri uses an absoluet URI", function()
+  test_support.start_server({
+    oidc_opts = {
+      redirect_uri_scheme = 'https://example.com/foo/redirect_uri',
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, status, headers = http.request({
+    url = "http://127.0.0.1/default/t",
+    redirect = false
+  })
+  it("the configured redirect uri is used", function()
+    assert.are.equals(302, status)
+    local redir_escaped = test_support.urlescape_for_regex("https://example.com/foo/redirect_uri")
+    assert.truthy(string.match(string.lower(headers["location"]),
+                               ".*redirect_uri=" .. string.lower(redir_escaped) .. ".*"))
+  end)
+end)
+
 describe("when accessing the protected resource without token and x-forwarded-host contains a comma separated list", function()
   test_support.start_server()
   teardown(test_support.stop_server)
