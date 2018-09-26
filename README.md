@@ -108,10 +108,14 @@ http {
       access_by_lua_block {
 
           local opts = {
-             -- the full redirect URI must be protected by this script and becomes:
+             -- the full redirect URI must be protected by this script
+             redirect_uri = "https://MY_HOST_NAME/redirect_uri"
+             -- up until version 1.6.1 you'd specify
+             -- redirect_uri_path = "/redirect_uri",
+             -- and the redirect URI became
              -- ngx.var.scheme.."://"..ngx.var.http_host..opts.redirect_uri_path
-             -- unless the scheme is overridden using opts.redirect_uri_scheme or an X-Forwarded-Proto header in the incoming request
-             redirect_uri_path = "/redirect_uri",
+             -- unless the scheme was overridden using opts.redirect_uri_scheme or an X-Forwarded-Proto header in the incoming request
+
              discovery = "https://accounts.google.com/.well-known/openid-configuration",
              client_id = "<client_id>",
              client_secret = "<client_secret>"
