@@ -248,6 +248,9 @@ end
 
 -- assemble the redirect_uri
 local function openidc_get_redirect_uri(opts)
+  if opts.redirect_uri then
+    return opts.redirect_uri
+  end
   local scheme = opts.redirect_uri_scheme or get_scheme()
   local host = get_host_name()
   if not host then
@@ -880,7 +883,10 @@ symmetric_secret, expected_algs, ...)
   local secret
   if is_algorithm_supported(jwt_obj.header) then
     if uses_asymmetric_algorithm(jwt_obj.header) then
-      secret = asymmetric_secret
+      if opts.secret then
+        log(WARN, "using deprecated option `opts.secret` for asymmetric key; switch to `opts.public_key` instead")
+      end
+      secret = asymmetric_secret or opts.secret
       if not secret and opts.discovery then
         log(DEBUG, "using discovery to find key")
         local err
@@ -892,7 +898,10 @@ symmetric_secret, expected_algs, ...)
         end
       end
     else
-      secret = symmetric_secret
+      if opts.secret then
+        log(WARN, "using deprecated option `opts.secret` for symmetric key; switch to `opts.symmetric_key` instead")
+      end
+      secret = symmetric_secret or opts.secret
     end
   end
 
@@ -930,7 +939,7 @@ end
 --
 local function openidc_load_and_validate_jwt_id_token(opts, jwt_id_token, session)
 
-  local jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, jwt_id_token, opts.secret, opts.client_secret,
+  local jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, jwt_id_token, opts.public_key, opts.client_secret,
     opts.discovery.id_token_signing_alg_values_supported)
   if err then
     local alg = (jwt_obj and jwt_obj.header and jwt_obj.header.alg) or ''
@@ -1194,8 +1203,21 @@ local function openidc_access_token(opts, session, try_to_renew)
   return session.data.access_token, err
 end
 
+function openidc_get_path(uri)
+  local without_query = uri:match("(.-)%?") or uri
+  return without_query:match(".-//[^/]+(/.*)") or without_query
+end
+
+function openidc_get_redirect_uri_path(opts)
+  return opts.redirect_uri and openidc_get_path(opts.redirect_uri) or opts.redirect_uri_path
+end
+
 -- main routine for OpenID Connect user authentication
 function openidc.authenticate(opts, target_url, unauth_action, session_opts)
+
+  if opts.redirect_uri_path or opts.redirect_uri_scheme then
+    log(WARN, "using deprecated option `opts.redirect_uri_path` or `opts.redirect_uri_scheme` for redirect_uri; switch to using an absolute URI and `opts.redirect_uri` instead")
+  end
 
   local err
 
@@ -1206,12 +1228,12 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
   local access_token
 
   -- see if this is a request to the redirect_uri i.e. an authorization response
-  local path = target_url:match("(.-)%?") or target_url
-  if path == opts.redirect_uri_path then
+  local path = openidc_get_path(target_url)
+  if path == openidc_get_redirect_uri_path(opts) then
     log(DEBUG, "Redirect URI path (" .. path .. ") is currently navigated -> Processing authorization response coming from OP")
 
     if not session.present then
-      err = "request to the redirect_uri_path but there's no session state found"
+      err = "request to the redirect_uri path but there's no session state found"
       log(ERROR, err)
       return nil, err, target_url, session
     end
@@ -1483,7 +1505,7 @@ function openidc.jwt_verify(access_token, opts, ...)
   local v = openidc_cache_get("introspection", access_token)
   if not v then
     local jwt_obj
-    jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, access_token, opts.secret, opts.secret,
+    jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, access_token, opts.public_key, opts.symmetric_key,
       opts.token_signing_alg_values_expected, ...)
     if not err then
       json = jwt_obj.payload

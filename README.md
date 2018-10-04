@@ -108,10 +108,14 @@ http {
       access_by_lua_block {
 
           local opts = {
-             -- the full redirect URI must be protected by this script and becomes:
+             -- the full redirect URI must be protected by this script
+             redirect_uri = "https://MY_HOST_NAME/redirect_uri"
+             -- up until version 1.6.1 you'd specify
+             -- redirect_uri_path = "/redirect_uri",
+             -- and the redirect URI became
              -- ngx.var.scheme.."://"..ngx.var.http_host..opts.redirect_uri_path
-             -- unless the scheme is overridden using opts.redirect_uri_scheme or an X-Forwarded-Proto header in the incoming request
-             redirect_uri_path = "/redirect_uri",
+             -- unless the scheme was overridden using opts.redirect_uri_scheme or an X-Forwarded-Proto header in the incoming request
+
              discovery = "https://accounts.google.com/.well-known/openid-configuration",
              client_id = "<client_id>",
              client_secret = "<client_secret>"
@@ -258,10 +262,12 @@ http {
           local opts = {
 
             -- 1. example of a shared secret for HS??? signature verification
-            --secret = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            --symmetric_key = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            -- in versions up to 1.6.1 this option's key would have been secret
+            -- rather than symmetric_key
 
             -- 2. another example of a public cert for RS??? signature verification
-            secret = [[-----BEGIN CERTIFICATE-----
+            public_key = [[-----BEGIN CERTIFICATE-----
 MIIC0DCCAbigAwIBAgIGAVSbMZs1MA0GCSqGSIb3DQEBCwUAMCkxCzAJBgNVBAYTAlVTMQwwCgYD
 VQQKEwNibGExDDAKBgNVBAMTA2JsYTAeFw0xNjA1MTAxNTAzMjBaFw0yNjA1MDgxNTAzMjBaMCkx
 CzAJBgNVBAYTAlVTMQwwCgYDVQQKEwNibGExDDAKBgNVBAMTA2JsYTCCASIwDQYJKoZIhvcNAQEB
@@ -276,6 +282,8 @@ OcTuruRhqYOIJjiYZSgK/P0zUw1cjLwUJ9ig/O6ozYmof83974fygA/wK3SgFNEoFlTkTpOvZhVW
 9kLfCVA/CRBfJNKnz5PWBBxd/3XSEuP/fcWqKGTy7zZso4MTB0NKgWO4duGTgMyZbM4onJPyA0CY
 lAc5Csj0o5Q+oEhPUAVBIF07m4rd0OvAVPOCQ2NJhQSL1oWASbf+fg==
 -----END CERTIFICATE-----]],
+            -- in versions up to 1.6.1 this option's key would have been secret
+            -- rather than public_key
 
             -- 3. alternatively one can point to a so-called Discovery document that
             -- contains "jwks_uri" entry; the jwks endpoint must provide either an "x5c" entry
