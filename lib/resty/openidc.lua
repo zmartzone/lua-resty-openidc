@@ -323,7 +323,6 @@ local function openidc_authorize(opts, session, target_url, prompt)
   end
 
   -- store state in the session
-  session:start()
   session.data.original_url = target_url
   session.data.state = state
   session.data.nonce = nonce
@@ -1033,7 +1032,6 @@ local function openidc_authorization_response(opts, session)
     return nil, err, session.data.original_url, session
   end
 
-  session:start()
   -- mark this sessions as authenticated
   session.data.authenticated = true
   -- clear state and nonce to protect against potential misuse
@@ -1182,7 +1180,6 @@ local function openidc_access_token(opts, session, try_to_renew)
   end
   log(DEBUG, "access_token refreshed: ", json.access_token, " updated refresh_token: ", json.refresh_token)
 
-  session:start()
   session.data.access_token = json.access_token
   session.data.access_token_expiration = current_time + openidc_access_token_expires_in(opts, json.expires_in)
   if json.refresh_token then
@@ -1224,7 +1221,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
 
   local err
 
-  local session = r_session.open(session_opts)
+  local session = r_session.start(session_opts)
 
   target_url = target_url or ngx.var.request_uri
 
@@ -1340,7 +1337,7 @@ end
 -- get a valid access_token (eventually refreshing the token), or nil if there's no valid access_token
 function openidc.access_token(opts, session_opts)
 
-  local session = r_session.open(session_opts)
+  local session = r_session.start(session_opts)
 
   return openidc_access_token(opts, session, true)
 end
