@@ -1,3 +1,6 @@
+10/04/2018
+- use session.start instead of session.open; see #174; thanks @thomasleplus
+
 09/17/2018
 - added an optional "request decorator" option that can be used to augment
   the HTTP requests when lua-resty-openidc talks to the discovery,
