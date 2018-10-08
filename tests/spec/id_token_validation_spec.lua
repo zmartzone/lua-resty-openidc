@@ -219,6 +219,22 @@ describe("when the id token signature key isn't part of the JWK", function()
   end)
 end)
 
+describe("when the id token signature key id isn't part of the key id's in the JWKs", function()
+  test_support.start_server({
+    token_header = {
+      kid = "dcab",
+    }
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login has failed", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error message has been logged", function()
+    assert.error_log_contains("RSA key with id dcab not found")
+  end)
+end)
+
 describe("when the id token signature uses a symmetric algorithm", function()
   test_support.start_server({
     jwt_sign_secret = "client_secret",
