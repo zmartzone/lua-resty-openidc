@@ -376,7 +376,7 @@ local function openidc_configure_proxy(httpc, proxy_opts)
 end
 
 -- make a call to the token endpoint
-local function openidc_call_token_endpoint(opts, endpoint, body, auth, endpoint_name)
+function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name)
 
   local ep_name = endpoint_name or 'token'
   local headers = {
@@ -1022,7 +1022,7 @@ local function openidc_authorization_response(opts, session)
   local current_time = ngx.time()
   -- make the call to the token endpoint
   local json
-  json, err = openidc_call_token_endpoint(opts, opts.discovery.token_endpoint, body, opts.token_endpoint_auth_method)
+  json, err = openidc.call_token_endpoint(opts, opts.discovery.token_endpoint, body, opts.token_endpoint_auth_method)
   if err then
     return nil, err, session.data.original_url, session
   end
@@ -1166,7 +1166,7 @@ local function openidc_access_token(opts, session, try_to_renew)
   }
 
   local json
-  json, err = openidc_call_token_endpoint(opts, opts.discovery.token_endpoint, body, opts.token_endpoint_auth_method)
+  json, err = openidc.call_token_endpoint(opts, opts.discovery.token_endpoint, body, opts.token_endpoint_auth_method)
   if err then
     return nil, err
   end
@@ -1459,7 +1459,7 @@ function openidc.introspect(opts)
   end
 
   -- call the introspection endpoint
-  json, err = openidc_call_token_endpoint(opts, opts.introspection_endpoint, body, opts.introspection_endpoint_auth_method, "introspection")
+  json, err = openidc.call_token_endpoint(opts, opts.introspection_endpoint, body, opts.introspection_endpoint_auth_method, "introspection")
 
 
   if not json then

@@ -1,3 +1,6 @@
+10/8/2018
+- make call_token_endpoint a public function
+
 10/04/2018
 - use session.start instead of session.open; see #174; thanks @thomasleplus
 
@@ -17,7 +20,7 @@
 - add an option to disable nonce parameter for broken OpenID Connect providers
 
 09/14/2018
-- deprecate `opt.secret` in favor of `opts.public_key` and `opts.symmetric_key`
+- deprecate `opt.secret` in favor of `opts.public_key` and `opts.symmetric_key`; thanks @dholth
 
 09/06/2018
 - bypass introspection cache on demand with introspection_cache_ignore; thanks @dmitriyblok
