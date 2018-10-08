@@ -163,6 +163,33 @@ describe("when the JWK specifies a kid and the JWKS contains multiple keys", fun
   base_checks()
 end)
 
+describe("when the JWK specifies a kid and the JWKS does not contain a key with that kid", function()
+  test_support.start_server({
+    verify_opts = {
+      discovery = {
+        jwks_uri = "http://127.0.0.1/jwk",
+      }
+    },
+    jwk = test_support.load("/spec/jwks_with_two_keys.json"),
+    token_header = {
+      kid = "dcab",
+    }
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/verify_bearer_token",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the token is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error is logged", function()
+    assert.error_log_contains("RSA key with id dcab not found")
+  end)
+  
+end)
+
 describe("when the JWK specifies no kid and the JWKS contains multiple keys", function()
   test_support.start_server({
     verify_opts = {
