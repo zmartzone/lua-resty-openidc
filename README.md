@@ -118,7 +118,13 @@ http {
 
              discovery = "https://accounts.google.com/.well-known/openid-configuration",
              client_id = "<client_id>",
-             client_secret = "<client_secret>"
+             client_secret = "<client_secret>",
+             
+             -- Strict Respect of OAuth 2.0 RFC 6749 for client Authentication (cf. https://tools.ietf.org/html/rfc6749#section-2.3.1)
+             -- client_id and client_secret MUST be encoded using "application/x-www-form-urlencoded"
+             -- strict_oauth_client_authentication is false by default for backward compatibility
+             -- strict_oauth_client_authentication = true,
+              
              --authorization_params = { hd="zmartzone.eu" },
              --scope = "openid email profile",
              -- Refresh the users id_token after 900 seconds without requiring re-authentication
