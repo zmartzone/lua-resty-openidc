@@ -386,7 +386,7 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name)
   if auth then
     if auth == "client_secret_basic" then
       if opts.client_secret then
-        if opt.strict_oauth_client_authentication then
+        if opts.strict_oauth_client_authentication then
           headers.Authorization = "Basic " .. b64(ngx.escape_uri(opts.client_id) .. ":" .. ngx.escape_uri(opts.client_secret))
         else
           headers.Authorization = "Basic " .. b64(opts.client_id .. ":" .. opts.client_secret)
