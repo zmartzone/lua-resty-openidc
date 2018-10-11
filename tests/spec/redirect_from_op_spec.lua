@@ -95,6 +95,36 @@ end)
 describe("when the redirect_uri is specified as relative URI", function()
   test_support.start_server({
     oidc_opts = {
+      redirect_uri = '/default/redirect_uri',
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, _, headers = http.request({
+    url = "http://localhost/default/t",
+    redirect = false
+  })
+  local state = test_support.grab(headers, 'state')
+  test_support.register_nonce(headers)
+  local cookie_header = test_support.extract_cookies(headers)
+  describe("accessing the redirect_uri path with good parameters", function()
+    local _, redirStatus, h = http.request({
+          url = "http://localhost/default/redirect_uri?code=foo&state=" .. state,
+          headers = { cookie = cookie_header },
+          redirect = false
+    })
+    it("redirects to the original URI", function()
+       assert.are.equals(302, redirStatus)
+       assert.are.equals("/default/t", h.location)
+    end)
+  end)
+  it("no deprecation warning is logged", function()
+    assert.is_not.error_log_contains("using deprecated option `opts.redirect_uri_path`")
+  end)
+end)
+
+describe("when the redirect_uri is specified via redirect_uri_path", function()
+  test_support.start_server({
+    oidc_opts = {
       redirect_uri_path = '/default/redirect_uri',
     },
     remove_oidc_config_keys = { 'redirect_uri' },
@@ -119,7 +149,7 @@ describe("when the redirect_uri is specified as relative URI", function()
     end)
   end)
   it("a deprecation warning is logged", function()
-    assert.error_log_contains("using deprecated option `opts.redirect_uri_path` or `opts.redirect_uri_scheme`")
+    assert.error_log_contains("using deprecated option `opts.redirect_uri_path`")
   end)
 end)
 
