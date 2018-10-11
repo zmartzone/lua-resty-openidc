@@ -1,3 +1,7 @@
+10/11/2018
+- url-encode client_id/client_secret; closes #204 and #205; thanks @grrolland
+  https://tools.ietf.org/html/rfc6749#section-2.3.1
+
 10/8/2018
 - make call_token_endpoint a public function
 

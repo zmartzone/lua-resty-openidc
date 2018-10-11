@@ -118,8 +118,11 @@ http {
              -- and could not set the hostname
 
              discovery = "https://accounts.google.com/.well-known/openid-configuration",
+             -- For non compliant OPs to OAuth 2.0 RFC 6749 for client Authentication (cf. https://tools.ietf.org/html/rfc6749#section-2.3.1)
+             -- client_id and client_secret MUST be invariant when url encoded
              client_id = "<client_id>",
-             client_secret = "<client_secret>"
+             client_secret = "<client_secret>",
+              
              --authorization_params = { hd="zmartzone.eu" },
              --scope = "openid email profile",
              -- Refresh the users id_token after 900 seconds without requiring re-authentication
