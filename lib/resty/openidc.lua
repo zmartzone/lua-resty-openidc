@@ -445,7 +445,7 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name)
 end
 
 -- make a call to the userinfo endpoint
-local function openidc_call_userinfo_endpoint(opts, access_token)
+function openidc.call_userinfo_endpoint(opts, access_token)
   if not opts.discovery.userinfo_endpoint then
     log(DEBUG, "no userinfo endpoint supplied")
     return nil, nil
@@ -1050,7 +1050,7 @@ local function openidc_authorization_response(opts, session)
     -- call the user info endpoint
     -- TODO: should this error be checked?
     local user
-    user, err = openidc_call_userinfo_endpoint(opts, json.access_token)
+    user, err = openidc.call_userinfo_endpoint(opts, json.access_token)
 
     if err then
       log(ERROR, "error calling userinfo endpoint: " .. err)
