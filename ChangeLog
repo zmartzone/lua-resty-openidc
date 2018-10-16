@@ -1,3 +1,8 @@
+10/16/2018
+- lua-resty-openidc now creates a new session whenever the token(s)
+  are refreshed, trying to soften the impact when multiple requests
+  race to refresh the token at the same time. See #190 and #209
+
 10/11/2018
 - url-encode client_id/client_secret; closes #204 and #205; thanks @grrolland
   https://tools.ietf.org/html/rfc6749#section-2.3.1
