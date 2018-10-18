@@ -340,7 +340,8 @@ local function openidc_authorize(opts, session, target_url, prompt)
 end
 
 -- parse the JSON result from a call to the OP
-local function openidc_parse_json_response(response)
+local function openidc_parse_json_response(response, ignore_body_on_success)
+  local ignore_body_on_success = ignore_body_on_success or false
 
   local err
   local res
@@ -349,6 +350,10 @@ local function openidc_parse_json_response(response)
   if response.status ~= 200 then
     err = "response indicates failure, status=" .. response.status .. ", body=" .. response.body
   else
+    if ignore_body_on_success then
+      return nil, nil
+    end
+
     -- decode the response and extract the JSON object
     res = cjson_s.decode(response.body)
 
@@ -381,7 +386,8 @@ local function openidc_configure_proxy(httpc, proxy_opts)
 end
 
 -- make a call to the token endpoint
-function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name)
+function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, ignore_body_on_success)
+  local ignore_body_on_success = ignore_body_on_success or false
 
   local ep_name = endpoint_name or 'token'
   local headers = {
@@ -441,7 +447,7 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name)
 
   log(DEBUG, ep_name .. " endpoint response: ", res.body)
 
-  return openidc_parse_json_response(res)
+  return openidc_parse_json_response(res, ignore_body_on_success)
 end
 
 -- make a call to the userinfo endpoint
@@ -1086,6 +1092,39 @@ local function openidc_authorization_response(opts, session)
   return nil, nil, session.data.original_url, session
 end
 
+-- token revocation (RFC 7009)
+local function openidc_revoke_token(opts, token_type_hint, token)
+  if not opts.discovery.revocation_endpoint then
+    log(DEBUG, "no revocation endpoint supplied. unable to revoke " .. token_type_hint .. ".")
+    return nil
+  end
+
+  local token_type_hint = token_type_hint or nil
+  local body = {
+    token = token
+  }
+  if token_type_hint then
+    body['token_type_hint'] = token_type_hint
+  end
+
+  -- ensure revocation endpoint auth method is properly discovered
+  err = ensure_config(opts)
+  if err then
+    log(ERROR, "revocation of " .. token_type_hint .. " unsuccessful: " .. err)
+    return false
+  end
+
+  -- call the revocation endpoint
+  _, err = openidc.call_token_endpoint(opts, opts.discovery.revocation_endpoint, body, opts.token_endpoint_auth_method, "revocation", true)
+  if err then
+    log(ERROR, "revocation of " .. token_type_hint .. " unsuccessful: " .. err)
+    return false
+  else
+    log(DEBUG, "revocation of " .. token_type_hint .. " successful")
+    return true
+  end
+end
+
 local openidc_transparent_pixel = "\137\080\078\071\013\010\026\010\000\000\000\013\073\072\068\082" ..
     "\000\000\000\001\000\000\000\001\008\004\000\000\000\181\028\012" ..
     "\002\000\000\000\011\073\068\065\084\120\156\099\250\207\000\000" ..
@@ -1095,7 +1134,17 @@ local openidc_transparent_pixel = "\137\080\078\071\013\010\026\010\000\000\000\
 -- handle logout
 local function openidc_logout(opts, session)
   local session_token = session.data.enc_id_token
+  local access_token = session.data.access_token
+  local refresh_token = session.data.refresh_token
   session:destroy()
+
+  if opts.revoke_tokens_on_logout then
+    log(DEBUG, "revoke_tokens_on_logout is enabled. " ..
+      "trying to revoke access and refresh tokens...")
+    openidc_revoke_token(opts, "refresh_token", refresh_token)
+    openidc_revoke_token(opts, "access_token", access_token)
+  end
+
   local headers = ngx.req.get_headers()
   local header = headers['Accept']
   if header and header:find("image/png") then

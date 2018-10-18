@@ -1,3 +1,6 @@
+10/18/2018
+- add token revocation support on logout (opts.revoke_tokens_on_logout)
+
 10/16/2018
 - lua-resty-openidc now creates a new session whenever the token(s)
   are refreshed, trying to soften the impact when multiple requests

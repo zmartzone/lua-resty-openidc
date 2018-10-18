@@ -370,6 +370,23 @@ JWT_SIGN_SECRET]=]
                 end
             }
         }
+
+        location /revocation {
+            content_by_lua_block {
+                ngx.req.read_body()
+                ngx.log(ngx.ERR, "Received revocation request: " .. ngx.req.get_body_data())
+                local auth = ngx.req.get_headers()["Authorization"]
+                ngx.log(ngx.ERR, "revocation authorization header: " .. (auth and auth or ""))
+                local cookie = ngx.req.get_headers()["Cookie"]
+                if not cookie then
+                  ngx.log(ngx.ERR, "no cookie in introspection call")
+                end
+                ngx.header.content_type = 'application/json;charset=UTF-8'
+                delay(REVOCATION_DELAY_RESPONSE)
+                ngx.status = 200
+                ngx.say('INVALID JSON.')
+            }
+        }
     }
 }
 ]]
@@ -450,6 +467,7 @@ local function write_config(out, custom_config)
     :gsub("DISCOVERY_DELAY_RESPONSE", ((custom_config["delay_response"] or {}).discovery or DEFAULT_DELAY_RESPONSE))
     :gsub("USERINFO_DELAY_RESPONSE", ((custom_config["delay_response"] or {}).userinfo or DEFAULT_DELAY_RESPONSE))
     :gsub("INTROSPECTION_DELAY_RESPONSE", ((custom_config["delay_response"] or {}).introspection or DEFAULT_DELAY_RESPONSE))
+    :gsub("REVOCATION_DELAY_RESPONSE", ((custom_config["delay_response"] or {}).revocation or DEFAULT_DELAY_RESPONSE))
     :gsub("JWK", custom_config["jwk"] or DEFAULT_JWK)
     :gsub("USERINFO", serpent.block(userinfo, {comment = false }))
     :gsub("FAKE_ACCESS_TOKEN_SIGNATURE", custom_config["fake_access_token_signature"] or DEFAULT_FAKE_ACCESS_TOKEN_SIGNATURE)
