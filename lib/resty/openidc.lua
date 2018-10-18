@@ -1141,8 +1141,12 @@ local function openidc_logout(opts, session)
   if opts.revoke_tokens_on_logout then
     log(DEBUG, "revoke_tokens_on_logout is enabled. " ..
       "trying to revoke access and refresh tokens...")
-    openidc_revoke_token(opts, "refresh_token", refresh_token)
-    openidc_revoke_token(opts, "access_token", access_token)
+    if refresh_token then
+      openidc_revoke_token(opts, "refresh_token", refresh_token)
+    end
+    if access_token then
+      openidc_revoke_token(opts, "access_token", access_token)
+    end
   end
 
   local headers = ngx.req.get_headers()
