@@ -365,3 +365,190 @@ describe("when logout is invoked and discovery contains ping_end_session_endpoin
   end)
 end)
 
+describe("when revoke_tokens_on_logout is enabled and a valid revocation endpoint is supplied with auth method client_secret_basic", function()
+  test_support.start_server({
+    oidc_opts = {
+      revoke_tokens_on_logout = true,
+      discovery = {
+        revocation_endpoint = "http://127.0.0.1/revocation",
+        token_endpoint_auth_methods_supported = { "foo", "client_secret_post", "client_secret_basic" }
+      },
+      token_endpoint_auth_method = "client_secret_basic"
+    }
+  })
+  teardown(test_support.stop_server)
+  local _, _, cookie = test_support.login()
+  local _, status, headers = http.request({
+      url = "http://127.0.0.1/default/logout",
+      headers = { cookie = cookie },
+      redirect = false
+  })
+  it("the response contains a default HTML-page", function()
+    assert.are.equals(200, status)
+    assert.are.equals("text/html", headers["content-type"])
+  end)
+
+  it("the session cookie has been revoked", function()
+    assert.truthy(string.match(headers["set-cookie"],
+                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+  end)
+
+  it("authorization credentials have not been passed on as post parameters to the revocation endpoint", function()
+    assert.is_not.error_log_contains("Received revocation request: .*client_id")
+  end)
+
+  it("authorization header has been passed on to the revocation endpoint", function()
+    assert.error_log_contains("revocation authorization header: Basic .+")
+  end)
+
+  it("token to be revoked has been passed on as a post parameter to the revocation endpoint", function()
+    assert.error_log_contains("Received revocation request: .*token=.+")
+  end)
+
+  it("debug messages concerning successful revocation have been logged", function()
+    assert.error_log_contains("revocation of refresh_token successful")
+    assert.error_log_contains("revocation of access_token successful")
+  end)
+end)
+
+describe("when revoke_tokens_on_logout is enabled and a valid revocation endpoint is supplied with auth method client_secret_post", function()
+  test_support.start_server({
+    oidc_opts = {
+      revoke_tokens_on_logout = true,
+      discovery = {
+        revocation_endpoint = "http://127.0.0.1/revocation",
+        token_endpoint_auth_methods_supported = { "foo", "client_secret_basic", "client_secret_post" }
+      },
+      token_endpoint_auth_method = "client_secret_post"
+    }
+  })
+  teardown(test_support.stop_server)
+  local _, _, cookie = test_support.login()
+  local _, status, headers = http.request({
+      url = "http://127.0.0.1/default/logout",
+      headers = { cookie = cookie },
+      redirect = false
+  })
+  it("the response contains a default HTML-page", function()
+    assert.are.equals(200, status)
+    assert.are.equals("text/html", headers["content-type"])
+  end)
+
+  it("the session cookie has been revoked", function()
+    assert.truthy(string.match(headers["set-cookie"],
+                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+  end)
+
+  it("authorization header has not been passed on to the revocation endpoint", function()
+    assert.is_not.error_log_contains("revocation authorization header: Basic")
+  end)
+
+  it("authorization credentials have been passed on as post parameters to the revocation endpoint", function()
+    assert.error_log_contains("Received revocation request: .*client_id=.+")
+  end)
+
+  it("token to be revoked has been passed on as a post parameter to the revocation endpoint", function()
+    assert.error_log_contains("Received revocation request: .*token=.+")
+  end)
+
+  it("debug messages concerning successful revocation have been logged", function()
+    assert.error_log_contains("revocation of refresh_token successful")
+    assert.error_log_contains("revocation of access_token successful")
+  end)
+end)
+
+describe("when revoke_tokens_on_logout is enabled and an invalid revocation endpoint is supplied", function()
+  test_support.start_server({
+    oidc_opts = {
+      revoke_tokens_on_logout = true,
+      discovery = {
+        revocation_endpoint = "http://127.0.0.1/invalid_revocation"
+      }
+    }
+  })
+  teardown(test_support.stop_server)
+  local _, _, cookie = test_support.login()
+  local _, status, headers = http.request({
+      url = "http://127.0.0.1/default/logout",
+      headers = { cookie = cookie },
+      redirect = false
+  })
+  it("the response still contains a default HTML-page", function()
+    assert.are.equals(200, status)
+    assert.are.equals("text/html", headers["content-type"])
+  end)
+
+  it("the session cookie still has been revoked", function()
+    assert.truthy(string.match(headers["set-cookie"],
+                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+  end)
+
+  it("error messages concerning unseccussful revocation have been logged", function()
+    assert.error_log_contains("revocation of refresh_token unsuccessful")
+    assert.error_log_contains("revocation of access_token unsuccessful")
+  end)
+end)
+
+describe("when revoke_tokens_on_logout is enabled but no revocation endpoint is supplied", function()
+  test_support.start_server({
+    oidc_opts = {
+      revoke_tokens_on_logout = true,
+      discovery = {
+        revocation_endpoint = nil
+      }
+    }
+  })
+  teardown(test_support.stop_server)
+  local _, _, cookie = test_support.login()
+  local _, status, headers = http.request({
+      url = "http://127.0.0.1/default/logout",
+      headers = { cookie = cookie },
+      redirect = false
+  })
+  it("the response still contains a default HTML-page", function()
+    assert.are.equals(200, status)
+    assert.are.equals("text/html", headers["content-type"])
+  end)
+
+  it("the session cookie still has been revoked", function()
+    assert.truthy(string.match(headers["set-cookie"],
+                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+  end)
+
+  it("debug messages concerning unseccussful revocation have been logged", function()
+    assert.error_log_contains("no revocation endpoint supplied. unable to revoke refresh_token")
+    assert.error_log_contains("no revocation endpoint supplied. unable to revoke access_token")
+  end)
+end)
+
+describe("when revoke_tokens_on_logout is not defined and a revocation_endpoint is given", function()
+  test_support.start_server({
+    oidc_opts = {
+      revoke_tokens_on_logout = nil,
+      discovery = {
+        revocation_endpoint = "http://127.0.0.1/revocation"
+      }
+    }
+  })
+  teardown(test_support.stop_server)
+  local _, _, cookie = test_support.login()
+  local _, status, headers = http.request({
+      url = "http://127.0.0.1/default/logout",
+      headers = { cookie = cookie },
+      redirect = false
+  })
+  it("the response still contains a default HTML-page", function()
+    assert.are.equals(200, status)
+    assert.are.equals("text/html", headers["content-type"])
+  end)
+
+  it("the session cookie still has been revoked", function()
+    assert.truthy(string.match(headers["set-cookie"],
+                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+  end)
+
+  it("no messages concerning revocation have been logged", function()
+    assert.is_not.error_log_contains("revocation")
+    assert.is_not.error_log_contains("revoke")
+  end)
+end)
