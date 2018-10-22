@@ -68,7 +68,8 @@ local WARN = ngx.WARN
 
 local supported_token_auth_methods = {
   client_secret_basic = true,
-  client_secret_post = true
+  client_secret_post = true,
+  private_key_jwt = true
 }
 
 local openidc = {
@@ -386,6 +387,30 @@ local function openidc_configure_proxy(httpc, proxy_opts)
   end
 end
 
+-- build client assertion for the 'private_key_jwt' authentication mode to the token endpoint
+local function get_client_assertion(opts, endpoint, private_key, key_id)
+  local cache_key = endpoint.."~"..opts.client_id.."~"..((string.len(private_key) > 200) and private_key:sub(98, 161) or private_key).."~"..(key_id and key_id or "")
+
+  local assertion = openidc_cache_get ("jwks", cache_key)
+
+  if not assertion then
+    local exptime = opts.client_jwt_assertion_expires_in or 60 * 60 -- expiration of the assertion in the cache
+    local jwt_validity = 60 -- assertion is valid for 60 seconds after its expiration: assuming the check by the OP will not be done later than 60 sec after the assertion retrieval.
+
+    local now = ngx.time()
+    local assertion_header  = {typ = "JWT", alg = "RS256", kid = key_id}
+    local assertion_payload = {sub = opts.client_id, iss = opts.client_id, aud = endpoint,
+                               exp = now + exptime + jwt_validity, jti = now, iat = now}
+
+    local jwt = require("resty.jwt")
+    assertion = jwt:sign(private_key, { header = assertion_header, payload = assertion_payload })
+
+    openidc_cache_set("jwks", cache_key, assertion, exptime)
+  end
+
+  return assertion
+end
+
 -- make a call to the token endpoint
 function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, ignore_body_on_success)
   local ignore_body_on_success = ignore_body_on_success or false
@@ -412,6 +437,12 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, 
         body.client_secret = opts.client_secret
       end
       log(DEBUG, "client_secret_post: client_id and client_secret being sent in POST body")
+    end
+    if auth == "private_key_jwt" then
+      body.client_id=opts.client_id
+      body.client_assertion_type="urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+      body.client_assertion=get_client_assertion(opts, endpoint, opts.client_rsa_private_key, opts.client_rsa_private_key_id)
+      log(DEBUG, "private_key_jwt: client_id, client_assertion_type and client_assertion being sent in POST body")
     end
   end
 
