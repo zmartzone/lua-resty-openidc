@@ -1258,7 +1258,7 @@ local function openidc_access_token(opts, session, try_to_renew)
 
   -- save the session with the new access_token and optionally the new refresh_token and id_token using a new sessionid
   local regenerated
-  regerenerated, err = session:regenerate()
+  regenerated, err = session:regenerate()
   if err then
     log(ERROR, "failed to regenerate session: " .. err)
     return nil, err
