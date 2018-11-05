@@ -526,13 +526,7 @@ local function openidc_discover(url, ssl_verify, timeout, exptime, proxy_opts, h
       log(DEBUG, "response data: " .. res.body)
       json, err = openidc_parse_json_response(res)
       if json then
-        if string.sub(url, 1, string.len(json['issuer'])) == json['issuer'] then
-          openidc_cache_set("discovery", url, cjson.encode(json), exptime or 24 * 60 * 60)
-        else
-          err = "issuer field in Discovery data does not match URL"
-          log(ERROR, err)
-          json = nil
-        end
+        openidc_cache_set("discovery", url, cjson.encode(json), exptime or 24 * 60 * 60)
       else
         err = "could not decode JSON from Discovery data" .. (err and (": " .. err) or '')
         log(ERROR, err)
@@ -1258,7 +1252,7 @@ local function openidc_access_token(opts, session, try_to_renew)
 
   -- save the session with the new access_token and optionally the new refresh_token and id_token using a new sessionid
   local regenerated
-  regerenerated, err = session:regenerate()
+  regenerated, err = session:regenerate()
   if err then
     log(ERROR, "failed to regenerate session: " .. err)
     return nil, err
