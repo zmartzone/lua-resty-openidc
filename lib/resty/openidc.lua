@@ -995,7 +995,10 @@ local function openidc_authorization_response(opts, session)
     log(ERROR, err)
     return nil, err, session.data.original_url, session
   end
-
+  
+  -- ensure that discovered data is resolved
+  openidc_ensure_discovered_data(opts)
+  
   -- check the iss if returned from the OP
   if args.iss and args.iss ~= opts.discovery.issuer then
     err = "iss from argument: " .. args.iss .. " does not match expected issuer: " .. opts.discovery.issuer
