@@ -53,7 +53,6 @@ local cjson = require("cjson")
 local cjson_s = require("cjson.safe")
 local http = require("resty.http")
 local r_session = require("resty.session")
-local r_jwt = require("resty.jwt")
 local string = string
 local ipairs = ipairs
 local pairs = pairs
@@ -424,6 +423,7 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, 
       local assertion_payload = {sub = opts.client_id, iss = opts.client_id, aud = endpoint, jti = ngx.var.request_id,
                                exp = now + (opts.client_jwt_assertion_expires_in and opts.client_jwt_assertion_expires_in or 60), iat = now}
 
+      local r_jwt = require("resty.jwt")
       body.client_assertion=r_jwt:sign(opts.client_rsa_private_key, { header = assertion_header, payload = assertion_payload })
       log(DEBUG, "private_key_jwt: client_id, client_assertion_type and client_assertion being sent in POST body")
     end
@@ -878,6 +878,7 @@ end
 -- parse a JWT and verify its signature (if present)
 local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, asymmetric_secret,
 symmetric_secret, expected_algs, ...)
+  local r_jwt = require("resty.jwt")
   local enc_hdr, enc_payload, enc_sign = string.match(jwt_string, '^(.+)%.(.+)%.(.*)$')
   if enc_payload and (not enc_sign or enc_sign == "") then
     local jwt = openidc_load_jwt_none_alg(enc_hdr, enc_payload)
