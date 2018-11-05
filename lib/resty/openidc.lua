@@ -53,6 +53,7 @@ local cjson = require("cjson")
 local cjson_s = require("cjson.safe")
 local http = require("resty.http")
 local r_session = require("resty.session")
+local r_jwt = require("resty.jwt")
 local string = string
 local ipairs = ipairs
 local pairs = pairs
@@ -387,30 +388,6 @@ local function openidc_configure_proxy(httpc, proxy_opts)
   end
 end
 
--- build client assertion for the 'private_key_jwt' authentication mode to the token endpoint
-local function get_client_assertion(opts, endpoint, private_key, key_id)
-  local cache_key = endpoint.."~"..opts.client_id.."~"..((string.len(private_key) > 200) and private_key:sub(98, 161) or private_key).."~"..(key_id and key_id or "")
-
-  local assertion = openidc_cache_get ("jwks", cache_key)
-
-  if not assertion then
-    local exptime = opts.client_jwt_assertion_expires_in or 60 * 60 -- expiration of the assertion in the cache
-    local jwt_validity = 60 -- assertion is valid for 60 seconds after its expiration: assuming the check by the OP will not be done later than 60 sec after the assertion retrieval.
-
-    local now = ngx.time()
-    local assertion_header  = {typ = "JWT", alg = "RS256", kid = key_id}
-    local assertion_payload = {sub = opts.client_id, iss = opts.client_id, aud = endpoint,
-                               exp = now + exptime + jwt_validity, jti = now, iat = now}
-
-    local jwt = require("resty.jwt")
-    assertion = jwt:sign(private_key, { header = assertion_header, payload = assertion_payload })
-
-    openidc_cache_set("jwks", cache_key, assertion, exptime)
-  end
-
-  return assertion
-end
-
 -- make a call to the token endpoint
 function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, ignore_body_on_success)
   local ignore_body_on_success = ignore_body_on_success or false
@@ -430,18 +407,24 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, 
         headers.Authorization = "Basic " .. b64(ngx.escape_uri(opts.client_id) .. ":")
       end
       log(DEBUG, "client_secret_basic: authorization header '" .. headers.Authorization .. "'")
-    end
-    if auth == "client_secret_post" then
+
+    elseif auth == "client_secret_post" then
       body.client_id = opts.client_id
       if opts.client_secret then
         body.client_secret = opts.client_secret
       end
       log(DEBUG, "client_secret_post: client_id and client_secret being sent in POST body")
-    end
-    if auth == "private_key_jwt" then
+
+    elseif auth == "private_key_jwt" then
       body.client_id=opts.client_id
       body.client_assertion_type="urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
-      body.client_assertion=get_client_assertion(opts, endpoint, opts.client_rsa_private_key, opts.client_rsa_private_key_id)
+
+      local now = ngx.time()
+      local assertion_header  = {typ = "JWT", alg = "RS256", kid = opts.client_rsa_private_key_id}
+      local assertion_payload = {sub = opts.client_id, iss = opts.client_id, aud = endpoint, jti = ngx.var.request_id,
+                               exp = now + (opts.client_jwt_assertion_expires_in and opts.client_jwt_assertion_expires_in or 60), iat = now}
+
+      body.client_assertion=r_jwt:sign(opts.client_rsa_private_key, { header = assertion_header, payload = assertion_payload })
       log(DEBUG, "private_key_jwt: client_id, client_assertion_type and client_assertion being sent in POST body")
     end
   end
@@ -895,7 +878,6 @@ end
 -- parse a JWT and verify its signature (if present)
 local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, asymmetric_secret,
 symmetric_secret, expected_algs, ...)
-  local jwt = require("resty.jwt")
   local enc_hdr, enc_payload, enc_sign = string.match(jwt_string, '^(.+)%.(.+)%.(.*)$')
   if enc_payload and (not enc_sign or enc_sign == "") then
     local jwt = openidc_load_jwt_none_alg(enc_hdr, enc_payload)
@@ -909,7 +891,7 @@ symmetric_secret, expected_algs, ...)
     end -- otherwise the JWT is invalid and load_jwt produces an error
   end
 
-  local jwt_obj = jwt:load_jwt(jwt_string, nil)
+  local jwt_obj = r_jwt:load_jwt(jwt_string, nil)
   if not jwt_obj.valid then
     local reason = "invalid jwt"
     if jwt_obj.reason then
@@ -957,7 +939,7 @@ symmetric_secret, expected_algs, ...)
     jwt_validators.set_system_leeway(opts.iat_slack and opts.iat_slack or 120)
   end
 
-  jwt_obj = jwt:verify_jwt_obj(secret, jwt_obj, ...)
+  jwt_obj = r_jwt:verify_jwt_obj(secret, jwt_obj, ...)
   if jwt_obj then
     log(DEBUG, "jwt: ", cjson.encode(jwt_obj), " ,valid: ", jwt_obj.valid, ", verified: ", jwt_obj.verified)
   end
