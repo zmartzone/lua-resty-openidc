@@ -996,6 +996,11 @@ local function openidc_authorization_response(opts, session)
     return nil, err, session.data.original_url, session
   end
 
+  err = ensure_config(opts)
+  if err then
+    return nil, err, session.data.original_url, session
+  end
+
   -- check the iss if returned from the OP
   if args.iss and args.iss ~= opts.discovery.issuer then
     err = "iss from argument: " .. args.iss .. " does not match expected issuer: " .. opts.discovery.issuer
@@ -1007,11 +1012,6 @@ local function openidc_authorization_response(opts, session)
   if args.client_id and args.client_id ~= opts.client_id then
     err = "client_id from argument: " .. args.client_id .. " does not match expected client_id: " .. opts.client_id
     log(ERROR, err)
-    return nil, err, session.data.original_url, session
-  end
-
-  err = ensure_config(opts)
-  if err then
     return nil, err, session.data.original_url, session
   end
 
