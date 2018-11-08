@@ -84,6 +84,24 @@ describe("when an explicit auth method is configured", function()
   end)
 end)
 
+describe("when 'private_key_jwt' auth method is configured", function()
+  test_support.start_server({
+    oidc_opts = {
+      discovery = {
+        token_endpoint_auth_methods_supported = { "client_secret_basic", "client_secret_post", "private_key_jwt" },
+      },
+      token_endpoint_auth_method = "private_key_jwt",
+      client_rsa_private_key = test_support.load("/spec/private_rsa_key.pem")
+    }
+  })
+  teardown(test_support.stop_server)
+  test_support.login()
+  it("then it is used", function()
+    assert_token_endpoint_call_contains("client_assertion=ey")  -- check only beginning of the assertion as it changes each time
+    assert_token_endpoint_call_contains("client_assertion_type=urn%%3Aietf%%3Aparams%%3Aoauth%%3Aclient%-assertion%-type%%3Ajwt%-bearer")
+  end)
+end)
+
 describe("if token endpoint is not resolvable", function()
   test_support.start_server({
     oidc_opts = {
