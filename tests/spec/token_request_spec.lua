@@ -30,8 +30,14 @@ describe("when the token endpoint is invoked", function()
   it("the request contains the client_secret parameter", function()
     assert_token_endpoint_call_contains("client_secret=client_secret")
   end)
-  it("the request doesn't contain a basic auth header", function()
+  it("the request doesn't contain any basic auth header", function()
     assert.is_not.error_log_contains("token authorization header: Basic")
+  end)
+  it("the request doesn't contain any client_assertion_type parameter", function()
+    assert.is_not.error_log_contains("request body for token endpoint call: .*client_assertion_type=")
+  end)
+  it("the request doesn't contain any client_assertion parameter", function()
+    assert.is_not.error_log_contains("request body for token endpoint call: .*client_assertion=.*")
   end)
 end)
 
@@ -50,6 +56,12 @@ describe("when the token endpoint is invoked using client_secret_basic", functio
   end)
   it("the request contains a basic auth header", function()
     assert.error_log_contains("token authorization header: Basic")
+  end)
+  it("the request doesn't contain any client_assertion_type parameter", function()
+    assert.is_not.error_log_contains("request body for token endpoint call: .*client_assertion_type=")
+  end)
+  it("the request doesn't contain any client_assertion parameter", function()
+    assert.is_not.error_log_contains("request body for token endpoint call: .*client_assertion=.*")
   end)
 end)
 
@@ -229,5 +241,74 @@ describe("when a request_decorator has been specified when calling the token end
   test_support.login()
   it("the request contains the additional parameter", function()
     assert_token_endpoint_call_contains("foo=bar")
+  end)
+end)
+
+local function extract_jwt_from_error_log()
+  local log = test_support.load("/tmp/server/logs/error.log")
+  local encoded_jwt = log:match("request body for token endpoint call: .*client_assertion=([^\n&]+)")
+  local enc_hdr, enc_payload, enc_sign = string.match(encoded_jwt, '^(.+)%.(.+)%.(.*)$')
+  local base64_url_decode = function(s)
+    local mime = require "mime"
+    return mime.unb64(s:gsub('-','+'):gsub('_','/'))
+  end
+  local dkjson = require "dkjson"
+  return {
+      header = dkjson.decode(base64_url_decode(enc_hdr), 1, nil),
+      payload = dkjson.decode(base64_url_decode(enc_payload), 1, nil),
+      signature = enc_sign
+  }
+end
+
+describe("when the token endpoint is invoked using client_secret_jwt", function()
+  test_support.start_server({
+    oidc_opts = {
+      discovery = {
+        token_endpoint_auth_methods_supported = { "client_secret_jwt" },
+      }
+    }
+  })
+  teardown(test_support.stop_server)
+  test_support.login()
+  it("the request doesn't contain the client_secret as parameter", function()
+    assert.is_not.error_log_contains("request body for token endpoint call: .*client_secret=client_secret.*")
+  end)
+  it("the request doesn't contain a basic auth header", function()
+    assert.is_not.error_log_contains("token authorization header: Basic")
+  end)
+  it("the request contains the proper client_assertion_type parameter", function()
+    -- url.escape escapes the "-" while openidc doesn't so we must revert the encoding for comparison
+    local at = test_support.urlescape_for_regex("urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
+      :gsub("%%%%2d", "%%-")
+    assert.error_log_contains("request body for token endpoint call: .*client_assertion_type="..at..".*", true)
+  end)
+  it("the request contains a client_assertion parameter", function()
+    assert.error_log_contains("request body for token endpoint call: .*client_assertion=.*")
+  end)
+  describe("then the submitted JWT", function()
+    local jwt = extract_jwt_from_error_log()
+    it("has a proper HMAC header", function()
+      assert.are.equal("JWT", jwt.header.typ)
+      assert.are.equal("HS256", jwt.header.alg)
+    end)
+    it("is signed", function()
+      assert.truthy(jwt.signature)
+    end)
+    it("contains the client_id as iss claim", function()
+      assert.are.equal("client_id", jwt.payload.iss)
+    end)
+    it("contains the client_id as sub claim", function()
+      assert.are.equal("client_id", jwt.payload.sub)
+    end)
+    it("contains the token endpoint as aud claim", function()
+      assert.are.equal("http://127.0.0.1/token", jwt.payload.aud)
+    end)
+    it("contains a jti claim", function()
+      assert.truthy(jwt.payload.jti)
+    end)
+    it("contains a non-expired exp claim", function()
+      assert.truthy(jwt.payload.exp)
+      assert.is_true(jwt.payload.exp > os.time())
+    end)
   end)
 end)

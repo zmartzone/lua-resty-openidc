@@ -69,7 +69,8 @@ local WARN = ngx.WARN
 local supported_token_auth_methods = {
   client_secret_basic = true,
   client_secret_post = true,
-  private_key_jwt = true
+  private_key_jwt = true,
+  client_secret_jwt = true
 }
 
 local openidc = {
@@ -414,18 +415,32 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, 
       end
       log(DEBUG, "client_secret_post: client_id and client_secret being sent in POST body")
 
-    elseif auth == "private_key_jwt" then
-      body.client_id=opts.client_id
-      body.client_assertion_type="urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
-
+    elseif auth == "private_key_jwt" or auth == "client_secret_jwt" then
+      body.client_id = opts.client_id
+      body.client_assertion_type = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
       local now = ngx.time()
-      local assertion_header  = {typ = "JWT", alg = "RS256", kid = opts.client_rsa_private_key_id}
-      local assertion_payload = {sub = opts.client_id, iss = opts.client_id, aud = endpoint, jti = ngx.var.request_id,
-                               exp = now + (opts.client_jwt_assertion_expires_in and opts.client_jwt_assertion_expires_in or 60), iat = now}
+      local assertion = {
+        header = {
+          typ = "JWT",
+          alg = auth == "private_key_jwt" and "RS256" or "HS256",
+        },
+        payload = {
+          iss = opts.client_id,
+          sub = opts.client_id,
+          aud = endpoint,
+          jti = ngx.var.request_id,
+          exp = now + (opts.client_jwt_assertion_expires_in and opts.client_jwt_assertion_expires_in or 60),
+          iat = now
+        }
+      }
+      if auth == "private_key_jwt" then
+        assertion.header.kid = opts.client_rsa_private_key_id
+      end
 
       local r_jwt = require("resty.jwt")
-      body.client_assertion=r_jwt:sign(opts.client_rsa_private_key, { header = assertion_header, payload = assertion_payload })
-      log(DEBUG, "private_key_jwt: client_id, client_assertion_type and client_assertion being sent in POST body")
+      body.client_assertion = r_jwt:sign(auth == "private_key_jwt" and opts.client_rsa_private_key or opts.client_secret,
+                                         assertion)
+      log(DEBUG, auth .. ": client_id, client_assertion_type and client_assertion being sent in POST body")
     end
   end
 
