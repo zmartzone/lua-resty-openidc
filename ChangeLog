@@ -1,3 +1,7 @@
+11/13/2018
+- fixed a bad error return value in certain setups of
+  bearer_jwt_verify; see #234; thanks @JoshTheGoldfish
+
 11/09/2018
 - added support for the client_secret_jwt authentication method; see #229
 
