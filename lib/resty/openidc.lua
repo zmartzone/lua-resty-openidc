@@ -1439,7 +1439,7 @@ local function openidc_get_bearer_access_token_from_cookie(opts)
 
   local accept_token_as = opts.auth_accept_token_as or "header"
   if accept_token_as:find("cookie") ~= 1 then
-    return nul, "openidc_get_bearer_access_token_from_cookie called but auth_accept_token_as wants "
+    return nil, "openidc_get_bearer_access_token_from_cookie called but auth_accept_token_as wants "
         .. opts.auth_accept_token_as
   end
   local divider = accept_token_as:find(':')
