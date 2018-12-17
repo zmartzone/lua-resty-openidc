@@ -416,6 +416,10 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, 
       log(DEBUG, "client_secret_post: client_id and client_secret being sent in POST body")
 
     elseif auth == "private_key_jwt" or auth == "client_secret_jwt" then
+      local key = auth == "private_key_jwt" and opts.client_rsa_private_key or opts.client_secret
+      if not key then
+        return nil, "Can't use " .. auth .. " without a key."
+      end
       body.client_id = opts.client_id
       body.client_assertion_type = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
       local now = ngx.time()
@@ -438,8 +442,7 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, 
       end
 
       local r_jwt = require("resty.jwt")
-      body.client_assertion = r_jwt:sign(auth == "private_key_jwt" and opts.client_rsa_private_key or opts.client_secret,
-                                         assertion)
+      body.client_assertion = r_jwt:sign(key, assertion)
       log(DEBUG, auth .. ": client_id, client_assertion_type and client_assertion being sent in POST body")
     end
   end
