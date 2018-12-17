@@ -114,6 +114,22 @@ describe("when 'private_key_jwt' auth method is configured", function()
   end)
 end)
 
+describe("when 'private_key_jwt' auth method is configured but no key specified", function()
+  test_support.start_server({
+    oidc_opts = {
+      discovery = {
+        token_endpoint_auth_methods_supported = { "client_secret_basic", "client_secret_post", "private_key_jwt" },
+      },
+      token_endpoint_auth_method = "private_key_jwt",
+    }
+  })
+  teardown(test_support.stop_server)
+  test_support.login()
+  it("then it is not used", function()
+    assert.error_log_contains("token authorization header: Basic")
+  end)
+end)
+
 describe("if token endpoint is not resolvable", function()
   test_support.start_server({
     oidc_opts = {
@@ -312,3 +328,21 @@ describe("when the token endpoint is invoked using client_secret_jwt", function(
     end)
   end)
 end)
+
+describe("when 'client_secret_jwt' auth method is configured but no key specified", function()
+  test_support.start_server({
+    oidc_opts = {
+      discovery = {
+        token_endpoint_auth_methods_supported = { "client_secret_basic", "client_secret_post", "client_secret_jwt" },
+      },
+      token_endpoint_auth_method = "client_secret_jwt",
+    },
+    remove_oidc_config_keys = { "client_secret" }
+  })
+  teardown(test_support.stop_server)
+  test_support.login()
+  it("then it is not used", function()
+    assert.error_log_contains("token authorization header: Basic")
+  end)
+end)
+
