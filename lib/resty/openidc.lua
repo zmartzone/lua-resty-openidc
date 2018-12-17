@@ -66,11 +66,21 @@ local DEBUG = ngx.DEBUG
 local ERROR = ngx.ERR
 local WARN = ngx.WARN
 
+local function token_auth_method_precondition(method, required_field)
+  return function(opts)
+    if not opts[required_field] then
+      ngx.log(ngx.DEBUG, "Can't use " .. method .. " without opts." .. required_field)
+      return false
+    end
+    return true
+  end
+end
+
 local supported_token_auth_methods = {
   client_secret_basic = true,
   client_secret_post = true,
-  private_key_jwt = true,
-  client_secret_jwt = true
+  private_key_jwt = token_auth_method_precondition('private_key_jwt', 'client_rsa_private_key'),
+  client_secret_jwt = token_auth_method_precondition('client_secret_jwt', 'client_secret')
 }
 
 local openidc = {
@@ -416,6 +426,10 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, 
       log(DEBUG, "client_secret_post: client_id and client_secret being sent in POST body")
 
     elseif auth == "private_key_jwt" or auth == "client_secret_jwt" then
+      local key = auth == "private_key_jwt" and opts.client_rsa_private_key or opts.client_secret
+      if not key then
+        return nil, "Can't use " .. auth .. " without a key."
+      end
       body.client_id = opts.client_id
       body.client_assertion_type = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
       local now = ngx.time()
@@ -438,8 +452,7 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, 
       end
 
       local r_jwt = require("resty.jwt")
-      body.client_assertion = r_jwt:sign(auth == "private_key_jwt" and opts.client_rsa_private_key or opts.client_secret,
-                                         assertion)
+      body.client_assertion = r_jwt:sign(key, assertion)
       log(DEBUG, auth .. ": client_id, client_assertion_type and client_assertion being sent in POST body")
     end
   end
@@ -579,10 +592,15 @@ local function openidc_ensure_discovered_data(opts)
   return err
 end
 
+local function can_use_token_auth_method(method, opts)
+  local supported = supported_token_auth_methods[method]
+  return supported and (type(supported) ~= 'function' or supported(opts))
+end
+
 -- get the token endpoint authentication method
 local function openidc_get_token_auth_method(opts)
 
-  if opts.token_endpoint_auth_method ~= nil and not supported_token_auth_methods[opts.token_endpoint_auth_method] then
+  if opts.token_endpoint_auth_method ~= nil and not can_use_token_auth_method(opts.token_endpoint_auth_method, opts) then
     log(ERROR, "configured value for token_endpoint_auth_method (" .. opts.token_endpoint_auth_method .. ") is not supported, ignoring it")
     opts.token_endpoint_auth_method = nil
   end
@@ -606,7 +624,7 @@ local function openidc_get_token_auth_method(opts)
     else
       for index, value in ipairs(opts.discovery.token_endpoint_auth_methods_supported) do
         log(DEBUG, index .. " => " .. value)
-        if supported_token_auth_methods[value] then
+        if can_use_token_auth_method(value, opts) then
           result = value
           log(DEBUG, "no configuration setting for option so select the first supported method specified by the OP: " .. result)
           break
