@@ -69,7 +69,7 @@ local WARN = ngx.WARN
 local function token_auth_method_precondition(method, required_field)
   return function(opts)
     if not opts[required_field] then
-      ngx.log(ngx.DEBUG, "Can't use " .. method .. " without opts." .. required_field)
+      log(DEBUG, "Can't use " .. method .. " without opts." .. required_field)
       return false
     end
     return true
