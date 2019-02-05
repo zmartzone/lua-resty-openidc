@@ -335,6 +335,10 @@ local function openidc_authorize(opts, session, target_url, prompt)
     params.display = opts.display
   end
 
+  if session.present and session.data.id_token and session.data.id_token.upn then
+    params.login_hint = session.data.id_token.upn
+  end
+
   -- merge any provided extra parameters
   if opts.authorization_params then
     for k, v in pairs(opts.authorization_params) do params[k] = v end
