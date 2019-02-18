@@ -1,3 +1,6 @@
+02/18/2019
+- release 1.7.1
+
 11/06/2018
 - make sure opts.discovery is resolved when "iss" is returned as part of the
   authorization response; see #224 ; thanks @mijohansen

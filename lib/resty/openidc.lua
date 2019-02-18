@@ -17,7 +17,7 @@ specific language governing permissions and limitations
 under the License.
 
 ***************************************************************************
-Copyright (C) 2017-2018 ZmartZone IAM
+Copyright (C) 2017-2019 ZmartZone IAM
 Copyright (C) 2015-2017 Ping Identity Corporation
 All rights reserved.
 
@@ -72,7 +72,7 @@ local supported_token_auth_methods = {
 }
 
 local openidc = {
-  _VERSION = "1.7.0"
+  _VERSION = "1.7.1"
 }
 openidc.__index = openidc
 
