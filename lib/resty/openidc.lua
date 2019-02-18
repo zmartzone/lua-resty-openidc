@@ -66,9 +66,21 @@ local DEBUG = ngx.DEBUG
 local ERROR = ngx.ERR
 local WARN = ngx.WARN
 
+local function token_auth_method_precondition(method, required_field)
+  return function(opts)
+    if not opts[required_field] then
+      log(DEBUG, "Can't use " .. method .. " without opts." .. required_field)
+      return false
+    end
+    return true
+  end
+end
+
 local supported_token_auth_methods = {
   client_secret_basic = true,
-  client_secret_post = true
+  client_secret_post = true,
+  private_key_jwt = token_auth_method_precondition('private_key_jwt', 'client_rsa_private_key'),
+  client_secret_jwt = token_auth_method_precondition('client_secret_jwt', 'client_secret')
 }
 
 local openidc = {
@@ -405,13 +417,43 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, 
         headers.Authorization = "Basic " .. b64(ngx.escape_uri(opts.client_id) .. ":")
       end
       log(DEBUG, "client_secret_basic: authorization header '" .. headers.Authorization .. "'")
-    end
-    if auth == "client_secret_post" then
+
+    elseif auth == "client_secret_post" then
       body.client_id = opts.client_id
       if opts.client_secret then
         body.client_secret = opts.client_secret
       end
       log(DEBUG, "client_secret_post: client_id and client_secret being sent in POST body")
+
+    elseif auth == "private_key_jwt" or auth == "client_secret_jwt" then
+      local key = auth == "private_key_jwt" and opts.client_rsa_private_key or opts.client_secret
+      if not key then
+        return nil, "Can't use " .. auth .. " without a key."
+      end
+      body.client_id = opts.client_id
+      body.client_assertion_type = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+      local now = ngx.time()
+      local assertion = {
+        header = {
+          typ = "JWT",
+          alg = auth == "private_key_jwt" and "RS256" or "HS256",
+        },
+        payload = {
+          iss = opts.client_id,
+          sub = opts.client_id,
+          aud = endpoint,
+          jti = ngx.var.request_id,
+          exp = now + (opts.client_jwt_assertion_expires_in and opts.client_jwt_assertion_expires_in or 60),
+          iat = now
+        }
+      }
+      if auth == "private_key_jwt" then
+        assertion.header.kid = opts.client_rsa_private_key_id
+      end
+
+      local r_jwt = require("resty.jwt")
+      body.client_assertion = r_jwt:sign(key, assertion)
+      log(DEBUG, auth .. ": client_id, client_assertion_type and client_assertion being sent in POST body")
     end
   end
 
@@ -550,10 +592,15 @@ local function openidc_ensure_discovered_data(opts)
   return err
 end
 
+local function can_use_token_auth_method(method, opts)
+  local supported = supported_token_auth_methods[method]
+  return supported and (type(supported) ~= 'function' or supported(opts))
+end
+
 -- get the token endpoint authentication method
 local function openidc_get_token_auth_method(opts)
 
-  if opts.token_endpoint_auth_method ~= nil and not supported_token_auth_methods[opts.token_endpoint_auth_method] then
+  if opts.token_endpoint_auth_method ~= nil and not can_use_token_auth_method(opts.token_endpoint_auth_method, opts) then
     log(ERROR, "configured value for token_endpoint_auth_method (" .. opts.token_endpoint_auth_method .. ") is not supported, ignoring it")
     opts.token_endpoint_auth_method = nil
   end
@@ -577,7 +624,7 @@ local function openidc_get_token_auth_method(opts)
     else
       for index, value in ipairs(opts.discovery.token_endpoint_auth_methods_supported) do
         log(DEBUG, index .. " => " .. value)
-        if supported_token_auth_methods[value] then
+        if can_use_token_auth_method(value, opts) then
           result = value
           log(DEBUG, "no configuration setting for option so select the first supported method specified by the OP: " .. result)
           break
@@ -858,7 +905,7 @@ end
 -- parse a JWT and verify its signature (if present)
 local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, asymmetric_secret,
 symmetric_secret, expected_algs, ...)
-  local jwt = require("resty.jwt")
+  local r_jwt = require("resty.jwt")
   local enc_hdr, enc_payload, enc_sign = string.match(jwt_string, '^(.+)%.(.+)%.(.*)$')
   if enc_payload and (not enc_sign or enc_sign == "") then
     local jwt = openidc_load_jwt_none_alg(enc_hdr, enc_payload)
@@ -872,7 +919,7 @@ symmetric_secret, expected_algs, ...)
     end -- otherwise the JWT is invalid and load_jwt produces an error
   end
 
-  local jwt_obj = jwt:load_jwt(jwt_string, nil)
+  local jwt_obj = r_jwt:load_jwt(jwt_string, nil)
   if not jwt_obj.valid then
     local reason = "invalid jwt"
     if jwt_obj.reason then
@@ -920,7 +967,7 @@ symmetric_secret, expected_algs, ...)
     jwt_validators.set_system_leeway(opts.iat_slack and opts.iat_slack or 120)
   end
 
-  jwt_obj = jwt:verify_jwt_obj(secret, jwt_obj, ...)
+  jwt_obj = r_jwt:verify_jwt_obj(secret, jwt_obj, ...)
   if jwt_obj then
     log(DEBUG, "jwt: ", cjson.encode(jwt_obj), " ,valid: ", jwt_obj.valid, ", verified: ", jwt_obj.verified)
   end
@@ -1410,7 +1457,7 @@ local function openidc_get_bearer_access_token_from_cookie(opts)
 
   local accept_token_as = opts.auth_accept_token_as or "header"
   if accept_token_as:find("cookie") ~= 1 then
-    return nul, "openidc_get_bearer_access_token_from_cookie called but auth_accept_token_as wants "
+    return nil, "openidc_get_bearer_access_token_from_cookie called but auth_accept_token_as wants "
         .. opts.auth_accept_token_as
   end
   local divider = accept_token_as:find(':')
