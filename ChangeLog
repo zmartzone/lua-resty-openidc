@@ -1,3 +1,7 @@
+03/06/2019
+- don't overwrite opts.discovery when an error occurs calling the
+  discovery endpoint; see #250
+
 02/18/2019
 - release 1.7.1
 

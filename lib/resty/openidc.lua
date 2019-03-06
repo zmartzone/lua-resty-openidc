@@ -586,8 +586,12 @@ end
 local function openidc_ensure_discovered_data(opts)
   local err
   if type(opts.discovery) == "string" then
-    opts.discovery, err = openidc_discover(opts.discovery, opts.ssl_verify, opts.timeout, opts.jwk_expires_in, opts.proxy_opts,
-                                           opts.http_request_decorator)
+    local discovery
+    discovery, err = openidc_discover(opts.discovery, opts.ssl_verify, opts.timeout, opts.jwk_expires_in, opts.proxy_opts,
+                                      opts.http_request_decorator)
+    if not err then
+      opts.discovery = discovery
+    end
   end
   return err
 end
