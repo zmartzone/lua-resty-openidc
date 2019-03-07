@@ -1,3 +1,7 @@
+03/07/2019
+- made the checks for certain HTTP headers handle the case where
+  multiple headers exist; thanks @ci42
+
 03/06/2019
 - don't overwrite opts.discovery when an error occurs calling the
   discovery endpoint; see #250

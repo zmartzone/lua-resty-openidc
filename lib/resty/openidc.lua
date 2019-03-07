@@ -201,12 +201,17 @@ local function openidc_validate_id_token(opts, id_token, nonce)
   return true
 end
 
+local function get_first(table_or_string)
+  local res = table_or_string
+  if table_or_string and type(table_or_string) == 'table' then
+    res = table_or_string[1]
+  end
+  return res
+end
+
 local function get_first_header(header_name)
   local header = ngx.req.get_headers()[header_name]
-  if header and type(header) == 'table' then
-    header = header[1]
-  end
-  return header
+  return get_first(header)
 end
 
 local function get_first_header_and_strip_whitespace(header_name)
@@ -1196,7 +1201,7 @@ local function openidc_logout(opts, session)
   end
 
   local headers = ngx.req.get_headers()
-  local header = headers['Accept']
+  local header = get_first(headers['Accept'])
   if header and header:find("image/png") then
     ngx.header["Cache-Control"] = "no-cache, no-store"
     ngx.header["Pragma"] = "no-cache"
@@ -1500,7 +1505,7 @@ local function openidc_get_bearer_access_token(opts)
   -- get the access token from the Authorization header
   local headers = ngx.req.get_headers()
   local header_name = opts.auth_accept_token_as_header_name or "Authorization"
-  local header = headers[header_name]
+  local header = get_first(headers[header_name])
 
   if header == nil or header:find(" ") == nil then
     err = "no Authorization header found"
