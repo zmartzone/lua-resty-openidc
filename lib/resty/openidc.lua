@@ -350,6 +350,11 @@ local function openidc_authorize(opts, session, target_url, prompt)
   session.data.state = state
   session.data.nonce = nonce
   session.data.last_authenticated = ngx.time()
+
+  if opts.lifecycle and opts.lifecycle.on_created then
+    opts.lifecycle.on_created(session)
+  end
+
   session:save()
 
   -- redirect to the /authorization endpoint
@@ -1134,6 +1139,10 @@ local function openidc_authorization_response(opts, session)
     end
   end
 
+  if opts.lifecycle and opts.lifecycle.on_authenticated then
+    opts.lifecycle.on_authenticated(session)
+  end
+
   -- save the session with the obtained id_token
   session:save()
 
@@ -1188,6 +1197,11 @@ local function openidc_logout(opts, session)
   local session_token = session.data.enc_id_token
   local access_token = session.data.access_token
   local refresh_token = session.data.refresh_token
+
+  if opts.lifecycle and opts.lifecycle.on_logout then
+    opts.lifecycle.on_logout(session)
+  end
+
   session:destroy()
 
   if opts.revoke_tokens_on_logout then
