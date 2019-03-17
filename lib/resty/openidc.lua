@@ -1159,7 +1159,7 @@ local function openidc_revoke_token(opts, token_type_hint, token)
   end
 
   -- ensure revocation endpoint auth method is properly discovered
-  err = ensure_config(opts)
+  local err = ensure_config(opts)
   if err then
     log(ERROR, "revocation of " .. token_type_hint .. " unsuccessful: " .. err)
     return false
