@@ -1,6 +1,7 @@
 03/18/2019
 - fixed accidental use of global variable err in revoke_tokens_on_logout;
   see #253, #254; thanks @arcivanov
+- fixed a few additional cases of using global symbols detected by lualint
 
 03/07/2019
 - made the checks for certain HTTP headers handle the case where

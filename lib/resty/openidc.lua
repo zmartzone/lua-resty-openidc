@@ -1166,6 +1166,7 @@ local function openidc_revoke_token(opts, token_type_hint, token)
   end
 
   -- call the revocation endpoint
+  local _
   _, err = openidc.call_token_endpoint(opts, opts.discovery.revocation_endpoint, body, opts.token_endpoint_auth_method, "revocation", true)
   if err then
     log(ERROR, "revocation of " .. token_type_hint .. " unsuccessful: " .. err)
@@ -1317,12 +1318,12 @@ local function openidc_access_token(opts, session, try_to_renew)
   return session.data.access_token, err
 end
 
-function openidc_get_path(uri)
+local function openidc_get_path(uri)
   local without_query = uri:match("(.-)%?") or uri
   return without_query:match(".-//[^/]+(/.*)") or without_query
 end
 
-function openidc_get_redirect_uri_path(opts)
+local function openidc_get_redirect_uri_path(opts)
   return opts.redirect_uri and openidc_get_path(opts.redirect_uri) or opts.redirect_uri_path
 end
 
