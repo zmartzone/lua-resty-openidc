@@ -875,7 +875,7 @@ local function openidc_pem_from_jwk(opts, kid)
   elseif jwk.kty == "RSA" and jwk.n and jwk.e then
     pem = openidc_pem_from_rsa_n_and_e(jwk.n, jwk.e)
   else
-    return nil, "don't know how to create RSA key/cert for " .. cjson.encode(jwt)
+    return nil, "don't know how to create RSA key/cert for " .. cjson.encode(jwk)
   end
 
   openidc_cache_set("jwks", cache_id, pem, opts.jwk_expires_in or 24 * 60 * 60)
