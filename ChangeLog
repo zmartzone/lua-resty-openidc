@@ -3,6 +3,10 @@
   see #253, #254; thanks @arcivanov
 - fixed a few additional cases of using global symbols detected by lualint
 
+03/15/2019
+- allow to tap into authentication workflow by providing an option
+  to specify lifecycle hooks via `opts.lifecycle`
+
 03/07/2019
 - made the checks for certain HTTP headers handle the case where
   multiple headers exist; thanks @ci42

@@ -206,6 +206,26 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
              --    https_proxy = "http://<proxy_host>:<proxy_port>/"
              -- }
 
+             -- Lifecycle Hooks
+             -- 
+             -- lifecycle = {
+             --    on_created = handle_created,
+             --    on_authenticated = handle_authenticated,
+             --    on_logout = handle_logout
+             -- }
+             -- 
+             -- where `handle_created`, `handle_authenticated` and `handle_logout` are callables
+             -- accepting a single argument `session`
+             --
+             --  -- `on_created` hook is invoked *after* a session has been created in 
+             --     `openidc_authorize` immediately prior to saving the session
+             --  -- `on_authenticated` hook is invoked *after* receiving authorization response in
+             --     `openidc_authorization_response` immediately prior to saving the session
+             --  -- `on_logout` hook is invoked *before* a session is destroyed in
+             --     `openidc_logout`
+             --
+             --  Any, all or none of the hooks may be used. Empty `lifecycle` does nothing.
+             
              -- Optional : add decorator for HTTP request that is
              -- applied when lua-resty-openidc talks to the OpenID Connect
              -- provider directly. Can be used to provide extra HTTP headers
