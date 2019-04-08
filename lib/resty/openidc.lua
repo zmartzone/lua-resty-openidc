@@ -315,9 +315,20 @@ local function openidc_authorize(opts, session, target_url, prompt)
   local resty_string = require("resty.string")
 
   -- generate state and nonce
-  local state = resty_string.to_hex(resty_random.bytes(16))
-  local nonce = (opts.use_nonce == nil or opts.use_nonce)
-    and resty_string.to_hex(resty_random.bytes(16))
+  local state = nil
+  if (session.data.state == nil) then
+    state = resty_string.to_hex(resty_random.bytes(16))
+  else
+    state = session.data.state
+  end
+
+  local nonce = nil
+  if (session.data.nonce == nil) then
+    nonce = (opts.use_nonce == nil or opts.use_nonce)
+      and resty_string.to_hex(resty_random.bytes(16))
+  else
+    nonce = session.data.nonce
+  end
 
   -- assemble the parameters to the authentication request
   local params = {
