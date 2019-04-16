@@ -1094,9 +1094,12 @@ local function openidc_authorization_response(opts, session)
     return nil, err, session.data.original_url, session
   end
 
-  local id_token, err = openidc_load_and_validate_jwt_id_token(opts, json.id_token, session);
-  if err then
-    return nil, err, session.data.original_url, session
+  local id_token
+  if json.id_token then
+    id_token, err = openidc_load_and_validate_jwt_id_token(opts, json.id_token, session);
+    if err then
+      return nil, err, session.data.original_url, session
+    end
   end
 
   -- mark this sessions as authenticated
