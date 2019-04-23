@@ -1350,7 +1350,11 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
 
   local err
 
-  local session = r_session.start(session_opts)
+  local session, session_error = r_session.start(session_opts)
+  if session == nil then
+    log(ERROR, "Error starting session: " .. session_error)
+    return nil, session_error, target_url, session
+  end
 
   target_url = target_url or ngx.var.request_uri
 
