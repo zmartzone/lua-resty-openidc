@@ -1,5 +1,5 @@
-04/23/2019
-- error handling when starting session
+04/25/2019
+- improved error handling when starting session; see #264; thanks @vershnik
 
 03/18/2019
 - fixed accidental use of global variable err in revoke_tokens_on_logout;
