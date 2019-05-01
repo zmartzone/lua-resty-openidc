@@ -1329,6 +1329,9 @@ local function openidc_access_token(opts, session, try_to_renew)
     log(ERROR, "failed to regenerate session: " .. err)
     return nil, err
   end
+  if opts.lifecycle and opts.lifecycle.on_regenerated then
+    opts.lifecycle.on_regenerated(session)
+  end
 
   return session.data.access_token, err
 end

@@ -211,16 +211,20 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
              -- lifecycle = {
              --    on_created = handle_created,
              --    on_authenticated = handle_authenticated,
+             --    on_regenerated = handle_regenerated
              --    on_logout = handle_logout
              -- }
              -- 
-             -- where `handle_created`, `handle_authenticated` and `handle_logout` are callables
+             -- where `handle_created`, `handle_authenticated`, `handle_regenerated` and `handle_logout` are callables
              -- accepting a single argument `session`
              --
              --  -- `on_created` hook is invoked *after* a session has been created in 
              --     `openidc_authorize` immediately prior to saving the session
              --  -- `on_authenticated` hook is invoked *after* receiving authorization response in
              --     `openidc_authorization_response` immediately prior to saving the session
+             --  -- `on_regenerated` is invoked immediately after the
+                     a new access token has been obtained via token
+                     refresh and is called with the regenerated session table
              --  -- `on_logout` hook is invoked *before* a session is destroyed in
              --     `openidc_logout`
              --
