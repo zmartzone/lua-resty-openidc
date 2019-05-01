@@ -209,18 +209,18 @@ local function get_first(table_or_string)
   return res
 end
 
-local function get_first_header(header_name)
-  local header = ngx.req.get_headers()[header_name]
+local function get_first_header(headers, header_name)
+  local header = headers[header_name]
   return get_first(header)
 end
 
-local function get_first_header_and_strip_whitespace(header_name)
-  local header = get_first_header(header_name)
+local function get_first_header_and_strip_whitespace(headers, header_name)
+  local header = get_first_header(headers, header_name)
   return header and header:gsub('%s', '')
 end
 
-local function get_forwarded_parameter(param_name)
-  local forwarded = get_first_header("Forwarded")
+local function get_forwarded_parameter(headers, param_name)
+  local forwarded = get_first_header(headers, 'Forwarded')
   local params = {}
   if forwarded then
     local function parse_parameter(pv)
@@ -247,20 +247,20 @@ local function get_forwarded_parameter(param_name)
   return params[param_name:gsub("^%s*(.-)%s*$", "%1"):lower()]
 end
 
-local function get_scheme()
-  return get_forwarded_parameter("proto")
-      or get_first_header_and_strip_whitespace('X-Forwarded-Proto')
+local function get_scheme(headers)
+  return get_forwarded_parameter(headers, 'proto')
+      or get_first_header_and_strip_whitespace(headers, 'X-Forwarded-Proto')
       or ngx.var.scheme
 end
 
-local function get_host_name_from_x_header()
-  local header = get_first_header_and_strip_whitespace('X-Forwarded-Host')
+local function get_host_name_from_x_header(headers)
+  local header = get_first_header_and_strip_whitespace(headers, 'X-Forwarded-Host')
   return header and header:gsub('^([^,]+),?.*$', '%1')
 end
 
-local function get_host_name()
-  return get_forwarded_parameter("host")
-      or get_host_name_from_x_header()
+local function get_host_name(headers)
+  return get_forwarded_parameter(headers, 'host')
+      or get_host_name_from_x_header(headers)
       or ngx.var.http_host
 end
 
@@ -274,8 +274,9 @@ local function openidc_get_redirect_uri(opts)
       return opts.redirect_uri
     end
   end
-  local scheme = opts.redirect_uri_scheme or get_scheme()
-  local host = get_host_name()
+  local headers = ngx.req.get_headers()
+  local scheme = opts.redirect_uri_scheme or get_scheme(headers)
+  local host = get_host_name(headers)
   if not host then
     -- possibly HTTP 1.0 and no Host header
     ngx.exit(ngx.HTTP_BAD_REQUEST)
