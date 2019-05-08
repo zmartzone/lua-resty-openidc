@@ -1,4 +1,4 @@
-05/01/2018
+05/01/2019
 - performance enhancement by caching the result of ngx.req.get_headers
   during the authenticate call.
 - added another lifecycle hook that is called when the session is
