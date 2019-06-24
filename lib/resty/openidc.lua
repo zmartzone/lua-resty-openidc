@@ -1194,6 +1194,32 @@ local openidc_transparent_pixel = "\137\080\078\071\013\010\026\010\000\000\000\
     "\174\066\096\130"
 
 -- handle logout
+local function default_post_logout_redirect(opts, session_token)
+  if opts.redirect_after_logout_uri or opts.discovery.end_session_endpoint then
+    local uri
+    if opts.redirect_after_logout_uri then
+      uri = opts.redirect_after_logout_uri
+    else
+      uri = opts.discovery.end_session_endpoint
+    end
+    local params = {}
+    if (opts.redirect_after_logout_with_id_token_hint or not opts.redirect_after_logout_uri) and session_token then
+      params["id_token_hint"] = session_token
+    end
+    if opts.post_logout_redirect_uri then
+      params["post_logout_redirect_uri"] = opts.post_logout_redirect_uri
+    end
+    return openidc_combine_uri(uri, params)
+  elseif opts.discovery.ping_end_session_endpoint then
+    local params = {}
+    if opts.post_logout_redirect_uri then
+      params["TargetResource"] = opts.post_logout_redirect_uri
+    end
+    return openidc_combine_uri(opts.discovery.ping_end_session_endpoint, params)
+  end
+  return nil
+end
+
 local function openidc_logout(opts, session)
   local session_token = session.data.enc_id_token
   local access_token = session.data.access_token
@@ -1228,27 +1254,11 @@ local function openidc_logout(opts, session)
     ngx.print(openidc_transparent_pixel)
     ngx.exit(ngx.OK)
     return
-  elseif opts.redirect_after_logout_uri or opts.discovery.end_session_endpoint then
-    local uri
-    if opts.redirect_after_logout_uri then
-      uri = opts.redirect_after_logout_uri
-    else
-      uri = opts.discovery.end_session_endpoint
+  else
+    local redirect_to = (opts.post_logout_redirect_provider or default_post_logout_redirect)(opts, session_token)
+    if redirect_to then
+      return ngx.redirect(redirect_to)
     end
-    local params = {}
-    if (opts.redirect_after_logout_with_id_token_hint or not opts.redirect_after_logout_uri) and session_token then
-      params["id_token_hint"] = session_token
-    end
-    if opts.post_logout_redirect_uri then
-      params["post_logout_redirect_uri"] = opts.post_logout_redirect_uri
-    end
-    return ngx.redirect(openidc_combine_uri(uri, params))
-  elseif opts.discovery.ping_end_session_endpoint then
-    local params = {}
-    if opts.post_logout_redirect_uri then
-      params["TargetResource"] = opts.post_logout_redirect_uri
-    end
-    return ngx.redirect(openidc_combine_uri(opts.discovery.ping_end_session_endpoint, params))
   end
 
   ngx.header.content_type = "text/html"
