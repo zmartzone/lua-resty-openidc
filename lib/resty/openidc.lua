@@ -1429,6 +1429,13 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
       target_url,
       session
     end
+    if unauth_action == 'deny' then
+      return
+      nil,
+      'unauthorized request',
+      target_url,
+      session
+    end
 
     err = ensure_config(opts)
     if err then

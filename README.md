@@ -206,6 +206,14 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
              --    https_proxy = "http://<proxy_host>:<proxy_port>/"
              -- }
 
+             -- behavior if the request is not known to be authenticated or the session or the access token have expired:
+             -- be default this results in a redirect to the OpenID Connect Provider' authorization endpoint
+             -- this can be overridden via the unauth_action option:
+             -- allow the request to proceed anyway
+             -- unauth_action = 'pass'
+             -- deny the request right away (results in authenticate returning an error)
+             -- unauth_action = 'deny'
+
              -- Lifecycle Hooks
              -- 
              -- lifecycle = {

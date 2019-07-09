@@ -1,3 +1,8 @@
+07/09/2019
+- added unauth_action='deny' to reject unauthenticated requests rather
+  than start the authorization code grant flow; see #271; based on
+  suggested change by @nmaniwa
+
 05/01/2019
 - performance enhancement by caching the result of ngx.req.get_headers
   during the authenticate call.
