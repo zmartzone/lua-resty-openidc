@@ -414,6 +414,10 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, 
   local ignore_body_on_success = ignore_body_on_success or false
 
   local ep_name = endpoint_name or 'token'
+  if not endpoint then
+    return nil, 'no endpoint URI for ' .. ep_name
+  end
+
   local headers = {
     ["Content-Type"] = "application/x-www-form-urlencoded"
   }
@@ -1603,7 +1607,18 @@ function openidc.introspect(opts)
   end
 
   -- call the introspection endpoint
-  json, err = openidc.call_token_endpoint(opts, opts.introspection_endpoint, body, opts.introspection_endpoint_auth_method, "introspection")
+  local introspection_endpoint = opts.introspection_endpoint
+  if not introspection_endpoint then
+    err = openidc_ensure_discovered_data(opts)
+    if err then
+      return nil, "opts.introspection_endpoint not said and " .. err
+    end
+    local endpoint = opts.discovery and opts.discovery.introspection_endpoint
+    if endpoint then
+      introspection_endpoint = endpoint
+    end
+  end
+  json, err = openidc.call_token_endpoint(opts, introspection_endpoint, body, opts.introspection_endpoint_auth_method, "introspection")
 
 
   if not json then

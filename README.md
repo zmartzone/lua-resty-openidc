@@ -490,7 +490,14 @@ http {
       access_by_lua '
 
           local opts = {
+             -- sets the URI of the introspection endpoint
              introspection_endpoint="https://localhost:9031/oauth2/introspect",
+
+             -- alternatively if your OAuth2 Provider provides a discovery document that contains the
+             -- introspection_endpoint claim you can leave the introspection_endpoint option
+             -- unset and instead use
+             -- discovery = "https://my-oauth2-provider/.well-known/oauth-authorization-server",
+
              client_id="admin",
              client_secret="demo-password",
              ssl_verify = "no",
