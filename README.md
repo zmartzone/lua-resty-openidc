@@ -206,14 +206,6 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
              --    https_proxy = "http://<proxy_host>:<proxy_port>/"
              -- }
 
-             -- behavior if the request is not known to be authenticated or the session or the access token have expired:
-             -- be default this results in a redirect to the OpenID Connect Provider' authorization endpoint
-             -- this can be overridden via the unauth_action option:
-             -- allow the request to proceed anyway
-             -- unauth_action = 'pass'
-             -- deny the request right away (results in authenticate returning an error)
-             -- unauth_action = 'deny'
-
              -- Lifecycle Hooks
              -- 
              -- lifecycle = {
@@ -289,6 +281,13 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
 ```
 -- check session, but do not redirect to auth if not already logged in
 local res, err = require("resty.openidc").authenticate(opts, nil, "pass")
+```
+
+## Check authentication only and deny unauthenticated access
+
+```
+-- check session, do not redirect to auth if not already logged in but return an error instead
+local res, err = require("resty.openidc").authenticate(opts, nil, "deny")
 ```
 
 ## Sample Configuration for OAuth 2.0 JWT Token Validation
