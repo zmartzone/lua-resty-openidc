@@ -64,11 +64,13 @@ If you are using [OpenResty](http://openresty.org/), the default location would 
 ## Support
 
 #### Community Support
+
 For generic questions, see the Wiki pages with Frequently Asked Questions at:
   [https://github.com/zmartzone/lua-resty-openidc/wiki](https://github.com/zmartzone/lua-resty-openidc/wiki)
 Any questions/issues should go to issues tracker.
 
 #### Commercial Services
+
 For commercial Support contracts, Professional Services, Training and use-case specific support you can contact:
   [sales@zmartzone.eu](mailto:sales@zmartzone.eu)
 
@@ -461,6 +463,7 @@ http {
   }
 }
 ```
+
 ## Sample Configuration for passing bearer OAuth 2.0 access tokens as cookie
 
 Sample `nginx.conf` configuration for validating Bearer Access Tokens passed as cookie against a ORY/Hydra Authorization Server.
