@@ -64,20 +64,20 @@ If you are using [OpenResty](http://openresty.org/), the default location would 
 ## Support
 
 #### Community Support
-For generic questions, see the Wiki pages with Frequently Asked Questions at:  
-  [https://github.com/zmartzone/lua-resty-openidc/wiki](https://github.com/zmartzone/lua-resty-openidc/wiki)  
+For generic questions, see the Wiki pages with Frequently Asked Questions at:
+  [https://github.com/zmartzone/lua-resty-openidc/wiki](https://github.com/zmartzone/lua-resty-openidc/wiki)
 Any questions/issues should go to issues tracker.
 
 #### Commercial Services
-For commercial Support contracts, Professional Services, Training and use-case specific support you can contact:  
-  [sales@zmartzone.eu](mailto:sales@zmartzone.eu)  
+For commercial Support contracts, Professional Services, Training and use-case specific support you can contact:
+  [sales@zmartzone.eu](mailto:sales@zmartzone.eu)
 
 
 ## Sample Configuration for Google+ Signin
 
 Sample `nginx.conf` configuration for authenticating users against Google+ Signin, protecting a reverse-proxied path.
 
-```
+```nginx
 events {
   worker_connections 128;
 }
@@ -171,7 +171,7 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
              -- whether this plugin shall try to silently renew the access token once it is expired if a refresh token is available.
              -- if it fails to renew the token, the user will be redirected to the authorization endpoint.
              --access_token_expires_in = 3600
-             -- Default lifetime in seconds of the access_token if no expires_in attribute is present in the token endpoint response. 
+             -- Default lifetime in seconds of the access_token if no expires_in attribute is present in the token endpoint response.
 
              --access_token_expires_leeway = 0
              --  Expiration leeway for access_token renewal. If this is set, renewal will happen access_token_expires_leeway seconds before the token expiration. This avoids errors in case the access_token just expires when arriving to the OAuth Resource Server.
@@ -181,7 +181,7 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
              --session_contents = {id_token=true}
              -- Whitelist of session content to enable. This can be used to reduce the session size.
              -- When not set everything will be included in the session.
-             -- Available are: 
+             -- Available are:
              -- id_token, enc_id_token, user, access_token (includes refresh token)
 
              -- You can specify timeouts for connect/send/read as a single number (setting all timeouts) or as a table. Values are in milliseconds
@@ -199,7 +199,7 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
              -- When revoke_tokens_on_logout is set to true a logout notifies the authorization server that previously obtained refresh and access tokens are no longer needed. This requires that revocation_endpoint is discoverable.
              -- If there is no revocation endpoint supplied or if there are errors on revocation the user will not be notified and the logout process continues normally.
 
-             -- Optional : use outgoing proxy to the OpenID Connect provider endpoints with the proxy_opts table : 
+             -- Optional : use outgoing proxy to the OpenID Connect provider endpoints with the proxy_opts table :
              -- this requires lua-resty-http >= 0.12
              -- proxy_opts = {
              --    http_proxy  = "http://<proxy_host>:<proxy_port>/",
@@ -207,18 +207,18 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
              -- }
 
              -- Lifecycle Hooks
-             -- 
+             --
              -- lifecycle = {
              --    on_created = handle_created,
              --    on_authenticated = handle_authenticated,
              --    on_regenerated = handle_regenerated
              --    on_logout = handle_logout
              -- }
-             -- 
+             --
              -- where `handle_created`, `handle_authenticated`, `handle_regenerated` and `handle_logout` are callables
              -- accepting a single argument `session`
              --
-             --  -- `on_created` hook is invoked *after* a session has been created in 
+             --  -- `on_created` hook is invoked *after* a session has been created in
              --     `openidc_authorize` immediately prior to saving the session
              --  -- `on_authenticated` hook is invoked *after* receiving authorization response in
              --     `openidc_authorization_response` immediately prior to saving the session
@@ -229,7 +229,7 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
              --     `openidc_logout`
              --
              --  Any, all or none of the hooks may be used. Empty `lifecycle` does nothing.
-             
+
              -- Optional : add decorator for HTTP request that is
              -- applied when lua-resty-openidc talks to the OpenID Connect
              -- provider directly. Can be used to provide extra HTTP headers
@@ -278,14 +278,14 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
 
 ## Check authentication only
 
-```
+```lua
 -- check session, but do not redirect to auth if not already logged in
 local res, err = require("resty.openidc").authenticate(opts, nil, "pass")
 ```
 
 ## Check authentication only and deny unauthenticated access
 
-```
+```lua
 -- check session, do not redirect to auth if not already logged in but return an error instead
 local res, err = require("resty.openidc").authenticate(opts, nil, "deny")
 ```
@@ -295,7 +295,7 @@ local res, err = require("resty.openidc").authenticate(opts, nil, "deny")
 Sample `nginx.conf` configuration for verifying Bearer JWT Access Tokens against a pre-configured secret/key.
 Once successfully verified, the NGINX server may function as a reverse proxy to an internal origin server.
 
-```
+```nginx
 events {
   worker_connections 128;
 }
@@ -402,7 +402,7 @@ lAc5Csj0o5Q+oEhPUAVBIF07m4rd0OvAVPOCQ2NJhQSL1oWASbf+fg==
 
 Sample `nginx.conf` configuration for validating Bearer Access Tokens against a PingFederate OAuth 2.0 Authorization Server.
 
-```
+```nginx
 events {
   worker_connections 128;
 }
@@ -465,7 +465,7 @@ http {
 
 Sample `nginx.conf` configuration for validating Bearer Access Tokens passed as cookie against a ORY/Hydra Authorization Server.
 
-```
+```nginx
 events {
   worker_connections 128;
 }
@@ -506,14 +506,14 @@ http {
              -- to be refreshed by introspecting (and validating) it again against the Authorization Server.
              -- When not defined the value is 0, which means it only expires after the `exp` (or alternative,
              -- see introspection_expiry_claim) hint as returned by the Authorization Server
-             -- introspection_interval = 60, 
-  
-             -- Defines the way in which bearer OAuth 2.0 access tokens can be passed to this Resource Server. 
+             -- introspection_interval = 60,
+
+             -- Defines the way in which bearer OAuth 2.0 access tokens can be passed to this Resource Server.
              -- "cookie" as a cookie header called "PA.global" or using the name specified after ":"
              -- "header" "Authorization: bearer" header
              -- When not defined the default "Authorization: bearer" header is used
              -- auth_accept_token_as = "cookie:PA",
-       
+
              -- If header is used header field is Authorization
              -- auth_accept_token_as_header_name = "cf-Access-Jwt-Assertion"
 
@@ -523,14 +523,14 @@ http {
              -- introspection_endpoint_auth_method = "client_secret_basic",
 
              -- Specify the names of cookies separated by whitespace to pickup from the browser and send along on backchannel
-             -- calls to the OP and AS endpoints. 
+             -- calls to the OP and AS endpoints.
              -- When not defined, no such cookies are sent.
              -- pass_cookies = "JSESSION"
 
              -- Defaults to "exp" - Controls the TTL of the introspection cache
              -- https://tools.ietf.org/html/rfc7662#section-2.2
              -- introspection_expiry_claim = "exp"
-             
+
              -- It may be necessary to force an introspection call for an access_token and ignore the existing cached
              -- introspection results. If so you need to set set the introspection_cache_ignore option to true.
              -- introspection_cache_ignore = true
@@ -592,7 +592,7 @@ $ docker run -it --rm -e coverage=t lua-resty-openidc/test:latest
 ```
 
 as the second command
-  
+
 Disclaimer
 ----------
 
