@@ -1199,6 +1199,9 @@ local openidc_transparent_pixel = "\137\080\078\071\013\010\026\010\000\000\000\
 
 -- handle logout
 local function openidc_logout(opts, session)
+  local resty_random = require("resty.random")
+  local resty_string = require("resty.string")
+
   local session_token = session.data.enc_id_token
   local access_token = session.data.access_token
   local refresh_token = session.data.refresh_token
@@ -1245,6 +1248,7 @@ local function openidc_logout(opts, session)
     end
     if opts.post_logout_redirect_uri then
       params["post_logout_redirect_uri"] = opts.post_logout_redirect_uri
+      params["state"] = resty_string.to_hex(resty_random.bytes(16))
     end
     return ngx.redirect(openidc_combine_uri(uri, params))
   elseif opts.discovery.ping_end_session_endpoint then
