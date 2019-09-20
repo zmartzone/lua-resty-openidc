@@ -526,3 +526,41 @@ describe("when a request_decorator has been specified when calling the token end
   end)
 end)
 
+describe("when introspection endpoint hasn't been specified", function()
+  test_support.start_server({
+    remove_introspection_config_keys = { 'introspection_endpoint' }
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/introspect",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the response is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error has been logged", function()
+    assert.error_log_contains("Introspection error: no endpoint URI for introspection")
+  end)
+end)
+
+describe("when introspection endpoint hasn't been specified but discovery doc provides introspection_endpoint claim", function()
+  test_support.start_server({
+    remove_introspection_config_keys = { 'introspection_endpoint' },
+    introspection_opts = {
+      discovery = {
+        introspection_endpoint = "http://127.0.0.1/introspection"
+      }
+    },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/introspect",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the response is valid", function()
+     assert.are.equals(200, status)
+  end)
+end)
+

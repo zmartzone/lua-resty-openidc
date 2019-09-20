@@ -450,6 +450,9 @@ local function write_config(out, custom_config)
   for _, k in ipairs(custom_config["remove_oidc_config_keys"] or {}) do
     oidc_config[k] = nil
   end
+  for _, k in ipairs(custom_config["remove_introspection_config_keys"] or {}) do
+    introspection_opts[k] = nil
+  end
   local config = DEFAULT_CONFIG_TEMPLATE
     :gsub("OIDC_CONFIG", serpent.block(oidc_config, {comment = false }))
     :gsub("TOKEN_HEADER", serpent.block(token_header, {comment = false }))
@@ -501,6 +504,8 @@ end
 --   the introspection endpoint
 -- - remove_introspection_claims is an array of claims to remove from the introspection response
 -- - introspection_opts is a table containing options that are accepted by oidc.introspect
+-- - remove_introspection_config_keys is an array of claims to remove from the introspection
+--   configuration
 -- - token_response_expires_in value for the expires_in claim of the token response
 -- - token_response_contains_refresh_token whether to include a
 --   refresh token with the token response (a boolean in quotes, i.e. "true" or "false")

@@ -84,7 +84,7 @@ local supported_token_auth_methods = {
 }
 
 local openidc = {
-  _VERSION = "1.7.1"
+  _VERSION = "1.7.2"
 }
 openidc.__index = openidc
 
@@ -209,18 +209,18 @@ local function get_first(table_or_string)
   return res
 end
 
-local function get_first_header(header_name)
-  local header = ngx.req.get_headers()[header_name]
+local function get_first_header(headers, header_name)
+  local header = headers[header_name]
   return get_first(header)
 end
 
-local function get_first_header_and_strip_whitespace(header_name)
-  local header = get_first_header(header_name)
+local function get_first_header_and_strip_whitespace(headers, header_name)
+  local header = get_first_header(headers, header_name)
   return header and header:gsub('%s', '')
 end
 
-local function get_forwarded_parameter(param_name)
-  local forwarded = get_first_header("Forwarded")
+local function get_forwarded_parameter(headers, param_name)
+  local forwarded = get_first_header(headers, 'Forwarded')
   local params = {}
   if forwarded then
     local function parse_parameter(pv)
@@ -247,20 +247,20 @@ local function get_forwarded_parameter(param_name)
   return params[param_name:gsub("^%s*(.-)%s*$", "%1"):lower()]
 end
 
-local function get_scheme()
-  return get_forwarded_parameter("proto")
-      or get_first_header_and_strip_whitespace('X-Forwarded-Proto')
+local function get_scheme(headers)
+  return get_forwarded_parameter(headers, 'proto')
+      or get_first_header_and_strip_whitespace(headers, 'X-Forwarded-Proto')
       or ngx.var.scheme
 end
 
-local function get_host_name_from_x_header()
-  local header = get_first_header_and_strip_whitespace('X-Forwarded-Host')
+local function get_host_name_from_x_header(headers)
+  local header = get_first_header_and_strip_whitespace(headers, 'X-Forwarded-Host')
   return header and header:gsub('^([^,]+),?.*$', '%1')
 end
 
-local function get_host_name()
-  return get_forwarded_parameter("host")
-      or get_host_name_from_x_header()
+local function get_host_name(headers)
+  return get_forwarded_parameter(headers, 'host')
+      or get_host_name_from_x_header(headers)
       or ngx.var.http_host
 end
 
@@ -274,8 +274,9 @@ local function openidc_get_redirect_uri(opts)
       return opts.redirect_uri
     end
   end
-  local scheme = opts.redirect_uri_scheme or get_scheme()
-  local host = get_host_name()
+  local headers = ngx.req.get_headers()
+  local scheme = opts.redirect_uri_scheme or get_scheme(headers)
+  local host = get_host_name(headers)
   if not host then
     -- possibly HTTP 1.0 and no Host header
     ngx.exit(ngx.HTTP_BAD_REQUEST)
@@ -413,6 +414,10 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, 
   local ignore_body_on_success = ignore_body_on_success or false
 
   local ep_name = endpoint_name or 'token'
+  if not endpoint then
+    return nil, 'no endpoint URI for ' .. ep_name
+  end
+
   local headers = {
     ["Content-Type"] = "application/x-www-form-urlencoded"
   }
@@ -1328,6 +1333,9 @@ local function openidc_access_token(opts, session, try_to_renew)
     log(ERROR, "failed to regenerate session: " .. err)
     return nil, err
   end
+  if opts.lifecycle and opts.lifecycle.on_regenerated then
+    opts.lifecycle.on_regenerated(session)
+  end
 
   return session.data.access_token, err
 end
@@ -1350,7 +1358,11 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
 
   local err
 
-  local session = r_session.start(session_opts)
+  local session, session_error = r_session.start(session_opts)
+  if session == nil then
+    log(ERROR, "Error starting session: " .. session_error)
+    return nil, session_error, target_url, session
+  end
 
   target_url = target_url or ngx.var.request_uri
 
@@ -1418,6 +1430,13 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
       return
       nil,
       err,
+      target_url,
+      session
+    end
+    if unauth_action == 'deny' then
+      return
+      nil,
+      'unauthorized request',
       target_url,
       session
     end
@@ -1588,7 +1607,18 @@ function openidc.introspect(opts)
   end
 
   -- call the introspection endpoint
-  json, err = openidc.call_token_endpoint(opts, opts.introspection_endpoint, body, opts.introspection_endpoint_auth_method, "introspection")
+  local introspection_endpoint = opts.introspection_endpoint
+  if not introspection_endpoint then
+    err = openidc_ensure_discovered_data(opts)
+    if err then
+      return nil, "opts.introspection_endpoint not said and " .. err
+    end
+    local endpoint = opts.discovery and opts.discovery.introspection_endpoint
+    if endpoint then
+      introspection_endpoint = endpoint
+    end
+  end
+  json, err = openidc.call_token_endpoint(opts, introspection_endpoint, body, opts.introspection_endpoint_auth_method, "introspection")
 
 
   if not json then

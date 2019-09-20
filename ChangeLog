@@ -1,3 +1,21 @@
+07/15/2019
+- release 1.7.2
+
+07/09/2019
+- added unauth_action='deny' to reject unauthenticated requests rather
+  than start the authorization code grant flow; see #271; based on
+  suggested change by @nmaniwa
+- read introspection_endpoint from discovery document when present; see #255
+
+05/01/2019
+- performance enhancement by caching the result of ngx.req.get_headers
+  during the authenticate call.
+- added another lifecycle hook that is called when the session is
+  regenerated after a token refresh
+
+04/25/2019
+- improved error handling when starting session; see #264; thanks @vershnik
+
 03/18/2019
 - fixed accidental use of global variable err in revoke_tokens_on_logout;
   see #253, #254; thanks @arcivanov
