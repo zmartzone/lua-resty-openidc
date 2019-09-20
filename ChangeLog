@@ -1,3 +1,6 @@
+09/20/2019
+- session started with session.start must be closed in order to release lock
+
 07/15/2019
 - release 1.7.2
 

@@ -1052,6 +1052,7 @@ local function openidc_authorization_response(opts, session)
   if not args.code or not args.state then
     err = "unhandled request to the redirect_uri: " .. ngx.var.request_uri
     log(ERROR, err)
+    session:close()
     return nil, err, session.data.original_url, session
   end
 
@@ -1059,11 +1060,13 @@ local function openidc_authorization_response(opts, session)
   if args.state ~= session.data.state then
     err = "state from argument: " .. (args.state and args.state or "nil") .. " does not match state restored from session: " .. (session.data.state and session.data.state or "nil")
     log(ERROR, err)
+    session:close()
     return nil, err, session.data.original_url, session
   end
 
   err = ensure_config(opts)
   if err then
+    session:close()
     return nil, err, session.data.original_url, session
   end
 
@@ -1071,6 +1074,7 @@ local function openidc_authorization_response(opts, session)
   if args.iss and args.iss ~= opts.discovery.issuer then
     err = "iss from argument: " .. args.iss .. " does not match expected issuer: " .. opts.discovery.issuer
     log(ERROR, err)
+    session:close()
     return nil, err, session.data.original_url, session
   end
 
@@ -1078,6 +1082,7 @@ local function openidc_authorization_response(opts, session)
   if args.client_id and args.client_id ~= opts.client_id then
     err = "client_id from argument: " .. args.client_id .. " does not match expected client_id: " .. opts.client_id
     log(ERROR, err)
+    session:close()
     return nil, err, session.data.original_url, session
   end
 
@@ -1096,11 +1101,13 @@ local function openidc_authorization_response(opts, session)
   local json
   json, err = openidc.call_token_endpoint(opts, opts.discovery.token_endpoint, body, opts.token_endpoint_auth_method)
   if err then
+    session:close()
     return nil, err, session.data.original_url, session
   end
 
   local id_token, err = openidc_load_and_validate_jwt_id_token(opts, json.id_token, session);
   if err then
+    session:close()
     return nil, err, session.data.original_url, session
   end
 
@@ -1376,6 +1383,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
     if not session.present then
       err = "request to the redirect_uri path but there's no session state found"
       log(ERROR, err)
+      session:close()
       return nil, err, target_url, session
     end
 
@@ -1388,6 +1396,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
 
     err = ensure_config(opts)
     if err then
+      session:close()
       return nil, err, session.data.original_url, session
     end
 
@@ -1443,6 +1452,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
 
     err = ensure_config(opts)
     if err then
+      session:close()
       return nil, err, session.data.original_url, session
     end
 
@@ -1456,6 +1466,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
     if session.data.last_authenticated == nil or (session.data.last_authenticated + opts.refresh_session_interval) < ngx.time() then
       err = ensure_config(opts)
       if err then
+        session:close()
         return nil, err, session.data.original_url, session
       end
 
@@ -1470,6 +1481,8 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
     log(DEBUG, "id_token=", cjson.encode(session.data.id_token))
   end
 
+  -- session started with session.start must be closed in order to release lock
+  session:close()
   -- return the id_token to the caller Lua script for access control purposes
   return
   {
