@@ -1429,7 +1429,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
     if unauth_action == "pass" then
       if token_expired then
         session.data.authenticated = false
-        return nil, 'unauthorized request', target_url, session
+        return nil, 'token refresh failed', target_url, session
       end
       return nil, err, target_url, session
     end
