@@ -341,6 +341,14 @@ local function openidc_authorize(opts, session, target_url, prompt)
     params.display = opts.display
   end
 
+	if opts.code_challenge_method then
+		params.code_challenge_method = opts.code_challenge_method
+	end
+
+	if opts.code_challenge then
+		params.code_challenge = opts.code_challenge
+	end
+
   -- merge any provided extra parameters
   if opts.authorization_params then
     for k, v in pairs(opts.authorization_params) do params[k] = v end
