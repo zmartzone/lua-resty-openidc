@@ -1057,7 +1057,7 @@ local function openidc_authorization_response(opts, session)
 
   -- check that the state returned in the response against the session; prevents CSRF
   if args.state ~= session.data.state then
-    err = "state from argument: " .. (args.state and args.state or "nil") .. " does not match state restored from session: " .. (session.data.state and session.data.state or "nil")
+    err = "state from argument does not match state restored from session"
     log(ERROR, err)
     return nil, err, session.data.original_url, session
   end
@@ -1069,14 +1069,14 @@ local function openidc_authorization_response(opts, session)
 
   -- check the iss if returned from the OP
   if args.iss and args.iss ~= opts.discovery.issuer then
-    err = "iss from argument: " .. args.iss .. " does not match expected issuer: " .. opts.discovery.issuer
+    err = "iss from argument does not match expected issuer"
     log(ERROR, err)
     return nil, err, session.data.original_url, session
   end
 
   -- check the client_id if returned from the OP
   if args.client_id and args.client_id ~= opts.client_id then
-    err = "client_id from argument: " .. args.client_id .. " does not match expected client_id: " .. opts.client_id
+    err = "client_id from argument does not match expected client_id"
     log(ERROR, err)
     return nil, err, session.data.original_url, session
   end
