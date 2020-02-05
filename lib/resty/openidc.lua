@@ -495,7 +495,8 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, 
     method = "POST",
     body = ngx.encode_args(body),
     headers = headers,
-    ssl_verify = (opts.ssl_verify ~= "no")
+    ssl_verify = (opts.ssl_verify ~= "no"),
+    keepalive = false
   }))
   if not res then
     err = "accessing " .. ep_name .. " endpoint (" .. endpoint .. ") failed: " .. err
@@ -527,7 +528,8 @@ function openidc.call_userinfo_endpoint(opts, access_token)
   local res, err = httpc:request_uri(opts.discovery.userinfo_endpoint,
                                      decorate_request(opts.http_request_decorator, {
     headers = headers,
-    ssl_verify = (opts.ssl_verify ~= "no")
+    ssl_verify = (opts.ssl_verify ~= "no"),
+    keepalive = false
   }))
   if not res then
     err = "accessing (" .. opts.discovery.userinfo_endpoint .. ") failed: " .. err
@@ -574,7 +576,8 @@ local function openidc_discover(url, ssl_verify, timeout, exptime, proxy_opts, h
     openidc_configure_timeouts(httpc, timeout)
     openidc_configure_proxy(httpc, proxy_opts)
     local res, error = httpc:request_uri(url, decorate_request(http_request_decorator, {
-      ssl_verify = (ssl_verify ~= "no")
+      ssl_verify = (ssl_verify ~= "no"),
+      keepalive = false
     }))
     if not res then
       err = "accessing discovery url (" .. url .. ") failed: " .. error
@@ -703,7 +706,8 @@ local function openidc_jwks(url, force, ssl_verify, timeout, exptime, proxy_opts
     openidc_configure_timeouts(httpc, timeout)
     openidc_configure_proxy(httpc, proxy_opts)
     local res, error = httpc:request_uri(url, decorate_request(http_request_decorator, {
-      ssl_verify = (ssl_verify ~= "no")
+      ssl_verify = (ssl_verify ~= "no"),
+      keepalive = false
     }))
     if not res then
       err = "accessing jwks url (" .. url .. ") failed: " .. error
