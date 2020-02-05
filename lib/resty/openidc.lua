@@ -1047,7 +1047,7 @@ end
 -- handle a "code" authorization response from the OP
 local function openidc_authorization_response(opts, session)
   local args = ngx.req.get_uri_args()
-  local err
+  local err, log_err, client_err
 
   if not args.code or not args.state then
     err = "unhandled request to the redirect_uri: " .. ngx.var.request_uri
