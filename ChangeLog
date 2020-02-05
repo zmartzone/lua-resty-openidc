@@ -1,3 +1,8 @@
+02/05/2020
+- no longer echo the URI parameters back on default error page when
+  OIDC provider returns an error in call to redirect_uri; see #306;
+  thanks @barrelmaker97
+
 10/02/2019
 - when unauth_action is 'pass' and a token refresh fails the session
   will get marked as no longer authenticated and a proper error is
