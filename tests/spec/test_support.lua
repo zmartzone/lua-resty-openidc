@@ -18,7 +18,8 @@ local DEFAULT_OIDC_CONFIG = {
    },
    client_id = "client_id",
    client_secret = "client_secret",
-   ssl_verify = "no"
+   ssl_verify = "no",
+   keepalive = "yes"
 }
 
 local DEFAULT_ID_TOKEN = {

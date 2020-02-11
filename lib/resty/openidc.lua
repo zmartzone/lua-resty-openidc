@@ -495,7 +495,8 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, 
     method = "POST",
     body = ngx.encode_args(body),
     headers = headers,
-    ssl_verify = (opts.ssl_verify ~= "no")
+    ssl_verify = (opts.ssl_verify ~= "no"),
+    keepalive = (opts.keepalive ~= "no")
   }))
   if not res then
     err = "accessing " .. ep_name .. " endpoint (" .. endpoint .. ") failed: " .. err
@@ -527,7 +528,8 @@ function openidc.call_userinfo_endpoint(opts, access_token)
   local res, err = httpc:request_uri(opts.discovery.userinfo_endpoint,
                                      decorate_request(opts.http_request_decorator, {
     headers = headers,
-    ssl_verify = (opts.ssl_verify ~= "no")
+    ssl_verify = (opts.ssl_verify ~= "no"),
+    keepalive = (opts.keepalive ~= "no")
   }))
   if not res then
     err = "accessing (" .. opts.discovery.userinfo_endpoint .. ") failed: " .. err
@@ -561,7 +563,7 @@ local function openidc_load_jwt_none_alg(enc_hdr, enc_payload)
 end
 
 -- get the Discovery metadata from the specified URL
-local function openidc_discover(url, ssl_verify, timeout, exptime, proxy_opts, http_request_decorator)
+local function openidc_discover(url, ssl_verify, keepalive, timeout, exptime, proxy_opts, http_request_decorator)
   log(DEBUG, "openidc_discover: URL is: " .. url)
 
   local json, err
@@ -574,7 +576,8 @@ local function openidc_discover(url, ssl_verify, timeout, exptime, proxy_opts, h
     openidc_configure_timeouts(httpc, timeout)
     openidc_configure_proxy(httpc, proxy_opts)
     local res, error = httpc:request_uri(url, decorate_request(http_request_decorator, {
-      ssl_verify = (ssl_verify ~= "no")
+      ssl_verify = (ssl_verify ~= "no"),
+      keepalive = (keepalive ~= "no")
     }))
     if not res then
       err = "accessing discovery url (" .. url .. ") failed: " .. error
@@ -602,7 +605,7 @@ local function openidc_ensure_discovered_data(opts)
   local err
   if type(opts.discovery) == "string" then
     local discovery
-    discovery, err = openidc_discover(opts.discovery, opts.ssl_verify, opts.timeout, opts.jwk_expires_in, opts.proxy_opts,
+    discovery, err = openidc_discover(opts.discovery, opts.ssl_verify, opts.keepalive, opts.timeout, opts.jwk_expires_in, opts.proxy_opts,
                                       opts.http_request_decorator)
     if not err then
       opts.discovery = discovery
@@ -686,7 +689,7 @@ function openidc.get_discovery_doc(opts)
   return opts.discovery, err
 end
 
-local function openidc_jwks(url, force, ssl_verify, timeout, exptime, proxy_opts, http_request_decorator)
+local function openidc_jwks(url, force, ssl_verify, keepalive, timeout, exptime, proxy_opts, http_request_decorator)
   log(DEBUG, "openidc_jwks: URL is: " .. url .. " (force=" .. force .. ") (decorator=" .. (http_request_decorator and type(http_request_decorator) or "nil"))
 
   local json, err, v
@@ -703,7 +706,8 @@ local function openidc_jwks(url, force, ssl_verify, timeout, exptime, proxy_opts
     openidc_configure_timeouts(httpc, timeout)
     openidc_configure_proxy(httpc, proxy_opts)
     local res, error = httpc:request_uri(url, decorate_request(http_request_decorator, {
-      ssl_verify = (ssl_verify ~= "no")
+      ssl_verify = (ssl_verify ~= "no"),
+      keepalive = (keepalive ~= "no")
     }))
     if not res then
       err = "accessing jwks url (" .. url .. ") failed: " .. error
@@ -861,7 +865,7 @@ local function openidc_pem_from_jwk(opts, kid)
   local jwk, jwks
 
   for force = 0, 1 do
-    jwks, err = openidc_jwks(opts.discovery.jwks_uri, force, opts.ssl_verify, opts.timeout, opts.jwk_expires_in, opts.proxy_opts,
+    jwks, err = openidc_jwks(opts.discovery.jwks_uri, force, opts.ssl_verify, opts.keepalive, opts.timeout, opts.jwk_expires_in, opts.proxy_opts,
                              opts.http_request_decorator)
     if err then
       return nil, err

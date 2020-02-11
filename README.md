@@ -143,6 +143,8 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
              --client_jwt_assertion_expires_in = 60,
              -- When using https to any OP endpoints, enforcement of SSL certificate check can be mandated ("yes") or not ("no").
              --ssl_verify = "no",
+             -- Connection keepalive with the OP can be enabled ("yes") or disabled ("no").
+             --keepalive = "no",
 
              --authorization_params = { hd="zmartzone.eu" },
              --scope = "openid email profile",
