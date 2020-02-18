@@ -293,6 +293,19 @@ local res, err = require("resty.openidc").authenticate(opts, nil, "pass")
 local res, err = require("resty.openidc").authenticate(opts, nil, "deny")
 ```
 
+## Sessions and Locking
+
+The `authenicate` function returns the current session object as its
+forth return argument. If you have configured lua-resty-session to use
+a server side storade backend that uses locking, the session may still
+be locked when it is returned. In this case you may want to close it
+explicitly
+
+```lua
+local res, err, target, session = require("resty.openidc").authenticate(opts)
+session:close()
+```
+
 ## Sample Configuration for OAuth 2.0 JWT Token Validation
 
 Sample `nginx.conf` configuration for verifying Bearer JWT Access Tokens against a pre-configured secret/key.
