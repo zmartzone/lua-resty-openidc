@@ -6,6 +6,9 @@
   endpoint if this has not been done before in order to detect the URI
   of the userinfo endpoint
 
+03/27/2020
+- added a function that implements OpenID Connect Front Channel Logout
+
 02/06/2020
 - ability to disable keepalive from lua-resty-http
   By disabling keepalive we disable the native connection pool,
