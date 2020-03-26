@@ -586,7 +586,7 @@ local function openidc_discover(url, ssl_verify, keepalive, timeout, exptime, pr
       log(DEBUG, "response data: " .. res.body)
       json, err = openidc_parse_json_response(res)
       if json then
-        openidc_cache_set("discovery", url, cjson.encode(json), exptime or 24 * 60 * 60)
+        openidc_cache_set("discovery", url, cjson.encode(json), exptime or 24 * 60 * 60 * 1000)
       else
         err = "could not decode JSON from Discovery data" .. (err and (": " .. err) or '')
         log(ERROR, err)
@@ -716,7 +716,7 @@ local function openidc_jwks(url, force, ssl_verify, keepalive, timeout, exptime,
       log(DEBUG, "response data: " .. res.body)
       json, err = openidc_parse_json_response(res)
       if json then
-        openidc_cache_set("jwks", url, cjson.encode(json), exptime or 24 * 60 * 60)
+        openidc_cache_set("jwks", url, cjson.encode(json), exptime or 24 * 60 * 60 * 1000)
       end
     end
 
@@ -892,7 +892,7 @@ local function openidc_pem_from_jwk(opts, kid)
     return nil, "don't know how to create RSA key/cert for " .. cjson.encode(jwk)
   end
 
-  openidc_cache_set("jwks", cache_id, pem, opts.jwk_expires_in or 24 * 60 * 60)
+  openidc_cache_set("jwks", cache_id, pem, opts.jwk_expires_in or 24 * 60 * 60 * 1000)
   return pem
 end
 
