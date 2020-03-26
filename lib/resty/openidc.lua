@@ -329,6 +329,10 @@ local function openidc_authorize(opts, session, target_url, prompt)
     state = state,
   }
 
+  if opts.custom_params then
+    for k,v in pairs(opts.custom_params) do params[k] = v end
+  end
+
   if nonce then
     params.nonce = nonce
   end
