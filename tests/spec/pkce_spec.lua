@@ -53,7 +53,7 @@ describe('when pkce is disabled and the token endpoint is invoked', function()
   end)
 end)
 
-describe('when pkce is disabled and the token endpoint is invoked', function()
+describe('when pkce is enabled and the token endpoint is invoked', function()
   test_support.start_server({oidc_opts = { use_pkce = true } })
   teardown(test_support.stop_server)
 
@@ -81,7 +81,7 @@ describe('when pkce is disabled and the token endpoint is invoked', function()
       if rem > 0 then
         s = s .. string.rep('=', 4 - rem)
       end
-      return s:gsub('-', '+'):gsub('_', '/')
+      return s:gsub('%-', '+'):gsub('_', '/')
     end
     local challenge = as_base64(code_challenge)
     local hashed_verifier = (require 'mime').b64((require 'sha2').bytes(code_verifier))

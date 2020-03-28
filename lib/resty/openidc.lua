@@ -291,14 +291,14 @@ local function openidc_base64_url_decode(input)
     local padlen = 4 - reminder
     input = input .. string.rep('=', padlen)
   end
-  input = input:gsub('-', '+'):gsub('_', '/')
+  input = input:gsub('%-', '+'):gsub('_', '/')
   return unb64(input)
 end
 
 -- perform base64url encoding
 local function openidc_base64_url_encode(input)
   local output = b64(input, true)
-  return output:gsub('+', '-'):gsub('/', '_')
+  return output:gsub('%+', '-'):gsub('/', '_')
 end
 
 local function openidc_combine_uri(uri, params)
