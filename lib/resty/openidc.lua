@@ -509,39 +509,6 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, 
   return openidc_parse_json_response(res, ignore_body_on_success)
 end
 
--- make a call to the userinfo endpoint
-function openidc.call_userinfo_endpoint(opts, access_token)
-  if not opts.discovery.userinfo_endpoint then
-    log(DEBUG, "no userinfo endpoint supplied")
-    return nil, nil
-  end
-
-  local headers = {
-    ["Authorization"] = "Bearer " .. access_token,
-  }
-
-  log(DEBUG, "authorization header '" .. headers.Authorization .. "'")
-
-  local httpc = http.new()
-  openidc_configure_timeouts(httpc, opts.timeout)
-  openidc_configure_proxy(httpc, opts.proxy_opts)
-  local res, err = httpc:request_uri(opts.discovery.userinfo_endpoint,
-                                     decorate_request(opts.http_request_decorator, {
-    headers = headers,
-    ssl_verify = (opts.ssl_verify ~= "no"),
-    keepalive = (opts.keepalive ~= "no")
-  }))
-  if not res then
-    err = "accessing (" .. opts.discovery.userinfo_endpoint .. ") failed: " .. err
-    return nil, err
-  end
-
-  log(DEBUG, "userinfo response: ", res.body)
-
-  -- parse the response from the user info endpoint
-  return openidc_parse_json_response(res)
-end
-
 -- computes access_token expires_in value (in seconds)
 local function openidc_access_token_expires_in(opts, expires_in)
   return (expires_in or opts.access_token_expires_in or 3600) - 1 - (opts.access_token_expires_leeway or 0)
@@ -612,6 +579,40 @@ local function openidc_ensure_discovered_data(opts)
     end
   end
   return err
+end
+
+-- make a call to the userinfo endpoint
+function openidc.call_userinfo_endpoint(opts, access_token)
+  openidc_ensure_discovered_data(opts)
+  if not opts.discovery.userinfo_endpoint then
+    log(DEBUG, "no userinfo endpoint supplied")
+    return nil, nil
+  end
+
+  local headers = {
+    ["Authorization"] = "Bearer " .. access_token,
+  }
+
+  log(DEBUG, "authorization header '" .. headers.Authorization .. "'")
+
+  local httpc = http.new()
+  openidc_configure_timeouts(httpc, opts.timeout)
+  openidc_configure_proxy(httpc, opts.proxy_opts)
+  local res, err = httpc:request_uri(opts.discovery.userinfo_endpoint,
+                                     decorate_request(opts.http_request_decorator, {
+    headers = headers,
+    ssl_verify = (opts.ssl_verify ~= "no"),
+    keepalive = (opts.keepalive ~= "no")
+  }))
+  if not res then
+    err = "accessing (" .. opts.discovery.userinfo_endpoint .. ") failed: " .. err
+    return nil, err
+  end
+
+  log(DEBUG, "userinfo response: ", res.body)
+
+  -- parse the response from the user info endpoint
+  return openidc_parse_json_response(res)
 end
 
 local function can_use_token_auth_method(method, opts)

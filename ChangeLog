@@ -1,7 +1,12 @@
+04/08/2020
+- openidc.call_userinfo_endpoint will now invoke the discovery
+  endpoint if this has not been done before in order to detect the URI
+  of the userinfo endpoint
+
 02/06/2020
 - ability to disable keepalive from lua-resty-http
   By disabling keepalive we disable the native connection pool,
-  avoiding errors when dealing with invalid connections. This is 
+  avoiding errors when dealing with invalid connections. This is
   specially useful when proxying ajax requests.
 
 02/05/2020
