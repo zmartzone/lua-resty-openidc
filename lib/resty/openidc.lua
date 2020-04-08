@@ -583,8 +583,11 @@ end
 
 -- make a call to the userinfo endpoint
 function openidc.call_userinfo_endpoint(opts, access_token)
-  openidc_ensure_discovered_data(opts)
-  if not opts.discovery.userinfo_endpoint then
+  local err = openidc_ensure_discovered_data(opts)
+  if err then
+    return nil, err
+  end
+  if not (opts and opts.discovery and opts.discovery.userinfo_endpoint) then
     log(DEBUG, "no userinfo endpoint supplied")
     return nil, nil
   end
