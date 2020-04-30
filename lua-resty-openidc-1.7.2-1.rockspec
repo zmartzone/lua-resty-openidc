@@ -25,7 +25,7 @@ dependencies = {
     "lua >= 5.1",
     "lua-resty-http >= 0.08",
     "lua-resty-session >= 2.8",
-    "lua-resty-jwt >= 0.2.0"
+    "lua-resty-jwt == 0.2.0"
 }
 build = {
     type = "builtin",
