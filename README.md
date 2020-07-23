@@ -249,6 +249,9 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
              -- defined in RFC 7636 will be used. The code challenge
              -- method will alwas be S256
 
+             -- prohibit_redirect = false,
+             -- this is a special option for XHR where any attempt to redirect
+             -- will result in an error being returned
           }
 
           -- call authenticate for OpenID Connect user authentication

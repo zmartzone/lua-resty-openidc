@@ -53,6 +53,11 @@ local cjson = require("cjson")
 local cjson_s = require("cjson.safe")
 local http = require("resty.http")
 local r_session = require("resty.session")
+local resty_random = require("resty.random")
+local resty_string = require("resty.string")
+local resty_sha256 = require("resty.sha256")
+local r_jwt = require("resty.jwt")
+local jwt_validators = require("resty.jwt-validators")
 local string = string
 local ipairs = ipairs
 local pairs = pairs
@@ -112,7 +117,9 @@ local function openidc_cache_get(type, key)
   local value
   if dict then
     value = dict:get(key)
-    if value then log(DEBUG, "cache hit: type=", type, " key=", key) end
+    if value then
+      log(DEBUG, "cache hit: type=", type, " key=", key)
+    end
   end
   return value
 end
@@ -317,20 +324,17 @@ local function decorate_request(http_request_decorator, req)
 end
 
 local function openidc_s256(verifier)
-  local sha256 = (require 'resty.sha256'):new()
+  local sha256 = resty_sha256:new()
   sha256:update(verifier)
   return openidc_base64_url_encode(sha256:final())
 end
 
 -- send the browser of to the OP's authorization endpoint
 local function openidc_authorize(opts, session, target_url, prompt)
-  local resty_random = require("resty.random")
-  local resty_string = require("resty.string")
-
   -- generate state and nonce
   local state = resty_string.to_hex(resty_random.bytes(16))
   local nonce = (opts.use_nonce == nil or opts.use_nonce)
-    and resty_string.to_hex(resty_random.bytes(16))
+      and resty_string.to_hex(resty_random.bytes(16))
   local code_verifier = opts.use_pkce and openidc_base64_url_encode(resty_random.bytes(32))
 
   -- assemble the parameters to the authentication request
@@ -361,7 +365,9 @@ local function openidc_authorize(opts, session, target_url, prompt)
 
   -- merge any provided extra parameters
   if opts.authorization_params then
-    for k, v in pairs(opts.authorization_params) do params[k] = v end
+    for k, v in pairs(opts.authorization_params) do
+      params[k] = v
+    end
   end
 
   -- store state in the session
@@ -446,8 +452,8 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, 
       if opts.client_secret then
         headers.Authorization = "Basic " .. b64(ngx.escape_uri(opts.client_id) .. ":" .. ngx.escape_uri(opts.client_secret))
       else
-      -- client_secret must not be set if Windows Integrated Authentication (WIA) is used with
-      -- Active Directory Federation Services (AD FS) 4.0 (or newer) on Windows Server 2016 (or newer)
+        -- client_secret must not be set if Windows Integrated Authentication (WIA) is used with
+        -- Active Directory Federation Services (AD FS) 4.0 (or newer) on Windows Server 2016 (or newer)
         headers.Authorization = "Basic " .. b64(ngx.escape_uri(opts.client_id) .. ":")
       end
       log(DEBUG, "client_secret_basic: authorization header '" .. headers.Authorization .. "'")
@@ -485,7 +491,6 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, 
         assertion.header.kid = opts.client_rsa_private_key_id
       end
 
-      local r_jwt = require("resty.jwt")
       body.client_assertion = r_jwt:sign(key, assertion)
       log(DEBUG, auth .. ": client_id, client_assertion_type and client_assertion being sent in POST body")
     end
@@ -592,7 +597,7 @@ local function openidc_ensure_discovered_data(opts)
   if type(opts.discovery) == "string" then
     local discovery
     discovery, err = openidc_discover(opts.discovery, opts.ssl_verify, opts.keepalive, opts.timeout, opts.jwk_expires_in, opts.proxy_opts,
-                                      opts.http_request_decorator)
+        opts.http_request_decorator)
     if not err then
       opts.discovery = discovery
     end
@@ -621,11 +626,11 @@ function openidc.call_userinfo_endpoint(opts, access_token)
   openidc_configure_timeouts(httpc, opts.timeout)
   openidc_configure_proxy(httpc, opts.proxy_opts)
   local res, err = httpc:request_uri(opts.discovery.userinfo_endpoint,
-                                     decorate_request(opts.http_request_decorator, {
-    headers = headers,
-    ssl_verify = (opts.ssl_verify ~= "no"),
-    keepalive = (opts.keepalive ~= "no")
-  }))
+      decorate_request(opts.http_request_decorator, {
+        headers = headers,
+        ssl_verify = (opts.ssl_verify ~= "no"),
+        keepalive = (opts.keepalive ~= "no")
+      }))
   if not res then
     err = "accessing (" .. opts.discovery.userinfo_endpoint .. ") failed: " .. err
     return nil, err
@@ -794,7 +799,6 @@ local function der2pem(data, typ)
   return string.format(envelope, typ, data:gsub(wrap, '%0\n', (#data - 1) / 64), typ)
 end
 
-
 local function encode_length(length)
   if length < 0x80 then
     return string.char(length)
@@ -805,7 +809,6 @@ local function encode_length(length)
   end
   error("Can't encode lengths over 65535")
 end
-
 
 local function encode_sequence(array, of)
   local encoded_array = array
@@ -889,7 +892,7 @@ local function openidc_pem_from_jwk(opts, kid)
 
   for force = 0, 1 do
     jwks, err = openidc_jwks(opts.discovery.jwks_uri, force, opts.ssl_verify, opts.keepalive, opts.timeout, opts.jwk_expires_in, opts.proxy_opts,
-                             opts.http_request_decorator)
+        opts.http_request_decorator)
     if err then
       return nil, err
     end
@@ -950,8 +953,7 @@ end
 
 -- parse a JWT and verify its signature (if present)
 local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, asymmetric_secret,
-symmetric_secret, expected_algs, ...)
-  local r_jwt = require("resty.jwt")
+                                                  symmetric_secret, expected_algs, ...)
   local enc_hdr, enc_payload, enc_sign = string.match(jwt_string, '^(.+)%.(.+)%.(.*)$')
   if enc_payload and (not enc_sign or enc_sign == "") then
     local jwt = openidc_load_jwt_none_alg(enc_hdr, enc_payload)
@@ -1009,7 +1011,6 @@ symmetric_secret, expected_algs, ...)
     -- validators for the exp and nbf claims if they are
     -- present. These validators need to know the configured slack
     -- value
-    local jwt_validators = require("resty.jwt-validators")
     jwt_validators.set_system_leeway(opts.iat_slack and opts.iat_slack or 120)
   end
 
@@ -1039,7 +1040,7 @@ end
 local function openidc_load_and_validate_jwt_id_token(opts, jwt_id_token, session)
 
   local jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, jwt_id_token, opts.public_key, opts.client_secret,
-    opts.discovery.id_token_signing_alg_values_supported)
+      opts.discovery.id_token_signing_alg_values_supported)
   if err then
     local alg = (jwt_obj and jwt_obj.header and jwt_obj.header.alg) or ''
     local is_unsupported_signature_error = jwt_obj and not jwt_obj.verified and not is_algorithm_supported(jwt_obj.header)
@@ -1069,6 +1070,21 @@ local function openidc_load_and_validate_jwt_id_token(opts, jwt_id_token, sessio
   end
 
   return id_token
+end
+
+-- set access and refresh tokens in a unified manner
+local function openidc_set_access_token(opts, session, current_time, json)
+  session.data.access_token = json.access_token
+  session.data.access_token_expiration = current_time +
+      openidc_access_token_expires_in(opts, json.expires_in)
+  if json.refresh_token then
+    session.data.refresh_token = json.refresh_token
+  end
+
+  log(DEBUG,
+      "setting access_token: ", json.access_token,
+      " access_token expiration: ", json.expires_in,
+      json.refresh_token and " refresh_token: " .. json.refresh_token or "")
 end
 
 -- handle a "code" authorization response from the OP
@@ -1130,7 +1146,8 @@ local function openidc_authorization_response(opts, session)
     return nil, err, session.data.original_url, session
   end
 
-  local id_token, err = openidc_load_and_validate_jwt_id_token(opts, json.id_token, session);
+  local id_token
+  id_token, err = openidc_load_and_validate_jwt_id_token(opts, json.id_token, session);
   if err then
     return nil, err, session.data.original_url, session
   end
@@ -1168,12 +1185,8 @@ local function openidc_authorization_response(opts, session)
   end
 
   if store_in_session(opts, 'access_token') then
-    session.data.access_token = json.access_token
-    session.data.access_token_expiration = current_time
-        + openidc_access_token_expires_in(opts, json.expires_in)
-    if json.refresh_token ~= nil then
-      session.data.refresh_token = json.refresh_token
-    end
+    log(DEBUG, "storing access token")
+    openidc_set_access_token(opts, session, current_time, json)
   end
 
   if opts.lifecycle and opts.lifecycle.on_authenticated then
@@ -1243,7 +1256,7 @@ local function openidc_logout(opts, session)
 
   if opts.revoke_tokens_on_logout then
     log(DEBUG, "revoke_tokens_on_logout is enabled. " ..
-      "trying to revoke access and refresh tokens...")
+        "trying to revoke access and refresh tokens...")
     if refresh_token then
       openidc_revoke_token(opts, "refresh_token", refresh_token)
     end
@@ -1298,6 +1311,7 @@ local function openidc_access_token(opts, session, try_to_renew)
   local err
 
   if session.data.access_token == nil then
+    log(DEBUG, "no access token available")
     return nil, err
   end
   local current_time = ngx.time()
@@ -1305,10 +1319,10 @@ local function openidc_access_token(opts, session, try_to_renew)
     return session.data.access_token, err
   end
   if not try_to_renew then
-    return nil, "token expired"
+    return nil, "access token expired and no renew requested"
   end
   if session.data.refresh_token == nil then
-    return nil, "token expired and no refresh token available"
+    return nil, "access token expired and no refresh token available"
   end
 
   log(DEBUG, "refreshing expired access_token: ", session.data.access_token, " with: ", session.data.refresh_token)
@@ -1335,17 +1349,12 @@ local function openidc_access_token(opts, session, try_to_renew)
   if json.id_token then
     id_token, err = openidc_load_and_validate_jwt_id_token(opts, json.id_token, session)
     if err then
-      log(ERROR, "invalid id token, discarding tokens returned while refreshing")
+      log(ERROR, "invalid id token, discarding tokens returned while refreshing access token")
       return nil, err
     end
   end
-  log(DEBUG, "access_token refreshed: ", json.access_token, " updated refresh_token: ", json.refresh_token)
 
-  session.data.access_token = json.access_token
-  session.data.access_token_expiration = current_time + openidc_access_token_expires_in(opts, json.expires_in)
-  if json.refresh_token then
-    session.data.refresh_token = json.refresh_token
-  end
+  openidc_set_access_token(opts, session, current_time, json)
 
   if json.id_token and
       (store_in_session(opts, 'enc_id_token') or store_in_session(opts, 'id_token')) then
@@ -1398,8 +1407,6 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
 
   target_url = target_url or ngx.var.request_uri
 
-  local access_token
-
   -- see if this is a request to the redirect_uri i.e. an authorization response
   local path = openidc_get_path(target_url)
   if path == openidc_get_redirect_uri_path(opts) then
@@ -1427,10 +1434,12 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
     return nil, nil, target_url, session
   end
 
+  local access_token
   local token_expired = false
   local try_to_renew = opts.renew_access_token_on_expiry == nil or opts.renew_access_token_on_expiry
+  local store_access_token = store_in_session(opts, "access_token")
   if session.present and session.data.authenticated
-      and store_in_session(opts, 'access_token') then
+      and store_access_token then
 
     -- refresh access_token if necessary
     access_token, err = openidc_access_token(opts, session, try_to_renew)
@@ -1444,13 +1453,14 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
   end
 
   log(DEBUG,
-    "session.present=", session.present,
-    ", session.data.id_token=", session.data.id_token ~= nil,
-    ", session.data.authenticated=", session.data.authenticated,
-    ", opts.force_reauthorize=", opts.force_reauthorize,
-    ", opts.renew_access_token_on_expiry=", opts.renew_access_token_on_expiry,
-    ", try_to_renew=", try_to_renew,
-    ", token_expired=", token_expired)
+      "session.present=", session.present,
+      ", session.data.id_token=", session.data.id_token ~= nil,
+      ", session.data.authenticated=", session.data.authenticated,
+      ", store_access_token=", store_access_token,
+      ", opts.force_reauthorize=", opts.force_reauthorize,
+      ", opts.renew_access_token_on_expiry=", opts.renew_access_token_on_expiry,
+      ", try_to_renew=", try_to_renew,
+      ", token_expired=", token_expired)
 
   -- if we are not authenticated then redirect to the OP for authentication
   -- the presence of the id_token is check for backwards compatibility
@@ -1461,12 +1471,12 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
     if unauth_action == "pass" then
       if token_expired then
         session.data.authenticated = false
-        return nil, 'token refresh failed', target_url, session
+        return nil, "token refresh failed", target_url, session
       end
       return nil, err, target_url, session
     end
-    if unauth_action == 'deny' then
-      return nil, 'unauthorized request', target_url, session
+    if unauth_action == "deny" then
+      return nil, "unauthorized request", target_url, session
     end
 
     err = ensure_config(opts)
@@ -1475,25 +1485,32 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
     end
 
     log(DEBUG, "Authentication is required - Redirecting to OP Authorization endpoint")
+    if opts.prohibit_redirect ~= nil then
+      return nil, "redirect prohibited", target_url, session
+    end
     openidc_authorize(opts, session, target_url, opts.prompt)
     return nil, nil, target_url, session
   end
 
   -- silently reauthenticate if necessary (mainly used for session refresh/getting updated id_token data)
   if opts.refresh_session_interval ~= nil then
-    if session.data.last_authenticated == nil or (session.data.last_authenticated + opts.refresh_session_interval) < ngx.time() then
+    if session.data.last_authenticated == nil or
+        (session.data.last_authenticated + opts.refresh_session_interval) < ngx.time() then
       err = ensure_config(opts)
       if err then
         return nil, err, session.data.original_url, session
       end
 
       log(DEBUG, "Silent authentication is required - Redirecting to OP Authorization endpoint")
+      if opts.prohibit_redirect ~= nil then
+        return nil, "redirect prohibited", target_url, session
+      end
       openidc_authorize(opts, session, target_url, "none")
       return nil, nil, target_url, session
     end
   end
 
-  if store_in_session(opts, 'id_token') then
+  if store_in_session(opts, "id_token") then
     -- log id_token contents
     log(DEBUG, "id_token=", cjson.encode(session.data.id_token))
   end
@@ -1631,7 +1648,9 @@ function openidc.introspect(opts)
 
   -- merge any provided extra parameters
   if opts.introspection_params then
-    for key, val in pairs(opts.introspection_params) do body[key] = val end
+    for key, val in pairs(opts.introspection_params) do
+      body[key] = val
+    end
   end
 
   -- call the introspection endpoint
@@ -1648,7 +1667,6 @@ function openidc.introspect(opts)
   end
   json, err = openidc.call_token_endpoint(opts, introspection_endpoint, body, opts.introspection_endpoint_auth_method, "introspection")
 
-
   if not json then
     return json, err
   end
@@ -1664,7 +1682,8 @@ function openidc.introspect(opts)
 
   if not introspection_cache_ignore and json[expiry_claim] then
     local ttl = json[expiry_claim]
-    if expiry_claim == "exp" then --https://tools.ietf.org/html/rfc7662#section-2.2
+    if expiry_claim == "exp" then
+      --https://tools.ietf.org/html/rfc7662#section-2.2
       ttl = ttl - ngx.time()
     end
     if introspection_interval > 0 then
@@ -1693,7 +1712,7 @@ function openidc.jwt_verify(access_token, opts, ...)
   if not v then
     local jwt_obj
     jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, access_token, opts.public_key, opts.symmetric_key,
-      opts.token_signing_alg_values_expected, ...)
+        opts.token_signing_alg_values_expected, ...)
     if not err then
       json = jwt_obj.payload
       log(DEBUG, "jwt: ", cjson.encode(json))

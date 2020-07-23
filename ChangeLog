@@ -1,4 +1,7 @@
 09/20/2020
+- add `prohibit_redirect` option to improve handling of XHR (#357)
+
+09/10/2020
 - release 1.7.3
 
 08/20/2020
