@@ -1,3 +1,6 @@
+08/20/2020
+- added optional support for RFC 7636 "Proof Key for Code Exchange"
+
 04/08/2020
 - openidc.call_userinfo_endpoint will now invoke the discovery
   endpoint if this has not been done before in order to detect the URI

@@ -291,8 +291,14 @@ local function openidc_base64_url_decode(input)
     local padlen = 4 - reminder
     input = input .. string.rep('=', padlen)
   end
-  input = input:gsub('-', '+'):gsub('_', '/')
+  input = input:gsub('%-', '+'):gsub('_', '/')
   return unb64(input)
+end
+
+-- perform base64url encoding
+local function openidc_base64_url_encode(input)
+  local output = b64(input, true)
+  return output:gsub('%+', '-'):gsub('/', '_')
 end
 
 local function openidc_combine_uri(uri, params)
@@ -310,6 +316,12 @@ local function decorate_request(http_request_decorator, req)
   return http_request_decorator and http_request_decorator(req) or req
 end
 
+local function openidc_s256(verifier)
+  local sha256 = (require 'resty.sha256'):new()
+  sha256:update(verifier)
+  return openidc_base64_url_encode(sha256:final())
+end
+
 -- send the browser of to the OP's authorization endpoint
 local function openidc_authorize(opts, session, target_url, prompt)
   local resty_random = require("resty.random")
@@ -319,6 +331,7 @@ local function openidc_authorize(opts, session, target_url, prompt)
   local state = resty_string.to_hex(resty_random.bytes(16))
   local nonce = (opts.use_nonce == nil or opts.use_nonce)
     and resty_string.to_hex(resty_random.bytes(16))
+  local code_verifier = opts.use_pkce and openidc_base64_url_encode(resty_random.bytes(32))
 
   -- assemble the parameters to the authentication request
   local params = {
@@ -341,6 +354,11 @@ local function openidc_authorize(opts, session, target_url, prompt)
     params.display = opts.display
   end
 
+  if code_verifier then
+    params.code_challenge_method = 'S256'
+    params.code_challenge = openidc_s256(code_verifier)
+  end
+
   -- merge any provided extra parameters
   if opts.authorization_params then
     for k, v in pairs(opts.authorization_params) do params[k] = v end
@@ -350,6 +368,7 @@ local function openidc_authorize(opts, session, target_url, prompt)
   session.data.original_url = target_url
   session.data.state = state
   session.data.nonce = nonce
+  session.data.code_verifier = code_verifier
   session.data.last_authenticated = ngx.time()
 
   if opts.lifecycle and opts.lifecycle.on_created then
@@ -1097,7 +1116,8 @@ local function openidc_authorization_response(opts, session)
     grant_type = "authorization_code",
     code = args.code,
     redirect_uri = openidc_get_redirect_uri(opts),
-    state = session.data.state
+    state = session.data.state,
+    code_verifier = session.data.code_verifier
   }
 
   log(DEBUG, "Authentication with OP done -> Calling OP Token Endpoint to obtain tokens")
@@ -1117,9 +1137,10 @@ local function openidc_authorization_response(opts, session)
 
   -- mark this sessions as authenticated
   session.data.authenticated = true
-  -- clear state and nonce to protect against potential misuse
+  -- clear state, nonce and code_verifier to protect against potential misuse
   session.data.nonce = nil
   session.data.state = nil
+  session.data.code_verifier = nil
   if store_in_session(opts, 'id_token') then
     session.data.id_token = id_token
   end

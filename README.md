@@ -244,6 +244,11 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
              --   return req
              -- end,
 
+             -- use_pkce = false,
+             -- when set to true the "Proof Key for Code Exchange" as
+             -- defined in RFC 7636 will be used. The code challenge
+             -- method will alwas be S256
+
           }
 
           -- call authenticate for OpenID Connect user authentication
