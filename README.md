@@ -193,10 +193,18 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
 
              --use_nonce = false
              -- By default the authorization request includes the
-             -- nonce paramter. You can use this option to disable it
+             -- nonce parameter. You can use this option to disable it
              -- which may be necessary when talking to a broken OpenID
-             -- Connect provider that ignores the paramter as the
+             -- Connect provider that ignores the parameter as the
              -- id_token will be rejected otherwise.
+
+             --reuse_existing_login_sessions = true
+             -- By default a new session and nonce is generated every time authorization is (re)started, invalidating previously open login tabs.
+             -- However, an existing session can be reused so all the previously opened login tabs are valid
+
+             --ignore_following_logins = true
+             -- By default if user logins when already logged, this second login will throw an error because state/nonce we wiped by the first login
+             -- By setting the parameter to true, following logins would be ignored and will redirect user to return url
 
              --revoke_tokens_on_logout = false
              -- When revoke_tokens_on_logout is set to true a logout notifies the authorization server that previously obtained refresh and access tokens are no longer needed. This requires that revocation_endpoint is discoverable.

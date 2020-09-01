@@ -327,11 +327,20 @@ local function openidc_authorize(opts, session, target_url, prompt)
   local resty_random = require("resty.random")
   local resty_string = require("resty.string")
 
-  -- generate state and nonce
+  local use_nonce = opts.use_nonce == nil or opts.use_nonce
+
+  -- generate state and nonce  
   local state = resty_string.to_hex(resty_random.bytes(16))
-  local nonce = (opts.use_nonce == nil or opts.use_nonce)
-    and resty_string.to_hex(resty_random.bytes(16))
+  local nonce = use_nonce and resty_string.to_hex(resty_random.bytes(16))
   local code_verifier = opts.use_pkce and openidc_base64_url_encode(resty_random.bytes(32))
+
+  -- reuse existing session state/nonce so all already opened login tabs are valid
+  if opts.reuse_existing_login_sessions and session and session.data.state then
+    state = session.data.state
+    if use_nonce and session.data.nonce then
+      nonce = session.data.nonce
+    end
+  end
 
   -- assemble the parameters to the authentication request
   local params = {
@@ -1075,6 +1084,10 @@ end
 local function openidc_authorization_response(opts, session)
   local args = ngx.req.get_uri_args()
   local err, log_err, client_err
+
+  if (opts.ignore_following_logins and session and session.data.authenticated and session.data.original_url) then
+    ngx.redirect(session.data.original_url)
+  end
 
   if not args.code or not args.state then
     err = "unhandled request to the redirect_uri: " .. ngx.var.request_uri
