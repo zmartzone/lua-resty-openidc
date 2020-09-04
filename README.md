@@ -180,7 +180,9 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
              --  Expiration leeway for access_token renewal. If this is set, renewal will happen access_token_expires_leeway seconds before the token expiration. This avoids errors in case the access_token just expires when arriving to the OAuth Resource Server.
 
              --force_reauthorize = false
-             -- When force_reauthorize is set to true the authorization flow will be executed even if a token has been cached already
+             -- When force_reauthorize is set to true the authorization flow will be executed even if a token has been cached already. 
+             -- If set, will override `reuse_existing_login_sessions` option.
+
              --session_contents = {id_token=true}
              -- Whitelist of session content to enable. This can be used to reduce the session size.
              -- When not set everything will be included in the session.
@@ -201,6 +203,7 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
              --reuse_existing_login_sessions = true
              -- By default a new session and nonce is generated every time authorization is (re)started, invalidating previously open login tabs.
              -- However, an existing session can be reused so all the previously opened login tabs are valid
+             -- Will be ignored when `force_reauthorize` option is set.
 
              --ignore_following_logins = true
              -- By default if user logins when already logged, this second login will throw an error because state/nonce we wiped by the first login

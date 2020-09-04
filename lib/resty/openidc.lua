@@ -335,7 +335,7 @@ local function openidc_authorize(opts, session, target_url, prompt)
   local code_verifier = opts.use_pkce and openidc_base64_url_encode(resty_random.bytes(32))
 
   -- reuse existing session state/nonce so all already opened login tabs are valid
-  if opts.reuse_existing_login_sessions and session and session.data.state then
+  if not opts.force_reauthorize and opts.reuse_existing_login_sessions and session and session.data.state then
     state = session.data.state
     if use_nonce and session.data.nonce then
       nonce = session.data.nonce
@@ -1085,7 +1085,7 @@ local function openidc_authorization_response(opts, session)
   local args = ngx.req.get_uri_args()
   local err, log_err, client_err
 
-  if (opts.ignore_following_logins and session and session.data.authenticated and session.data.original_url) then
+  if (opts.ignore_following_logins and session and session.data.authenticated and session.data.original_url and ngx.time() < session.data.access_token_expiration) then
     ngx.redirect(session.data.original_url)
   end
 
