@@ -951,6 +951,7 @@ end
 -- parse a JWT and verify its signature (if present)
 local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, asymmetric_secret,
 symmetric_secret, expected_algs, ...)
+  log(DEBUG, "verify crypto")
   local r_jwt = require("resty.jwt")
   local enc_hdr, enc_payload, enc_sign = string.match(jwt_string, '^(.+)%.(.+)%.(.*)$')
   if enc_payload and (not enc_sign or enc_sign == "") then
@@ -1015,6 +1016,7 @@ symmetric_secret, expected_algs, ...)
 
   jwt_obj = r_jwt:verify_jwt_obj(secret, jwt_obj, ...)
   if jwt_obj then
+    log(DEBUG, "Will print encoded jwt")
     log(DEBUG, "jwt: ", cjson.encode(jwt_obj), " ,valid: ", jwt_obj.valid, ", verified: ", jwt_obj.verified)
   end
   if not jwt_obj.verified then
