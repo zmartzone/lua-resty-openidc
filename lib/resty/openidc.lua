@@ -1139,6 +1139,7 @@ local function openidc_authorization_response(opts, session)
 end
 
 function save_as_authenticated(opts,session,json,id_token)
+  log(DEBUG, "Saving as authenticated")
   -- mark this sessions as authenticated
   session.data.authenticated = true
   -- clear state, nonce and code_verifier to protect against potential misuse
