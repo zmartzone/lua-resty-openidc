@@ -1421,7 +1421,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
   log(DEBUG, "Target URL: " .. target_url)
   log(DEBUG, "Path: " .. path)
   if(redirect_uri) then
-    log(DEBUG, "openidc_get_redirect_uri_path: " .. target_url)
+    log(DEBUG, "openidc_get_redirect_uri_path: " .. redirect_uri)
   else
     log(DEBUG, "redirect uri is null")
   end
