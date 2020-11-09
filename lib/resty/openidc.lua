@@ -1419,12 +1419,13 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
   local path = openidc_get_path(target_url)
   local redirect_uri = openidc_get_redirect_uri_path(opts)
   log(DEBUG, "Target URL: " .. target_url)
+  log(DEBUG, "Path: " .. path)
   if(redirect_uri) then
     log(DEBUG, "openidc_get_redirect_uri_path: " .. target_url)
   else
     log(DEBUG, "redirect uri is null")
   end
-  if path == openidc_get_redirect_uri_path(opts) and string.find(target_url,"state=") then
+  if path == redirect_uri and string.find(target_url,"state=") then
     log(DEBUG, "Redirect URI path (" .. path .. ") is currently navigated -> Processing authorization response coming from OP")
 
     if not session.present then
