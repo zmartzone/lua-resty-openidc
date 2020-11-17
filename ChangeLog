@@ -2,6 +2,7 @@
 - changed dependency on lua-resty-jwt to allow newer versions in
   luarocks packaging; see #363, #366, #362;
   thanks to @Darguelles and @kayano
+- release 1.7.4
 
 09/20/2020
 - release 1.7.3
