@@ -10,7 +10,7 @@ env:
     - VERSION=1.7.4-1
     - NAME=lua-resty-openidc
     - ROCKSPEC=$NAME-$VERSION.rockspec
-    - LUAROCKS=2.3.0
+    - LUAROCKS=3.4.0
   matrix:
     - LUA=lua5.1
 
