@@ -1,3 +1,11 @@
+12/05/2020
+- fixed a session leak in access_token() and for a very unlikely
+  code-path in authenticate(); authenticate will still normally not
+  close the session as users may want to use it after the method
+  returns; see
+  https://github.com/zmartzone/lua-resty-openidc#sessions-and-locking
+  see #374
+
 11/17/2020
 - changed dependency on lua-resty-jwt to allow newer versions in
   luarocks packaging; see #363, #366, #362;
