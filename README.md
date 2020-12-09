@@ -300,9 +300,9 @@ local res, err = require("resty.openidc").authenticate(opts, nil, "deny")
 
 ## Sessions and Locking
 
-The `authenicate` function returns the current session object as its
+The `authenticate` function returns the current session object as its
 forth return argument. If you have configured lua-resty-session to use
-a server side storade backend that uses locking, the session may still
+a server side storage backend that uses locking, the session may still
 be locked when it is returned. In this case you may want to close it
 explicitly
 
