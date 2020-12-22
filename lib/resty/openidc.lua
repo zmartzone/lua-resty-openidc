@@ -149,11 +149,10 @@ local function openidc_validate_id_token(opts, id_token, nonce)
     return false
   end
 
-  -- TODO put this back!!! check nonce
-  --if nonce and nonce ~= id_token.nonce then
-  --  log(ERROR, "nonce \"", id_token.nonce, "\" in id_token is not equal to the nonce that was sent in the request \"", nonce, "\"")
-  --  return false
- -- end
+  if opts.ignore_nonce_validation and opts.ignore_nonce_validation == 'yes' and nonce and nonce ~= id_token.nonce then
+    log(ERROR, "nonce \"", id_token.nonce, "\" in id_token is not equal to the nonce that was sent in the request \"", nonce, "\"")
+    return false
+  end
 
   -- check issued-at timestamp
   if not id_token.iat then
