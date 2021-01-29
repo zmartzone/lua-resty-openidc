@@ -149,8 +149,7 @@ local function openidc_validate_id_token(opts, id_token, nonce)
     return false
   end
 
-  -- check nonce
-  if nonce and nonce ~= id_token.nonce then
+  if opts.ignore_nonce_validation and opts.ignore_nonce_validation == 'yes' and nonce and nonce ~= id_token.nonce then
     log(ERROR, "nonce \"", id_token.nonce, "\" in id_token is not equal to the nonce that was sent in the request \"", nonce, "\"")
     return false
   end
@@ -1122,19 +1121,30 @@ local function openidc_authorization_response(opts, session)
 
   log(DEBUG, "Authentication with OP done -> Calling OP Token Endpoint to obtain tokens")
 
-  local current_time = ngx.time()
   -- make the call to the token endpoint
   local json
   json, err = openidc.call_token_endpoint(opts, opts.discovery.token_endpoint, body, opts.token_endpoint_auth_method)
   if err then
     return nil, err, session.data.original_url, session
   end
+  return openidc.save_as_authenticated(opts,session,json)
+end
+
+function openidc.save_as_authenticated(opts,session,json)
+  local current_time = ngx.time()
+  if session == nil then
+    session, session_error = r_session.start(session_opts)
+    if session == nil then
+      log(ERROR, "Error starting session: " .. session_error)
+      return nil, session_error
+    end
+  end
 
   local id_token, err = openidc_load_and_validate_jwt_id_token(opts, json.id_token, session);
   if err then
     return nil, err, session.data.original_url, session
   end
-
+  
   -- mark this sessions as authenticated
   session.data.authenticated = true
   -- clear state, nonce and code_verifier to protect against potential misuse
@@ -1183,6 +1193,9 @@ local function openidc_authorization_response(opts, session)
   -- save the session with the obtained id_token
   session:save()
 
+  if not session.data.original_url then
+    session.data.original_url = openidc_get_redirect_uri(opts)
+  end
   -- redirect to the URL that was accessed originally
   log(DEBUG, "OIDC Authorization Code Flow completed -> Redirecting to original URL (" .. session.data.original_url .. ")")
   ngx.redirect(session.data.original_url)
@@ -1383,7 +1396,7 @@ end
 
 -- main routine for OpenID Connect user authentication
 function openidc.authenticate(opts, target_url, unauth_action, session_opts)
-
+  log(DEBUG, "openidc.authenticate")
   if opts.redirect_uri_path then
     log(WARN, "using deprecated option `opts.redirect_uri_path`; switch to using an absolute URI and `opts.redirect_uri` instead")
   end
@@ -1391,6 +1404,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
   local err
 
   local session, session_error = r_session.start(session_opts)
+  log(DEBUG, "Session lifetime: " .. session.cookie.lifetime)
   if session == nil then
     log(ERROR, "Error starting session: " .. session_error)
     return nil, session_error, target_url, session
@@ -1402,7 +1416,15 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
 
   -- see if this is a request to the redirect_uri i.e. an authorization response
   local path = openidc_get_path(target_url)
-  if path == openidc_get_redirect_uri_path(opts) and string.find(target_url,"state=") then
+  local redirect_uri = openidc_get_redirect_uri_path(opts)
+  log(DEBUG, "Target URL: " .. target_url)
+  log(DEBUG, "Path: " .. path)
+  if(redirect_uri) then
+    log(DEBUG, "openidc_get_redirect_uri_path: " .. redirect_uri)
+  else
+    log(DEBUG, "redirect uri is null")
+  end
+  if path == redirect_uri and string.find(target_url,"state=") then
     log(DEBUG, "Redirect URI path (" .. path .. ") is currently navigated -> Processing authorization response coming from OP")
 
     if not session.present then
