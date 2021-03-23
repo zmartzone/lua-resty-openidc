@@ -265,7 +265,7 @@ local function get_host_name(headers)
 end
 
 -- assemble the redirect_uri
-local function openidc_get_redirect_uri(opts)
+local function openidc_get_redirect_uri(opts, session)
   local path = opts.redirect_uri_path
   if opts.redirect_uri then
     if opts.redirect_uri:sub(1, 1) == '/' then
@@ -279,6 +279,7 @@ local function openidc_get_redirect_uri(opts)
   local host = get_host_name(headers)
   if not host then
     -- possibly HTTP 1.0 and no Host header
+    if session then session:close() end
     ngx.exit(ngx.HTTP_BAD_REQUEST)
   end
   return scheme .. "://" .. host .. path
@@ -338,7 +339,7 @@ local function openidc_authorize(opts, session, target_url, prompt)
     client_id = opts.client_id,
     response_type = "code",
     scope = opts.scope and opts.scope or "openid email profile",
-    redirect_uri = openidc_get_redirect_uri(opts),
+    redirect_uri = openidc_get_redirect_uri(opts, session),
     state = state,
   }
 
@@ -1115,7 +1116,7 @@ local function openidc_authorization_response(opts, session)
   local body = {
     grant_type = "authorization_code",
     code = args.code,
-    redirect_uri = openidc_get_redirect_uri(opts),
+    redirect_uri = openidc_get_redirect_uri(opts, session),
     state = session.data.state,
     code_verifier = session.data.code_verifier
   }
@@ -1514,8 +1515,9 @@ end
 function openidc.access_token(opts, session_opts)
 
   local session = r_session.start(session_opts)
-
-  return openidc_access_token(opts, session, true)
+  local token, err = openidc_access_token(opts, session, true)
+  session:close()
+  return token, err
 end
 
 
