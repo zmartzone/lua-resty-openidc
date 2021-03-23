@@ -63,16 +63,10 @@ If you are using [OpenResty](http://openresty.org/), the default location would 
 
 ## Support
 
-#### Community Support
-
 For generic questions, see the Wiki pages with Frequently Asked Questions at:  
 [https://github.com/zmartzone/lua-resty-openidc/wiki](https://github.com/zmartzone/lua-resty-openidc/wiki)  
-Any questions/issues should go to issues tracker.
+Any questions/issues should go to the Github Discussons or Issues tracker.
 
-#### Commercial Services
-
-For commercial Support contracts, Professional Services, Training and use-case specific support you can contact:  
-[sales@zmartzone.eu](mailto:sales@zmartzone.eu)
 
 ## Sample Configuration for Google+ Signin
 
@@ -618,5 +612,6 @@ as the second command
 Disclaimer
 ----------
 
-*This software is open sourced by ZmartZone IAM. For commercial support
-you can contact [ZmartZone IAM](https://www.zmartzone.eu) as described above in the [Support](#support) section.*
+*This software is open sourced by ZmartZone IAM but not supported commercially as such.
+Any questions/issues should go to the Github Discussions or Issues tracker.
+See also the DISCLAIMER file in this directory.*
