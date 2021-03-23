@@ -61,13 +61,6 @@ Otherwise copy `openidc.lua` somewhere in your `lua_package_path` under a direct
 If you are using [OpenResty](http://openresty.org/), the default location would be `/usr/local/openresty/lualib/resty`.
 
 
-## Support
-
-For generic questions, see the Wiki pages with Frequently Asked Questions at:  
-[https://github.com/zmartzone/lua-resty-openidc/wiki](https://github.com/zmartzone/lua-resty-openidc/wiki)  
-Any questions/issues should go to the Github Discussons or Issues tracker.
-
-
 ## Sample Configuration for Google+ Signin
 
 Sample `nginx.conf` configuration for authenticating users against Google+ Signin, protecting a reverse-proxied path.
@@ -609,8 +602,14 @@ $ docker run -it --rm -e coverage=t lua-resty-openidc/test:latest
 
 as the second command
 
-Disclaimer
-----------
+## Support
+
+For generic questions, see the Wiki pages with Frequently Asked Questions at:  
+[https://github.com/zmartzone/lua-resty-openidc/wiki](https://github.com/zmartzone/lua-resty-openidc/wiki)  
+Any questions/issues should go to the Github Discussons or Issues tracker.
+
+
+## Disclaimer
 
 *This software is open sourced by ZmartZone IAM but not supported commercially as such.
 Any questions/issues should go to the Github Discussions or Issues tracker.
