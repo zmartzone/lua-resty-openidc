@@ -26,6 +26,7 @@ local DEFAULT_ID_TOKEN = {
   sub = "subject",
   iss = "http://127.0.0.1/",
   aud = "client_id",
+  sid = 'test_sid',
   iat = os.time(),
   exp = os.time() + 3600,
 }
@@ -74,6 +75,9 @@ local DEFAULT_INTROSPECTION_OPTS = {
   introspection_endpoint = "http://127.0.0.1/introspection",
   client_id = "client_id",
   client_secret = "client_secret",
+}
+
+local DEFAULT_FC_LOGOUT_OPTS = {
 }
 
 local DEFAULT_TOKEN_RESPONSE_EXPIRES_IN = "3600"
@@ -388,6 +392,13 @@ JWT_SIGN_SECRET]=]
                 ngx.say('INVALID JSON.')
             }
         }
+
+        location /fc-logout {
+            content_by_lua_block {
+                local opts = FC_LOGOUT_OPTS
+                oidc.front_channel_logout(opts)
+            }
+        }
     }
 }
 ]]
@@ -427,6 +438,7 @@ local function write_config(out, custom_config)
                                        custom_config["introspection_response"] or {})
   local introspection_opts = merge(merge({}, DEFAULT_INTROSPECTION_OPTS),
                                    custom_config["introspection_opts"] or {})
+  local fc_logout_opts = merge(merge({}, DEFAULT_FC_LOGOUT_OPTS), custom_config["fc_logout_opts"] or {})
   local token_response_expires_in = custom_config["token_response_expires_in"] or DEFAULT_TOKEN_RESPONSE_EXPIRES_IN
   local token_response_contains_refresh_token = custom_config["token_response_contains_refresh_token"]
     or DEFAULT_TOKEN_RESPONSE_CONTAINS_REFRESH_TOKEN
@@ -461,6 +473,7 @@ local function write_config(out, custom_config)
     :gsub("VERIFY_OPTS", serpent.block(verify_opts, {comment = false }))
     :gsub("INTROSPECTION_RESPONSE", serpent.block(introspection_response, {comment = false }))
     :gsub("INTROSPECTION_OPTS", serpent.block(introspection_opts, {comment = false }))
+    :gsub("FC_LOGOUT_OPTS", serpent.block(fc_logout_opts, {comment = false }))
     :gsub("TOKEN_RESPONSE_EXPIRES_IN", token_response_expires_in)
     :gsub("TOKEN_RESPONSE_CONTAINS_REFRESH_TOKEN", token_response_contains_refresh_token)
     :gsub("REFRESHING_TOKEN_FAILS", refreshing_token_fails)
@@ -521,6 +534,7 @@ end
 -- - unauth_action value to pass as unauth_action parameter to authenticate
 -- - break_id_token_signature whether to create an id token with an invalid signature
 -- - none_alg_id_token_signature whether to use the "none" alg when signing the id token
+-- - fc_logout_opts is a table containing options that are accepted by oidc.front_channel_logout
 function test_support.start_server(custom_config)
   assert(os.execute("rm -rf /tmp/server"), "failed to remove old server dir")
   assert(os.execute("mkdir -p /tmp/server/conf"), "failed to create server dir")

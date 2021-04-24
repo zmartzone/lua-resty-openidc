@@ -1743,4 +1743,62 @@ function openidc.set_logging(new_log, new_levels)
   WARN = new_levels.WARN and new_levels.WARN or ngx.WARN
 end
 
+function openidc.front_channel_logout(opts, session_opts)
+  local session, is_existing = r_session.open(session_opts)
+  local logout_success = true
+  log(DEBUG, 'Front-Channel Logout invoked')
+  if not is_existing then
+    log(WARN, 'no session present, nothing to do')
+    logout_success = false
+  else
+    if not session.started then
+      session:start()
+    end
+    local args = ngx.req.get_uri_args()
+    if not (args.sid and args.iss) then
+      log(DEBUG, 'Front-Channel Logout invoked without sid or iss')
+      if opts.session_required == nil or opts.session_required then
+        log(ERROR, 'deny logout as the required session information is missing')
+        logout_success = false
+      end
+    else
+      local id_token = session.data.id_token
+      if (opts.session_required == nil or opts.session_required) and not id_token then
+        log(ERROR, 'as id_token is not stored in session and session is required')
+        logout_success = false
+      end
+      if id_token and id_token.sid and id_token.sid ~= args.sid then
+        log(ERROR, 'Front-Channel Logout sid argument is different from sid stored in id_token')
+        logout_success = false
+      end
+      if id_token and id_token.iss and id_token.iss ~= args.iss then
+        log(ERROR, 'Front-Channel Logout iss argument is different from iss stored in id_token')
+        logout_success = false
+      end
+      if not id_token and opts and opts.iss and opts.iss ~= args.iss then
+        log(ERROR, 'Front-Channel Logout iss argument is different from iss stored in opts')
+        logout_success = false
+      end
+    end
+  end
+  ngx.header['Cache-Control'] = 'no-cache, no-store'
+  ngx.header['Pragma'] = 'no-cache'
+  ngx.header.content_type = 'text/html'
+  if logout_success then
+    log(DEBUG, 'Performing Front-Channel Logout')
+    session:destroy()
+  end
+  ngx.print('<html><body>')
+  if logout_success and opts.downstream_logout then
+    local downstream = type(opts.downstream_logout) == 'table' and opts.downstream_logout
+      or { opts.downstream_logout }
+    local _, d
+    for _, d in pairs(downstream) do
+      log(DEBUG, 'also notify ', d)
+      ngx.print('<iframe src="' .. d .. '">')
+    end
+  end
+  ngx.print('</body></html>')
+end
+
 return openidc

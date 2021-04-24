@@ -298,6 +298,43 @@ local res, err, target, session = require("resty.openidc").authenticate(opts)
 session:close()
 ```
 
+## Front-Channel Logout
+
+The `front_channel_logout` function can be used as a content handler
+to implement [OpenID Connect Front-Channel
+Logout](https://openid.net/specs/openid-connect-frontchannel-1_0.html).
+
+```nginx
+  ...
+  location /fc-logout {
+    content_by_lua_block {
+      local opts = {
+        -- session_required = true,
+        -- If this parameter is not set or set to true, requests to
+        -- the front channel logout URI must include the iss and sid
+        -- parameters.
+        -- This also requires id_tokens to be stored inside of the session.
+        -- Default is true
+
+        -- opts.iss = '...',
+        -- if session_required is false the iss parameter can be
+        -- compared to a hard-coded iss value.
+        -- Default is nil
+
+        -- downstream_logout = { 'other-uri', 'yet-another-uri' }
+        -- can contain a table of URIs to be notified via new iframes
+        -- included inside of the response
+        -- Default is no downstream logout URIs at all
+      }
+      require("resty.openidc").front_channel_logout(opts)
+    }
+  }
+```
+
+The `front_channel_logout` accepts as an optional second argument a
+table that is passed to `session.open` in order to read the existing
+session.
+
 ## Sample Configuration for OAuth 2.0 JWT Token Validation
 
 Sample `nginx.conf` configuration for verifying Bearer JWT Access Tokens against a pre-configured secret/key.
