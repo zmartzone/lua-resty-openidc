@@ -327,6 +327,7 @@ end
 local function openidc_authorize(opts, session, target_url, prompt)
   local resty_random = require("resty.random")
   local resty_string = require("resty.string")
+  local err
 
   -- generate state and nonce
   local state = resty_string.to_hex(resty_random.bytes(16))
@@ -373,7 +374,11 @@ local function openidc_authorize(opts, session, target_url, prompt)
   session.data.last_authenticated = ngx.time()
 
   if opts.lifecycle and opts.lifecycle.on_created then
-    opts.lifecycle.on_created(session)
+    err = opts.lifecycle.on_created(session)
+    if err then
+      log(WARN, "failed in `on_created` handler: " .. err)
+      return err
+    end
   end
 
   session:save()
@@ -1178,7 +1183,11 @@ local function openidc_authorization_response(opts, session)
   end
 
   if opts.lifecycle and opts.lifecycle.on_authenticated then
-    opts.lifecycle.on_authenticated(session)
+    err = opts.lifecycle.on_authenticated(session)
+    if err then
+      log(WARN, "failed in `on_authenticated` handler: " .. err)
+      return nil, err, session.data.original_url, session
+    end
   end
 
   -- save the session with the obtained id_token
@@ -1235,9 +1244,14 @@ local function openidc_logout(opts, session)
   local session_token = session.data.enc_id_token
   local access_token = session.data.access_token
   local refresh_token = session.data.refresh_token
+  local err
 
   if opts.lifecycle and opts.lifecycle.on_logout then
-    opts.lifecycle.on_logout(session)
+    err = opts.lifecycle.on_logout(session)
+    if err then
+      log(WARN, "failed in `on_logout` handler: " .. err)
+      return err
+    end
   end
 
   session:destroy()
@@ -1367,7 +1381,11 @@ local function openidc_access_token(opts, session, try_to_renew)
     return nil, err
   end
   if opts.lifecycle and opts.lifecycle.on_regenerated then
-    opts.lifecycle.on_regenerated(session)
+    err = opts.lifecycle.on_regenerated(session)
+    if err then
+      log(WARN, "failed in `on_regenerated` handler: " .. err)
+      return nil, err
+    end
   end
 
   return session.data.access_token, err
