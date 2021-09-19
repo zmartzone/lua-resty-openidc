@@ -375,6 +375,9 @@ lAc5Csj0o5Q+oEhPUAVBIF07m4rd0OvAVPOCQ2NJhQSL1oWASbf+fg==
              -- the expiration time in seconds for jwk cache, default is 1 day.
              --jwk_expires_in = 24 * 60 * 60
 
+             -- It may be necessary to force an introspection call for a bearer token and ignore the existing cached
+             -- introspection results. If so you need to set set the introspection_cache_ignore option to true.
+             -- introspection_cache_ignore = true
           }
 
           -- call bearer_jwt_verify for OAuth 2.0 JWT validation

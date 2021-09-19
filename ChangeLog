@@ -1,3 +1,7 @@
+09/19/2021
+- made jwt_verify() and bearer_jwt_verify() honor
+  opts.introspection_cache_ignore as well.
+
 12/05/2020
 - fixed a session leak in access_token() and for a very unlikely
   code-path in authenticate(); authenticate will still normally not

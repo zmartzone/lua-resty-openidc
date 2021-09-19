@@ -1688,10 +1688,14 @@ end
 function openidc.jwt_verify(access_token, opts, ...)
   local err
   local json
+  local v
+  local introspection_cache_ignore = opts.introspection_cache_ignore or false
 
   local slack = opts.iat_slack and opts.iat_slack or 120
   -- see if we've previously cached the validation result for this access token
-  local v = openidc_cache_get("introspection", access_token)
+  if not introspection_cache_ignore then
+    v = openidc_cache_get("introspection", access_token)
+  end
   if not v then
     local jwt_obj
     jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, access_token, opts.public_key, opts.symmetric_key,
@@ -1700,8 +1704,10 @@ function openidc.jwt_verify(access_token, opts, ...)
       json = jwt_obj.payload
       log(DEBUG, "jwt: ", cjson.encode(json))
 
-      local ttl = json.exp and json.exp - ngx.time() or 120
-      openidc_cache_set("introspection", access_token, cjson.encode(json), ttl)
+      if not introspection_cache_ignore then
+        local ttl = json.exp and json.exp - ngx.time() or 120
+        openidc_cache_set("introspection", access_token, cjson.encode(json), ttl)
+      end
     end
 
   else
