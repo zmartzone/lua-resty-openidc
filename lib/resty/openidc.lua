@@ -1613,17 +1613,41 @@ local function openidc_get_bearer_access_token(opts)
   return access_token, err
 end
 
+local function get_introspection_endpoint(opts)
+  local introspection_endpoint = opts.introspection_endpoint
+  if not introspection_endpoint then
+    local err = openidc_ensure_discovered_data(opts)
+    if err then
+      return nil, "opts.introspection_endpoint not said and " .. err
+    end
+    local endpoint = opts.discovery and opts.discovery.introspection_endpoint
+    if endpoint then
+      return endpoint
+    end
+  end
+  return introspection_endpoint
+end
+
+local function get_introspection_cache_prefix(opts)
+  return (get_introspection_endpoint(opts) or 'nil-endpoint') .. ','
+    .. (opts.client_id or 'no-client_id') .. ','
+    .. (opts.client_secret and 'secret' or 'no-client_secret') .. ':'
+end
+
 local function get_cached_introspection(opts, access_token)
   local introspection_cache_ignore = opts.introspection_cache_ignore or false
   if not introspection_cache_ignore then
-    return openidc_cache_get("introspection", access_token)
+    return openidc_cache_get("introspection",
+                             get_introspection_cache_prefix(opts) .. access_token)
   end
 end
 
 local function set_cached_introspection(opts, access_token, encoded_json, ttl)
   local introspection_cache_ignore = opts.introspection_cache_ignore or false
   if not introspection_cache_ignore then
-    openidc_cache_set("introspection", access_token, encoded_json, ttl)
+    openidc_cache_set("introspection",
+                      get_introspection_cache_prefix(opts) .. access_token,
+                      encoded_json, ttl)
   end
 end
 
@@ -1665,16 +1689,10 @@ function openidc.introspect(opts)
   end
 
   -- call the introspection endpoint
-  local introspection_endpoint = opts.introspection_endpoint
-  if not introspection_endpoint then
-    err = openidc_ensure_discovered_data(opts)
-    if err then
-      return nil, "opts.introspection_endpoint not said and " .. err
-    end
-    local endpoint = opts.discovery and opts.discovery.introspection_endpoint
-    if endpoint then
-      introspection_endpoint = endpoint
-    end
+  local introspection_endpoint
+  introspection_endpoint, err = get_introspection_endpoint(opts)
+  if err then
+    return nil, err
   end
   json, err = openidc.call_token_endpoint(opts, introspection_endpoint, body, opts.introspection_endpoint_auth_method, "introspection")
 
@@ -1711,17 +1729,34 @@ function openidc.introspect(opts)
 
 end
 
+local function get_jwt_verification_cache_prefix(opts)
+  local signing_alg_values_expected = (opts.accept_none_alg and 'none' or 'no-none')
+  local expected_algs = opts.token_signing_alg_values_expected or {}
+  if type(expected_algs) == 'string' then
+    expected_algs = { expected_algs }
+  end
+  for _, alg in ipairs(expected_algs) do
+    signing_alg_values_expected = signing_alg_values_expected .. ',' .. alg
+  end
+  return (opts.public_key or 'no-pubkey') .. ','
+    .. (opts.symmetric_key or 'no-symkey') .. ','
+    .. signing_alg_values_expected .. ':'
+end
+
 local function get_cached_jwt_verification(opts, access_token)
   local jwt_verification_cache_ignore = opts.jwt_verification_cache_ignore or false
   if not jwt_verification_cache_ignore then
-    return openidc_cache_get("jwt_verification", access_token)
+    return openidc_cache_get("jwt_verification",
+                             get_jwt_verification_cache_prefix(opts) .. access_token)
   end
 end
 
 local function set_cached_jwt_verification(opts, access_token, encoded_json, ttl)
   local jwt_verification_cache_ignore = opts.jwt_verification_cache_ignore or false
   if not jwt_verification_cache_ignore then
-    openidc_cache_set("jwt_verification", access_token, encoded_json, ttl)
+    openidc_cache_set("jwt_verification",
+                      get_jwt_verification_cache_prefix(opts) .. access_token,
+                      encoded_json, ttl)
   end
 end
 
