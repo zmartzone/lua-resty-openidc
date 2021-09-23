@@ -299,6 +299,16 @@ local res, err, target, session = require("resty.openidc").authenticate(opts)
 session:close()
 ```
 
+## Caching of Introspection and JWT Verification Results
+
+Note the `jwt_verification` and `introspection` caches are shared
+between all configured locations. If you are using locations with
+different `opts` configuration the shared cache may allow a token that
+is valid for only one location to be accepted by another if it is read
+from the cache. In order to avoid cache confusion it is recommended to
+set `opts.cache_segment` to unique strings for each set of related
+locations.
+
 ## Sample Configuration for OAuth 2.0 JWT Token Validation
 
 Sample `nginx.conf` configuration for verifying Bearer JWT Access Tokens against a pre-configured secret/key.
@@ -379,6 +389,10 @@ lAc5Csj0o5Q+oEhPUAVBIF07m4rd0OvAVPOCQ2NJhQSL1oWASbf+fg==
              -- It may be necessary to force verification for a bearer token and ignore the existing cached
              -- verification results. If so you need to set set the jwt_verification_cache_ignore option to true.
              -- jwt_verification_cache_ignore = true
+
+             -- optional name of a cache-segment if you need separate
+             -- caches for differently configured locations
+             -- cache_segment = 'api'
           }
 
           -- call bearer_jwt_verify for OAuth 2.0 JWT validation
@@ -447,6 +461,10 @@ http {
              -- Defaults to "exp" - Controls the TTL of the introspection cache
              -- https://tools.ietf.org/html/rfc7662#section-2.2
              -- introspection_expiry_claim = "exp"
+
+             -- optional name of a cache-segment if you need separate
+             -- caches for differently configured locations
+             -- cache_segment = 'api'
           }
 
           -- call introspect for OAuth 2.0 Bearer Access Token validation
@@ -547,6 +565,10 @@ http {
              -- It may be necessary to force an introspection call for an access_token and ignore the existing cached
              -- introspection results. If so you need to set set the introspection_cache_ignore option to true.
              -- introspection_cache_ignore = true
+
+             -- optional name of a cache-segment if you need separate
+             -- caches for differently configured locations
+             -- cache_segment = 'api'
           }
 
           -- call introspect for OAuth 2.0 Bearer Access Token validation
