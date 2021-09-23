@@ -219,6 +219,7 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
              --     `openidc_logout`
              --
              --  Any, all or none of the hooks may be used. Empty `lifecycle` does nothing.
+             --  A hook that returns a truthy value causes the lifecycle action they are taking part of to fail.
 
              -- Optional : add decorator for HTTP request that is
              -- applied when lua-resty-openidc talks to the OpenID Connect
