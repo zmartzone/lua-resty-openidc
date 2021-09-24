@@ -132,6 +132,7 @@ function openidc.invalidate_caches()
   openidc_cache_invalidate("discovery")
   openidc_cache_invalidate("jwks")
   openidc_cache_invalidate("introspection")
+  openidc_cache_invalidate("jwt_verification")
 end
 
 -- validate the contents of and id_token
@@ -1612,6 +1613,45 @@ local function openidc_get_bearer_access_token(opts)
   return access_token, err
 end
 
+local function get_introspection_endpoint(opts)
+  local introspection_endpoint = opts.introspection_endpoint
+  if not introspection_endpoint then
+    local err = openidc_ensure_discovered_data(opts)
+    if err then
+      return nil, "opts.introspection_endpoint not said and " .. err
+    end
+    local endpoint = opts.discovery and opts.discovery.introspection_endpoint
+    if endpoint then
+      return endpoint
+    end
+  end
+  return introspection_endpoint
+end
+
+local function get_introspection_cache_prefix(opts)
+  return (opts.cache_segment and opts.cache_segment.gsub(',', '_') or 'DEFAULT') .. ','
+    .. (get_introspection_endpoint(opts) or 'nil-endpoint') .. ','
+    .. (opts.client_id or 'no-client_id') .. ','
+    .. (opts.client_secret and 'secret' or 'no-client_secret') .. ':'
+end
+
+local function get_cached_introspection(opts, access_token)
+  local introspection_cache_ignore = opts.introspection_cache_ignore or false
+  if not introspection_cache_ignore then
+    return openidc_cache_get("introspection",
+                             get_introspection_cache_prefix(opts) .. access_token)
+  end
+end
+
+local function set_cached_introspection(opts, access_token, encoded_json, ttl)
+  local introspection_cache_ignore = opts.introspection_cache_ignore or false
+  if not introspection_cache_ignore then
+    openidc_cache_set("introspection",
+                      get_introspection_cache_prefix(opts) .. access_token,
+                      encoded_json, ttl)
+  end
+end
+
 -- main routine for OAuth 2.0 token introspection
 function openidc.introspect(opts)
 
@@ -1623,12 +1663,7 @@ function openidc.introspect(opts)
 
   -- see if we've previously cached the introspection result for this access token
   local json
-  local v
-  local introspection_cache_ignore = opts.introspection_cache_ignore or false
-
-  if not introspection_cache_ignore then
-    v = openidc_cache_get("introspection", access_token)
-  end
+  local v = get_cached_introspection(opts, access_token)
 
   if v then
     json = cjson.decode(v)
@@ -1655,16 +1690,10 @@ function openidc.introspect(opts)
   end
 
   -- call the introspection endpoint
-  local introspection_endpoint = opts.introspection_endpoint
-  if not introspection_endpoint then
-    err = openidc_ensure_discovered_data(opts)
-    if err then
-      return nil, "opts.introspection_endpoint not said and " .. err
-    end
-    local endpoint = opts.discovery and opts.discovery.introspection_endpoint
-    if endpoint then
-      introspection_endpoint = endpoint
-    end
+  local introspection_endpoint
+  introspection_endpoint, err = get_introspection_endpoint(opts)
+  if err then
+    return nil, err
   end
   json, err = openidc.call_token_endpoint(opts, introspection_endpoint, body, opts.introspection_endpoint_auth_method, "introspection")
 
@@ -1679,10 +1708,11 @@ function openidc.introspect(opts)
   end
 
   -- cache the results
+  local introspection_cache_ignore = opts.introspection_cache_ignore or false
   local expiry_claim = opts.introspection_expiry_claim or "exp"
-  local introspection_interval = opts.introspection_interval or 0
 
   if not introspection_cache_ignore and json[expiry_claim] then
+    local introspection_interval = opts.introspection_interval or 0
     local ttl = json[expiry_claim]
     if expiry_claim == "exp" then --https://tools.ietf.org/html/rfc7662#section-2.2
       ttl = ttl - ngx.time()
@@ -1693,12 +1723,43 @@ function openidc.introspect(opts)
       end
     end
     log(DEBUG, "cache token ttl: " .. ttl)
-    openidc_cache_set("introspection", access_token, cjson.encode(json), ttl)
-
+    set_cached_introspection(opts, access_token, cjson.encode(json), ttl)
   end
 
   return json, err
 
+end
+
+local function get_jwt_verification_cache_prefix(opts)
+  local signing_alg_values_expected = (opts.accept_none_alg and 'none' or 'no-none')
+  local expected_algs = opts.token_signing_alg_values_expected or {}
+  if type(expected_algs) == 'string' then
+    expected_algs = { expected_algs }
+  end
+  for _, alg in ipairs(expected_algs) do
+    signing_alg_values_expected = signing_alg_values_expected .. ',' .. alg
+  end
+  return (opts.cache_segment and opts.cache_segment.gsub(',', '_') or 'DEFAULT') .. ','
+    .. (opts.public_key or 'no-pubkey') .. ','
+    .. (opts.symmetric_key or 'no-symkey') .. ','
+    .. signing_alg_values_expected .. ':'
+end
+
+local function get_cached_jwt_verification(opts, access_token)
+  local jwt_verification_cache_ignore = opts.jwt_verification_cache_ignore or false
+  if not jwt_verification_cache_ignore then
+    return openidc_cache_get("jwt_verification",
+                             get_jwt_verification_cache_prefix(opts) .. access_token)
+  end
+end
+
+local function set_cached_jwt_verification(opts, access_token, encoded_json, ttl)
+  local jwt_verification_cache_ignore = opts.jwt_verification_cache_ignore or false
+  if not jwt_verification_cache_ignore then
+    openidc_cache_set("jwt_verification",
+                      get_jwt_verification_cache_prefix(opts) .. access_token,
+                      encoded_json, ttl)
+  end
 end
 
 -- main routine for OAuth 2.0 JWT token validation
@@ -1706,26 +1767,20 @@ end
 function openidc.jwt_verify(access_token, opts, ...)
   local err
   local json
-  local v
-  local introspection_cache_ignore = opts.introspection_cache_ignore or false
+  local v = get_cached_jwt_verification(opts, access_token)
 
   local slack = opts.iat_slack and opts.iat_slack or 120
-  -- see if we've previously cached the validation result for this access token
-  if not introspection_cache_ignore then
-    v = openidc_cache_get("introspection", access_token)
-  end
   if not v then
     local jwt_obj
     jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, access_token, opts.public_key, opts.symmetric_key,
       opts.token_signing_alg_values_expected, ...)
     if not err then
       json = jwt_obj.payload
-      log(DEBUG, "jwt: ", cjson.encode(json))
+      local encoded_json = cjson.encode(json)
+      log(DEBUG, "jwt: ", encoded_json)
 
-      if not introspection_cache_ignore then
-        local ttl = json.exp and json.exp - ngx.time() or 120
-        openidc_cache_set("introspection", access_token, cjson.encode(json), ttl)
-      end
+      set_cached_jwt_verification(opts, access_token, encoded_json,
+                                  json.exp and json.exp - ngx.time() or 120)
     end
 
   else

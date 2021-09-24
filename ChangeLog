@@ -2,9 +2,13 @@
 - if lifecyle handlers return truthy values they cause the operation
   they are handlers of to fail; see #384; thanks to @arcivanov
 
-09/19/2021
-- made jwt_verify() and bearer_jwt_verify() honor
-  opts.introspection_cache_ignore as well.
+- added opts.cache_segment as option to shard the cache used by token
+  introspection or JWT verification; see #399
+
+09/22/2021
+- made jwt_verify() and bearer_jwt_verify() use a separate cache named
+  "jwt_verification" and introduced opts.jwt_verification_cache_ignore
+  to disable caching completely; see #399
 
 12/05/2020
 - fixed a session leak in access_token() and for a very unlikely
