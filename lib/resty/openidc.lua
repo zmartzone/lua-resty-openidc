@@ -1201,7 +1201,7 @@ local function openidc_authorization_response(opts, session)
 end
 
 -- token revocation (RFC 7009)
-local function openidc_revoke_token(opts, token_type_hint, token)
+local function openidc.revoke_token(opts, token_type_hint, token)
   if not opts.discovery.revocation_endpoint then
     log(DEBUG, "no revocation endpoint supplied. unable to revoke " .. token_type_hint .. ".")
     return nil
@@ -1261,10 +1261,10 @@ local function openidc_logout(opts, session)
     log(DEBUG, "revoke_tokens_on_logout is enabled. " ..
       "trying to revoke access and refresh tokens...")
     if refresh_token then
-      openidc_revoke_token(opts, "refresh_token", refresh_token)
+      openidc.revoke_token(opts, "refresh_token", refresh_token)
     end
     if access_token then
-      openidc_revoke_token(opts, "access_token", access_token)
+      openidc.revoke_token(opts, "access_token", access_token)
     end
   end
 
