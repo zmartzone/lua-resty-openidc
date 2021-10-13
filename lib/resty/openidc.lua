@@ -1234,6 +1234,36 @@ local function openidc_revoke_token(opts, token_type_hint, token)
   end
 end
 
+function openidc.revoke_token(opts, token_type_hint, token)
+  local err = openidc_ensure_discovered_data(opts)
+  if err then
+    log(ERROR, "revocation of " .. token_type_hint .. " unsuccessful: " .. err)
+    return false
+  end
+
+  return openidc_revoke_token(opts, token_type_hint, token)
+end
+
+function openidc.revoke_tokens(opts, session)
+  local err = openidc_ensure_discovered_data(opts)
+  if err then
+    log(ERROR, "revocation of tokens unsuccessful: " .. err)
+    return false
+  end
+
+  local access_token = session.data.access_token
+  local refresh_token = session.data.refresh_token
+
+  local access_token_revoke, refresh_token_revoke
+  if refresh_token then
+    access_token_revoke = openidc_revoke_token(opts, "refresh_token", refresh_token)
+  end
+  if access_token then
+    refresh_token_revoke = openidc_revoke_token(opts, "access_token", access_token)
+  end
+  return access_token_revoke and refresh_token_revoke
+end
+
 local openidc_transparent_pixel = "\137\080\078\071\013\010\026\010\000\000\000\013\073\072\068\082" ..
     "\000\000\000\001\000\000\000\001\008\004\000\000\000\181\028\012" ..
     "\002\000\000\000\011\073\068\065\084\120\156\099\250\207\000\000" ..
