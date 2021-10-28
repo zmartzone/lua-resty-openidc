@@ -1214,11 +1214,12 @@ local function openidc_revoke_token(opts, token_type_hint, token)
   if token_type_hint then
     body['token_type_hint'] = token_type_hint
   end
+  local token_type_log = token_type_hint or 'token'
 
   -- ensure revocation endpoint auth method is properly discovered
   local err = ensure_config(opts)
   if err then
-    log(ERROR, "revocation of " .. token_type_hint .. " unsuccessful: " .. err)
+    log(ERROR, "revocation of " .. token_type_log .. " unsuccessful: " .. err)
     return false
   end
 
@@ -1226,10 +1227,10 @@ local function openidc_revoke_token(opts, token_type_hint, token)
   local _
   _, err = openidc.call_token_endpoint(opts, opts.discovery.revocation_endpoint, body, opts.token_endpoint_auth_method, "revocation", true)
   if err then
-    log(ERROR, "revocation of " .. token_type_hint .. " unsuccessful: " .. err)
+    log(ERROR, "revocation of " .. token_type_log .. " unsuccessful: " .. err)
     return false
   else
-    log(DEBUG, "revocation of " .. token_type_hint .. " successful")
+    log(DEBUG, "revocation of " .. token_type_log .. " successful")
     return true
   end
 end
