@@ -1238,7 +1238,7 @@ end
 function openidc.revoke_token(opts, token_type_hint, token)
   local err = openidc_ensure_discovered_data(opts)
   if err then
-    log(ERROR, "revocation of " .. token_type_hint .. " unsuccessful: " .. err)
+    log(ERROR, "revocation of " .. (token_type_hint or "token (no type specified)") .. " unsuccessful: " .. err)
     return false
   end
 
