@@ -1436,8 +1436,12 @@ local function openidc_get_redirect_uri_path(opts)
   return opts.redirect_uri and openidc_get_path(opts.redirect_uri) or opts.redirect_uri_path
 end
 
+local function is_session(o)
+  return o ~= nil and o.start and type(o.start) == "function"
+end
+
 -- main routine for OpenID Connect user authentication
-function openidc.authenticate(opts, target_url, unauth_action, session_opts)
+function openidc.authenticate(opts, target_url, unauth_action, session_or_opts)
 
   if opts.redirect_uri_path then
     log(WARN, "using deprecated option `opts.redirect_uri_path`; switch to using an absolute URI and `opts.redirect_uri` instead")
@@ -1445,10 +1449,16 @@ function openidc.authenticate(opts, target_url, unauth_action, session_opts)
 
   local err
 
-  local session, session_error = r_session.start(session_opts)
-  if session == nil then
-    log(ERROR, "Error starting session: " .. session_error)
-    return nil, session_error, target_url, session
+  local session
+  if is_session(session_or_opts) then
+    session = session_or_opts
+  else
+    local session_error
+    session, session_error = r_session.start(session_or_opts)
+    if session == nil then
+      log(ERROR, "Error starting session: " .. session_error)
+      return nil, session_error, target_url, session
+    end
   end
 
   target_url = target_url or ngx.var.request_uri
