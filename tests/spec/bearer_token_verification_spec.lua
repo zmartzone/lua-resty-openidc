@@ -147,6 +147,19 @@ describe("when using a RSA key from a JWK that doesn't contain the x5c claim", f
   base_checks()
 end)
 
+describe("when using a RSA key from a JWK that contains an empty x5c claim but n and e", function()
+  test_support.start_server({
+    verify_opts = {
+      discovery = {
+        jwks_uri = "http://127.0.0.1/jwk",
+      }
+    },
+    jwk = test_support.load("/spec/rsa_key_jwk_with_n_and_e_and_empty_x5c.json")
+  })
+  teardown(test_support.stop_server)
+  base_checks()
+end)
+
 describe("when the JWK specifies a kid and the JWKS contains multiple keys", function()
   test_support.start_server({
     verify_opts = {

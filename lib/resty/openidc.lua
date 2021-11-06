@@ -847,7 +847,6 @@ local function encode_bit_string(array)
 end
 
 local function openidc_pem_from_x5c(x5c)
-  -- TODO check x5c length
   log(DEBUG, "Found x5c, getting PEM public key from x5c entry of json public key")
   local chunks = split_by_chunk(b64(openidc_base64_url_decode(x5c[1])), 64)
   local pem = "-----BEGIN CERTIFICATE-----\n" ..
@@ -912,10 +911,15 @@ local function openidc_pem_from_jwk(opts, kid)
     return nil, err
   end
 
+  local x5c = jwk.x5c
+  if x5c and #(jwk.x5c) == 0 then
+    log(WARN, "Found invalid JWK with empty x5c array, ignoring x5c claim")
+    x5c = nil
+  end
+
   local pem
-  -- TODO check x5c length
-  if jwk.x5c then
-    pem = openidc_pem_from_x5c(jwk.x5c)
+  if x5c then
+    pem = openidc_pem_from_x5c(x5c)
   elseif jwk.kty == "RSA" and jwk.n and jwk.e then
     pem = openidc_pem_from_rsa_n_and_e(jwk.n, jwk.e)
   else
