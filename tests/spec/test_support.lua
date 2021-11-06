@@ -372,6 +372,16 @@ JWT_SIGN_SECRET]=]
             }
         }
 
+        location /revoke_tokens {
+          content_by_lua_block {
+              local opts = OIDC_CONFIG
+              local res, err, target, session = oidc.authenticate(opts, nil, UNAUTH_ACTION)
+              local r = oidc.revoke_tokens(opts, session)
+              ngx.header.content_type = 'text/plain'
+              ngx.say('revoke-result: ' .. tostring(r))
+          }
+        }
+
         location /revocation {
             content_by_lua_block {
                 ngx.req.read_body()

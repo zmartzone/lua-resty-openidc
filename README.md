@@ -309,6 +309,12 @@ from the cache. In order to avoid cache confusion it is recommended to
 set `opts.cache_segment` to unique strings for each set of related
 locations.
 
+## Revoke tokens
+
+The `revoke_tokens(opts, session)` function revokes the current refresh and access token. In contrast to a full logout, the session cookie will not be destroyed and the endsession endpoint will not be called. The function returns `true` if both tokens were revoked successfully. This function might be helpful in scenarios where you want to destroy/remove a session from the server side.
+
+With `revoke_token(opts, token_type_hint, token)` it is also possible to revoke a specific token. `token_type_hint` can usually be `refresh_token` or `access_token`.
+
 ## Sample Configuration for OAuth 2.0 JWT Token Validation
 
 Sample `nginx.conf` configuration for verifying Bearer JWT Access Tokens against a pre-configured secret/key.
