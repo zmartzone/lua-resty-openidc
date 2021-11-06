@@ -6,6 +6,10 @@
 - when the x5c claim of a JWK is an empty array it will be ignored
   rather than cause an error; see #406
 
+- `authenticate`'s last parameter can now be an existing session
+  rather than options for starting a new one: see #405; thanks to
+  @thorstenfleischmann
+
 09/23/2021
 - if lifecyle handlers return truthy values they cause the operation
   they are handlers of to fail; see #384; thanks to @arcivanov
