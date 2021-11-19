@@ -299,6 +299,39 @@ local res, err, target, session = require("resty.openidc").authenticate(opts)
 session:close()
 ```
 
+## Caching
+
+lua-resty-openidc can use [shared memory
+caches](https://github.com/openresty/lua-nginx-module/#lua_shared_dict)
+for several things. If you want it to use the caches, you must use
+`lua_shared_dict` in your `nginx.conf` file.
+
+Currently up to four caches are used
+
+* the cache named `discovery` stores the OpenID Connect Disovery
+  metadata of your OpenID Connect Provider. Cache items expire after
+  24 hours unless overriden by `opts.discovery_expires_in` (a value
+  given in seconds) . This cache will store one item per issuer URI
+  and you can look up the discovery document yourself to get an
+  estimate for the size required - usually a few kB per OpenID Connect
+  Provider.
+* the cache named `jwks` stores the key material of your OpenID
+  Connect Provider if it is provided via the JWKS endpoint. Cache
+  items expire after 24 hours unless overriden by
+  `opts.jwks_expires_in`. This cache will store one item per JWKS URI
+  and you can look up the jwks yourself to get an estimate for the
+  size required - usually a few kB per OpenID Connect Provider.
+* the cache named `introspection` stores the result of OAuth2 token
+  introspection. Cache items expire when the corresponding token
+  expires. Tokens with unknown expiry are not cached at all. This
+  cache will contain one entry per introspected access token - usually
+  this will be a few kB per token.
+* the cache named `jwt_verification` stores the result of JWT
+  verification.  Cache items expire when the corresponding token
+  expires. Tokens with unknown expiry are not cached for two
+  minutes. This cache will contain one entry per verified JWT -
+  usually this will be a few kB per token.
+
 ## Caching of Introspection and JWT Verification Results
 
 Note the `jwt_verification` and `introspection` caches are shared
