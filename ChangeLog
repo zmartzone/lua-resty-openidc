@@ -1,3 +1,7 @@
+12/17/2021
+- added id_token and the token endpoint response as additional
+  arguments to the on_authenticated lifecycle hook; see #413
+
 11/19/2021
 - added opts.discovery_expires_in in order to make cache expiry of
   OpenID Connect Discovery responses configurable.

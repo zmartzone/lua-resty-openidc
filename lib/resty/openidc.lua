@@ -1188,7 +1188,7 @@ local function openidc_authorization_response(opts, session)
   end
 
   if opts.lifecycle and opts.lifecycle.on_authenticated then
-    err = opts.lifecycle.on_authenticated(session)
+    err = opts.lifecycle.on_authenticated(session, id_token, json)
     if err then
       log(WARN, "failed in `on_authenticated` handler: " .. err)
       return nil, err, session.data.original_url, session

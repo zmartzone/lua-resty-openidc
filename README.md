@@ -212,6 +212,7 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
              --     `openidc_authorize` immediately prior to saving the session
              --  -- `on_authenticated` hook is invoked *after* receiving authorization response in
              --     `openidc_authorization_response` immediately prior to saving the session
+             --     Starting with lua-resty-openidc 1.7.5 this receives the decoded id_token as second and the response of the token endpoint as third argument      
              --  -- `on_regenerated` is invoked immediately after the
                      a new access token has been obtained via token
                      refresh and is called with the regenerated session table
