@@ -7,7 +7,7 @@ A new issue about a bug should be verified with a minimized example.
 
 ###### Environment
 
-- lua-resty-openidc version (e.g. 1.7.4)
+- lua-resty-openidc version (e.g. 1.7.5)
 - OpenID Connect provider (e.g. Keycloak, Azure AD)
 
 ###### Expected behaviour
