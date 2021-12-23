@@ -1,3 +1,6 @@
+12/23/2021
+- use Github actions for docker-based CI; delete Travis files
+
 12/21/2021
 - release 1.7.5
 
