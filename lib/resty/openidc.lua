@@ -17,17 +17,9 @@ specific language governing permissions and limitations
 under the License.
 
 ***************************************************************************
-Copyright (C) 2017-2019 ZmartZone IAM
+Copyright (C) 2017-2022 ZmartZone Holding B.V.
 Copyright (C) 2015-2017 Ping Identity Corporation
 All rights reserved.
-
-For further information please contact:
-
-     Ping Identity Corporation
-     1099 18th St Suite 2950
-     Denver, CO 80202
-     303.468.2900
-     http://www.pingidentity.com
 
 DISCLAIMER OF WARRANTIES:
 
