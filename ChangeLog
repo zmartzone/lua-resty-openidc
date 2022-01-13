@@ -1,3 +1,6 @@
+01/04/2022
+- added support for OAuth 2.0 Form Post Response Mode.
+
 12/23/2021
 - use Github actions for docker-based CI; delete Travis files
 

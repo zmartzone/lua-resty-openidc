@@ -133,6 +133,7 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
              -- Connection keepalive with the OP can be enabled ("yes") or disabled ("no").
              --keepalive = "no",
 
+             --response_mode=form_post can be used to make lua-resty-openidc use the [OAuth 2.0 Form Post Response Mode](https://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html). *Note* for modern browsers you will need to set [`$session_cookie_samesite`](https://github.com/bungle/lua-resty-session#string-sessioncookiesamesite) to `None` with form_post unless your OpenID Connect Provider and Relying Party share the same domain.
              --authorization_params = { hd="zmartzone.eu" },
              --scope = "openid email profile",
              -- Refresh the users id_token after 900 seconds without requiring re-authentication
