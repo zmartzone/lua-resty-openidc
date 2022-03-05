@@ -1,3 +1,7 @@
+03/05/2022
+- improved error message when expecting a Bearer token header and the
+  header doesn't contain a space character; see #421
+
 01/04/2022
 - added support for OAuth 2.0 Form Post Response Mode.
 

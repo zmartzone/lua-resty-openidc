@@ -1637,14 +1637,14 @@ local function openidc_get_bearer_access_token(opts)
   local header_name = opts.auth_accept_token_as_header_name or "Authorization"
   local header = get_first(headers[header_name])
 
-  if header == nil or header:find(" ") == nil then
+  if header == nil then
     err = "no Authorization header found"
     log(ERROR, err)
     return nil, err
   end
 
   local divider = header:find(' ')
-  if string.lower(header:sub(0, divider - 1)) ~= string.lower("Bearer") then
+  if divider == 0 or string.lower(header:sub(0, divider - 1)) ~= string.lower("Bearer") then
     err = "no Bearer authorization header value found"
     log(ERROR, err)
     return nil, err
