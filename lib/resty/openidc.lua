@@ -1676,7 +1676,7 @@ local function get_introspection_endpoint(opts)
 end
 
 local function get_introspection_cache_prefix(opts)
-  return (opts.cache_segment and opts.cache_segment.gsub(',', '_') or 'DEFAULT') .. ','
+  return (opts.cache_segment and opts.cache_segment:gsub(',', '_') or 'DEFAULT') .. ','
     .. (get_introspection_endpoint(opts) or 'nil-endpoint') .. ','
     .. (opts.client_id or 'no-client_id') .. ','
     .. (opts.client_secret and 'secret' or 'no-client_secret') .. ':'
@@ -1786,7 +1786,7 @@ local function get_jwt_verification_cache_prefix(opts)
   for _, alg in ipairs(expected_algs) do
     signing_alg_values_expected = signing_alg_values_expected .. ',' .. alg
   end
-  return (opts.cache_segment and opts.cache_segment.gsub(',', '_') or 'DEFAULT') .. ','
+  return (opts.cache_segment and opts.cache_segment:gsub(',', '_') or 'DEFAULT') .. ','
     .. (opts.public_key or 'no-pubkey') .. ','
     .. (opts.symmetric_key or 'no-symkey') .. ','
     .. signing_alg_values_expected .. ':'
