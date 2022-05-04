@@ -10,7 +10,7 @@ RUN ["apt-get", "update"]
 RUN ["apt-get", "install", "-y", "git"]
 RUN ["luarocks", "install", "busted"]
 RUN ["luarocks", "install", "LuaSocket"]
-RUN ["luarocks", "install", "serpent"]
+RUN ["luarocks", "install", "serpent", "0.28"]
 RUN ["luarocks", "install", "dkjson"]
 RUN ["luarocks", "install", "luacov"]
 
