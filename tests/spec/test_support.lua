@@ -153,7 +153,7 @@ JWT_SIGN_SECRET]=]
     server {
         log_subrequest on;
 
-        listen      80;
+        listen      localhost:80;
         #listen     443 ssl;
         #ssl_certificate     certificate-chain.crt;
         #ssl_certificate_key private.key;
