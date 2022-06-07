@@ -1,4 +1,4 @@
-FROM openresty/openresty:bionic
+FROM openresty/openresty:1.15.8.1-3-bionic
 
 # install dependencies
 RUN ["luarocks", "install", "lua-resty-session"]
