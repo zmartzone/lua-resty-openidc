@@ -58,6 +58,21 @@ local DEBUG = ngx.DEBUG
 local ERROR = ngx.ERR
 local WARN = ngx.WARN
 
+-- Split string in multiple parts
+local function split_string(str, delim)
+  local result = {}
+  local sep = string.format("([^%s]+)", delim)
+  for m in str:gmatch(sep) do
+    result[#result+1]=m
+  end
+  return result
+end
+
+-- Test if string start with
+local function string_starts(input_string, partern)
+  return string.sub(input_string, 1, string.len(input_string)) == patern
+end
+
 local function token_auth_method_precondition(method, required_field)
   return function(opts)
     if not opts[required_field] then
@@ -972,7 +987,37 @@ symmetric_secret, expected_algs, ...)
     end -- otherwise the JWT is invalid and load_jwt produces an error
   end
 
-  local jwt_obj = r_jwt:load_jwt(jwt_string, nil)
+   -- dertermine if jwt uses JWS or JWE
+  local tokens = split_string(jwt_string, "%.")
+  local num_token = #tokens
+  local is_jwe = num_token > 3
+
+  local jwt_obj
+  if is_jwe then
+    jwe_header = cjson.decode(unb64(tokens[1]))
+
+    if jwe_header.alg == "RSA-OAEP-256" then
+      if jwe_header.kid == opts.client_rsa_private_enc_key_id then
+        local jwe_obj = nil
+        jwe_obj = r_jwt:load_jwt(jwt_string, opts.client_rsa_private_enc_key)
+        -- Test if JWE payload exist or not
+        if jwe_obj.payload == nil and jwe_obj.internal ~= nil then
+          jwt_obj = r_jwt:load_jwt(jwe_obj.internal.json_payload, nil)
+        else
+          jwt_obj = jwe_obj
+        end
+      else
+        reason = "jwe_header.kid not matching client_rsa_private_enc_key_id"
+        return nil, reason
+      end
+    else
+      reason = "jwe_header.alg not supported by the jwt.lua library"
+      return nil, reason
+    end
+  else
+    jwt_obj = r_jwt:load_jwt(jwt_string, nil)
+  end
+
   if not jwt_obj.valid then
     local reason = "invalid jwt"
     if jwt_obj.reason then
