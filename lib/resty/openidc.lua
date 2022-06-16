@@ -419,7 +419,21 @@ local function openidc_parse_json_response(response, ignore_body_on_success)
     res = cjson_s.decode(response.body)
 
     if not res then
-      err = "JSON decoding failed"
+       -- Try to parse body as JWT
+      local r_jwt = require("resty.jwt")
+      local jwt_obj = r_jwt:load_jwt(response.body, nil)
+
+      -- Test if body successfully parsed
+      if not jwt_obj.valid then
+        local reason = "invalid jwt"
+        if jwt_obj.reason then
+          reason = reason .. ": " .. jwt_obj.reason
+        end
+        return nil, reason
+      else
+        res = jwt_obj.payload
+      end
+
     end
   end
 
