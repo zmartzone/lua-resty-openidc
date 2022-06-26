@@ -602,7 +602,8 @@ end
 -- returns a Cookie header value based on all cookies requested via
 -- Set-Cookie inside headers
 function test_support.extract_cookies(headers)
-   local pair = headers["set-cookie"] or ''
+   local h = headers or {}
+   local pair = h["set-cookie"] or ''
    local semi = pair:find(";")
    if semi then
       pair = pair:sub(1, semi - 1)
