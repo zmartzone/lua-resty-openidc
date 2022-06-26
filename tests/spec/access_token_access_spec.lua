@@ -200,6 +200,7 @@ end)
 describe("when token endpoint is not reachable", function()
   test_support.start_server({
     access_token_opts = {
+      timeout = 40000,
       discovery = {
         token_endpoint = "http://192.0.2.1/"
       }

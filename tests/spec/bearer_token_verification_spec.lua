@@ -438,6 +438,7 @@ end)
 describe("when jwks endpoint is not reachable", function()
   test_support.start_server({
     verify_opts = {
+      timeout = 40000,
       discovery = {
         jwks_uri = "http://192.0.2.1/"
       }
