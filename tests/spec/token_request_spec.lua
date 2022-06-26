@@ -151,6 +151,7 @@ end)
 describe("if token endpoint is not reachable", function()
   test_support.start_server({
     oidc_opts = {
+      timeout = 40000,
       discovery = {
         token_endpoint = "http://192.0.2.1/"
       }
