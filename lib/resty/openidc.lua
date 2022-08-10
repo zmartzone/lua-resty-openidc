@@ -1376,6 +1376,7 @@ local function openidc_access_token(opts, session, try_to_renew)
   local body = {
     grant_type = "refresh_token",
     refresh_token = session.data.refresh_token,
+    redirect_uri = openidc_get_redirect_uri(opts, session),
     scope = opts.scope and opts.scope or "openid email profile"
   }
 
