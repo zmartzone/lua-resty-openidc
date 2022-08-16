@@ -1045,7 +1045,7 @@ end
 --
 local function openidc_load_and_validate_jwt_id_token(opts, jwt_id_token, session)
 
-  local jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, jwt_id_token, opts.public_key, opts.client_secret,
+  local jwt_obj, err = openidc_load_jwt_and_verify_crypto(opts, jwt_id_token, opts.public_key, opts.symmetric_key,
     opts.discovery.id_token_signing_alg_values_supported)
   if err then
     local alg = (jwt_obj and jwt_obj.header and jwt_obj.header.alg) or ''

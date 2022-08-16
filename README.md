@@ -378,7 +378,9 @@ http {
 
           local opts = {
 
-            -- 1. example of a shared secret for HS??? signature verification
+            -- 1. example of a shared secret for HS??? signature verification.
+            -- The key is passed as-is to HMAC and thus may contain binary data
+            -- and cannot be base64 or otherwise encoded.
             --symmetric_key = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             -- in versions up to 1.6.1 this option's key would have been secret
             -- rather than symmetric_key
