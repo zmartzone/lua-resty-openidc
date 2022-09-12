@@ -141,6 +141,10 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
              --iat_slack = 600,
              --redirect_uri_scheme = "https",
              --logout_path = "/logout",
+             --registrations_endpoint = "https://my-oauth2-provider/realms/my-realm/protocol/openid-connect/registrations"
+             --   OAuth endpoint to be used when redirect to registration page is desired. Also requires 'registrations_path' to be set.
+             --registrations_path = "/registration",
+             --   Path on which a redirect to the registration page should be provided instead of the authorization page. Also requires 'registrations_endpoint' to be set.
              --redirect_after_logout_uri = "/",
              -- Where should the user be redirected after logout from the RP. This option overides any end_session_endpoint that the OP may have provided in the discovery response.
              --redirect_after_logout_with_id_token_hint = true,

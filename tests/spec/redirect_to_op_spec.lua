@@ -516,3 +516,65 @@ describe("when a request_decorator has been specified when calling the discovery
     assert.error_log_contains('discovery uri_args:.*"foo"%s*:%s*"bar"')
   end)
 end)
+
+describe("when registrations path and endpoint are configured, redirect correctly on given path", function()
+  test_support.start_server({
+    oidc_opts = {
+      registrations_path="/default/registration",
+      registrations_endpoint="http://127.0.0.1/openid-connect/registrations"
+    }
+  })
+  teardown(test_support.stop_server)
+  local _, status, headers = http.request({
+    url = "http://127.0.0.1/default/registration",
+    redirect = false
+  })
+  it("redirects to the registrations endpoint", function()
+    assert.are.equals(302, status)
+    assert.truthy(string.match(headers["location"], "http://127.0.0.1/openid%-connect/registrations%?.*client_id=client_id.*"))
+  end)
+  it("HTTP Caching is disabled", function()
+    assert.are.equals("no-cache, no-store, max-age=0", headers["cache-control"])
+  end)
+  it("requests the authorization code grant flow", function()
+    assert.truthy(string.match(headers["location"], ".*response_type=code.*"))
+  end)
+  it("uses the configured redirect uri", function()
+    local redir_escaped = test_support.urlescape_for_regex("http://localhost/default/redirect_uri")
+    -- lower as url.escape uses %2f for a slash, openidc uses %2F
+    assert.truthy(string.match(string.lower(headers["location"]),
+                               ".*redirect_uri=" .. string.lower(redir_escaped) .. ".*"))
+  end)
+  it("uses a state parameter", function()
+    assert.truthy(string.match(headers["location"], ".*state=.*"))
+  end)
+  it("uses a nonce parameter", function()
+    assert.truthy(string.match(headers["location"], ".*nonce=.*"))
+  end)
+  it("uses the default scopes", function()
+    assert.truthy(string.match(headers["location"],
+                               ".*scope=" .. test_support.urlescape_for_regex("openid email profile") .. ".*"))
+  end)
+  it("doesn't use the prompt parameter", function()
+    assert.falsy(string.match(headers["location"], ".*prompt=.*"))
+  end)
+end)
+
+describe("when registrations path and endpoint are configured, other paths still redirect to the authorization endpoint", function()
+  test_support.start_server({
+    oidc_opts = {
+      registrations_path="/default/registration",
+      registrations_endpoint="http://127.0.0.1/openid-connect/registrations"
+    }
+  })
+  teardown(test_support.stop_server)
+  local _, status, headers = http.request({
+    url = "http://127.0.0.1/default/t",
+    redirect = false
+  })
+  it("redirects to the registrations endpoint", function()
+    assert.are.equals(302, status)
+    print(headers["location"])
+    assert.truthy(string.match(headers["location"], "http://127.0.0.1/authorize%?.*client_id=client_id.*"))
+  end)
+end)

@@ -1,3 +1,6 @@
+09/12/2022
+- added support for registrations endpoint
+
 03/05/2022
 - improved error message when expecting a Bearer token header and the
   header doesn't contain a space character; see #421

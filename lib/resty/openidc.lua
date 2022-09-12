@@ -316,6 +316,11 @@ local function openidc_s256(verifier)
   return openidc_base64_url_encode(sha256:final())
 end
 
+local function openidc_get_path(uri)
+    local without_query = uri:match("(.-)%?") or uri
+    return without_query:match(".-//[^/]+(/.*)") or without_query
+  end
+
 -- send the browser of to the OP's authorization endpoint
 local function openidc_authorize(opts, session, target_url, prompt)
   local resty_random = require("resty.random")
@@ -380,9 +385,16 @@ local function openidc_authorize(opts, session, target_url, prompt)
 
   session:save()
 
-  -- redirect to the /authorization endpoint
+  -- redirect to the authorization or registration endpoint
   ngx.header["Cache-Control"] = "no-cache, no-store, max-age=0"
-  return ngx.redirect(openidc_combine_uri(opts.discovery.authorization_endpoint, params))
+  local endpoint = opts.discovery.authorization_endpoint
+  if opts.registrations_path and opts.registrations_endpoint then
+    local path = openidc_get_path(target_url)
+    if path == opts.registrations_path then
+      endpoint = opts.registrations_endpoint
+    end
+  end
+  return ngx.redirect(openidc_combine_uri(endpoint, params))
 end
 
 -- parse the JSON result from a call to the OP
@@ -1427,11 +1439,6 @@ local function openidc_access_token(opts, session, try_to_renew)
   end
 
   return session.data.access_token, err
-end
-
-local function openidc_get_path(uri)
-  local without_query = uri:match("(.-)%?") or uri
-  return without_query:match(".-//[^/]+(/.*)") or without_query
 end
 
 local function openidc_get_redirect_uri_path(opts)
