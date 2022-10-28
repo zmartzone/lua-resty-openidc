@@ -447,11 +447,11 @@ function openidc.call_token_endpoint(opts, endpoint, body, auth, endpoint_name, 
   if auth then
     if auth == "client_secret_basic" then
       if opts.client_secret then
-        headers.Authorization = "Basic " .. b64(ngx.escape_uri(opts.client_id) .. ":" .. ngx.escape_uri(opts.client_secret))
+        headers.Authorization = "Basic " .. b64(opts.client_id .. ":" .. opts.client_secret)
       else
       -- client_secret must not be set if Windows Integrated Authentication (WIA) is used with
       -- Active Directory Federation Services (AD FS) 4.0 (or newer) on Windows Server 2016 (or newer)
-        headers.Authorization = "Basic " .. b64(ngx.escape_uri(opts.client_id) .. ":")
+        headers.Authorization = "Basic " .. b64(opts.client_id .. ":")
       end
       log(DEBUG, "client_secret_basic: authorization header '" .. headers.Authorization .. "'")
 
