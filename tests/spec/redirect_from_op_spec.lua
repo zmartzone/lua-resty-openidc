@@ -179,3 +179,31 @@ describe("when the redirect_uri and target-uri are specified as absolute URIs", 
     end)
   end)
 end)
+
+describe("when redirect_uri and local_redirect_uri_path are specified", function()
+  test_support.start_server({
+    oidc_opts = {
+      redirect_uri = 'https://example.com/foo/default-absolute/redirect_uri',
+      local_redirect_uri_path = '/default-absolute/redirect_uri',
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, _, headers = http.request({
+    url = "http://localhost/default-absolute/t",
+    redirect = false
+  })
+  local state = test_support.grab(headers, 'state')
+  test_support.register_nonce(headers)
+  local cookie_header = test_support.extract_cookies(headers)
+  describe("accessing the redirect_uri path with good parameters", function()
+    local _, redirStatus, h = http.request({
+          url = "http://localhost/default-absolute/redirect_uri?code=foo&state=" .. state,
+          headers = { cookie = cookie_header },
+          redirect = false
+    })
+    it("redirects to the original URI", function()
+       assert.are.equals(302, redirStatus)
+       assert.are.equals("http://localhost/default-absolute/t", h.location)
+    end)
+  end)
+end)
