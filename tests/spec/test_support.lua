@@ -64,6 +64,22 @@ function test_support.self_signed_jwt(payload, alg, signature)
 end
 
 local DEFAULT_JWT_SIGN_SECRET = test_support.load("/spec/private_rsa_key.pem")
+local DEFAULT_JWE_ENC_RSA_KEY = ""
+local DEFAULT_JWE_ENC_RSA_KID = "RSAencKID"
+local DEFAULT_JWE_DEC_RSA_KEY = test_support.load("/spec/private_rsa_key.pem")
+local DEFAULT_JWE_ENC_AES_KEY = ""
+local DEFAULT_JWE_ENC_AES_KID = "AESencKID"
+local DEFAULT_JWE_TOKEN_HEADER = {
+  typ = "JWE",
+  alg = "RSA-OAEP-256",
+  enc = "A128CBC-HS256",
+  kid = DEFAULT_JWE_ENC_RSA_KID
+}
+local DEFAULT_JWE_FAKE_ALG = "false"
+local DEFAULT_JWE_FAKE_ENC = "false"
+local DEFAULT_JWE_FAKE_JWE = "false"
+
+local DEFAULT_JWE_SIGNED_PAYLOAD = "true"
 
 local DEFAULT_JWK = test_support.load("/spec/rsa_key_jwk_with_x5c.json")
 
@@ -90,6 +106,94 @@ local DEFAULT_UNAUTH_ACTION = "nil"
 
 local DEFAULT_DELAY_RESPONSE = "0"
 
+local DEFAULT_INIT_TEMPLATE = [[
+local test_globals = {}
+local sign_secret = [=[
+JWT_SIGN_SECRET]=]
+local jwe_enc_rsa_key = [=[JWE_ENC_RSA_KEY]=]
+local jwe_enc_aes_key = [=[JWE_ENC_AES_KEY]=]
+  -- ground work for future implementation of JWE using AES 'alg'
+
+if os.getenv('coverage') then
+  require("luacov.runner")("/spec/luacov/settings.luacov")
+end
+test_globals.oidc = require "resty.openidc"
+test_globals.cjson = require "cjson"
+
+test_globals.jwks = [=[JWK]=]
+test_globals.use_jwe = jwe_enc_rsa_key ~= "" or jwe_enc_aes_key ~= ""
+
+test_globals.delay = function(delay_response)
+  if delay_response > 0 then
+    ngx.sleep(delay_response / 1000)
+  end
+end
+
+test_globals.b64url = function(s)
+  return ngx.encode_base64(test_globals.cjson.encode(s)):gsub('+','-'):gsub('/','_')
+end
+
+test_globals.create_jwt = function(payload, fake_signature)
+  if not fake_signature then
+    local jwt_content = {
+      header = TOKEN_HEADER,
+      payload = payload
+    }
+    local jwt = require "resty.jwt"
+    return jwt:sign(sign_secret, jwt_content)
+  else
+    local header = test_globals.b64url({
+        typ = "JWT",
+        alg = "AB256"
+    })
+    return header .. "." .. test_globals.b64url(payload) .. ".NOT_A_VALID_SIGNATURE"
+  end
+end
+
+test_globals.create_jwe = function(payload, fake_alg, fake_enc, fake_jwe)
+  if jwe_enc_rsa_key ~= "" then
+    local jwe_header = JWE_TOKEN_HEADER
+    if fake_alg then
+      jwe_header.alg = "WRONG_ALG"
+    end
+    if fake_enc then
+      jwe_header.enc = "WRONG_ENC"
+    end
+    
+    if fake_alg or fake_enc or fake_jwe then
+      return test_globals.b64url(jwe_header) .. ".NOT_A_VALID_PRESHARED_KEY.NOT_A_VALID_IV.NOT_A_VALID_CIPHERTEXT.NOT_A_VALID_MAC"
+    else
+      local jwt_content = {
+        header = jwe_header,
+        payload = payload
+      }
+      local jwt = require "resty.jwt"
+      return jwt:sign(jwe_enc_rsa_key, jwt_content)
+    end
+  elseif jwe_enc_aes_key ~= "" then
+    ngx.log(ngx.ERR, "JWE w/ AES  test not implemented yet")
+    return nil
+  else
+    ngx.log(ngx.ERR, "Something went wrong while creating the JWE")
+    return nil
+  end
+end
+
+test_globals.query_decorator = function(req)
+  req.query = "foo=bar"
+  return req
+end
+
+test_globals.body_decorator = function(req)
+  local body = ngx.decode_args(req.body)
+  body.foo = "bar"
+  req.body = ngx.encode_args(body)
+  return req
+end
+
+return test_globals
+]]
+
 local DEFAULT_CONFIG_TEMPLATE = [[
 worker_processes  1;
 pid       /tmp/server/logs/nginx.pid;
@@ -101,51 +205,10 @@ events {
 
 http {
     access_log /tmp/server/logs/access.log;
-    lua_package_path '~/lua/?.lua;;';
+    lua_package_path '~/lua/?.lua;/tmp/server/conf/?.lua;;';
     lua_shared_dict discovery 1m;
     init_by_lua_block {
-        sign_secret = [=[
-JWT_SIGN_SECRET]=]
-        if os.getenv('coverage') then
-          require("luacov.runner")("/spec/luacov/settings.luacov")
-        end
-        oidc = require "resty.openidc"
-        cjson = require "cjson"
-        delay = function(delay_response)
-          if delay_response > 0 then
-            ngx.sleep(delay_response / 1000)
-          end
-        end
-        b64url = function(s)
-          return ngx.encode_base64(cjson.encode(s)):gsub('+','-'):gsub('/','_')
-        end
-        create_jwt = function(payload, fake_signature)
-          if not fake_signature then
-            local jwt_content = {
-              header = TOKEN_HEADER,
-              payload = payload
-            }
-            local jwt = require "resty.jwt"
-            return jwt:sign(sign_secret, jwt_content)
-          else
-            local header = b64url({
-                typ = "JWT",
-                alg = "AB256"
-            })
-            return header .. "." .. b64url(payload) .. ".NOT_A_VALID_SIGNATURE"
-          end
-        end
-        query_decorator = function(req)
-          req.query = "foo=bar"
-          return req
-        end
-        body_decorator = function(req)
-          local body = ngx.decode_args(req.body)
-          body.foo = "bar"
-          req.body = ngx.encode_args(body)
-          return req
-        end
-        jwks = [=[JWK]=]
+        test_globals = require("test_globals")
     }
 
     resolver      8.8.8.8;
@@ -160,7 +223,7 @@ JWT_SIGN_SECRET]=]
 
         location /jwt {
             content_by_lua_block {
-                local jwt_token = create_jwt(ACCESS_TOKEN, FAKE_ACCESS_TOKEN_SIGNATURE)
+                local jwt_token = test_globals.create_jwt(ACCESS_TOKEN, FAKE_ACCESS_TOKEN_SIGNATURE)
                 ngx.header.content_type = 'text/plain'
                 ngx.say(jwt_token)
             }
@@ -168,10 +231,10 @@ JWT_SIGN_SECRET]=]
 
         location /jwk {
             content_by_lua_block {
-                ngx.log(ngx.ERR, "jwk uri_args: " .. cjson.encode(ngx.req.get_uri_args()))
+                ngx.log(ngx.ERR, "jwk uri_args: " .. test_globals.cjson.encode(ngx.req.get_uri_args()))
                 ngx.header.content_type = 'application/json;charset=UTF-8'
-                delay(JWK_DELAY_RESPONSE)
-                ngx.say(jwks)
+                test_globals.delay(JWK_DELAY_RESPONSE)
+                ngx.say(test_globals.jwks)
             }
         }
 
@@ -183,9 +246,9 @@ JWT_SIGN_SECRET]=]
             access_by_lua_block {
               local opts = OIDC_CONFIG
               if opts.decorate then
-                opts.http_request_decorator = opts.decorate == "body" and body_decorator or query_decorator
+                opts.http_request_decorator = opts.decorate == "body" and test_globals.body_decorator or test_globals.query_decorator
               end
-              local res, err, target, session = oidc.authenticate(opts, nil, UNAUTH_ACTION)
+              local res, err, target, session = test_globals.oidc.authenticate(opts, nil, UNAUTH_ACTION)
               if err then
                 ngx.status = 401
                 ngx.log(ngx.ERR, "authenticate failed: " .. err)
@@ -204,10 +267,10 @@ JWT_SIGN_SECRET]=]
             access_by_lua_block {
               local opts = OIDC_CONFIG
               if opts.decorate then
-                opts.http_request_decorator = opts.decorate == "body" and body_decorator or query_decorator
+                opts.http_request_decorator = opts.decorate == "body" and test_globals.body_decorator or test_globals.query_decorator
               end
               local uri = ngx.var.scheme .. "://" .. ngx.var.host .. ngx.var.request_uri
-              local res, err, target, session = oidc.authenticate(opts, uri, UNAUTH_ACTION)
+              local res, err, target, session = test_globals.oidc.authenticate(opts, uri, UNAUTH_ACTION)
               if err then
                 ngx.status = 401
                 ngx.log(ngx.ERR, "authenticate failed: " .. err)
@@ -253,15 +316,23 @@ JWT_SIGN_SECRET]=]
                 end
                 local jwt_token
                 if NONE_ALG_ID_TOKEN_SIGNATURE then
-                  local header = b64url({
+                  local header = test_globals.b64url({
                       typ = "JWT",
                       alg = "none"
                   })
-                  jwt_token = header .. "." .. b64url(id_token) .. "."
+                  jwt_token = header .. "." .. test_globals.b64url(id_token) .. "."
                 else
-                  jwt_token = create_jwt(id_token, FAKE_ID_TOKEN_SIGNATURE)
-                  if BREAK_ID_TOKEN_SIGNATURE then
-                    jwt_token = jwt_token:sub(1, -6) .. "XXXXX"
+                  if not test_globals.use_jwe then
+                    jwt_token = test_globals.create_jwt(id_token, FAKE_ID_TOKEN_SIGNATURE)
+                    if BREAK_ID_TOKEN_SIGNATURE then
+                      jwt_token = jwt_token:sub(1, -6) .. "XXXXX"
+                    end
+                  else 
+                    if JWE_SIGNED_PAYLOAD then 
+                      jwt_token = test_globals.create_jwe(test_globals.create_jwt(id_token), JWE_FAKE_ALG, JWE_FAKE_ENC, JWE_FAKE_JWE)
+                    else
+                      jwt_token = test_globals.create_jwe(id_token, JWE_FAKE_ALG, JWE_FAKE_ENC, JWE_fake_JWE)
+                    end
                   end
                 end
                 local token_response = {
@@ -272,8 +343,8 @@ JWT_SIGN_SECRET]=]
                 if args.grant_type == "authorization_code" or REFRESH_RESPONSE_CONTAINS_ID_TOKEN then
                   token_response.id_token = jwt_token
                 end
-                delay(TOKEN_DELAY_RESPONSE)
-                ngx.say(cjson.encode(token_response))
+                test_globals.delay(TOKEN_DELAY_RESPONSE)
+                ngx.say(test_globals.cjson.encode(token_response))
             }
         }
 
@@ -281,24 +352,24 @@ JWT_SIGN_SECRET]=]
             content_by_lua_block {
                 local opts = VERIFY_OPTS
                 if opts.decorate then
-                  opts.http_request_decorator = query_decorator
+                  opts.http_request_decorator = test_globals.query_decorator
                 end
-                local json, err, token = oidc.bearer_jwt_verify(opts)
+                local json, err, token = test_globals.oidc.bearer_jwt_verify(opts)
                 if err then
                   ngx.status = 401
                   ngx.log(ngx.ERR, "Invalid token: " .. err)
                 else
                   ngx.status = 204
-                  ngx.log(ngx.ERR, "Valid token: " .. cjson.encode(json))
+                  ngx.log(ngx.ERR, "Valid token: " .. test_globals.cjson.encode(json))
                 end
             }
         }
 
         location /discovery {
             content_by_lua_block {
-                ngx.log(ngx.ERR, "discovery uri_args: " .. cjson.encode(ngx.req.get_uri_args()))
+                ngx.log(ngx.ERR, "discovery uri_args: " .. test_globals.cjson.encode(ngx.req.get_uri_args()))
                 ngx.header.content_type = 'application/json;charset=UTF-8'
-                delay(DISCOVERY_DELAY_RESPONSE)
+                test_globals.delay(DISCOVERY_DELAY_RESPONSE)
                 ngx.say([=[{
   "authorization_endpoint": "http://127.0.0.1/authorize",
   "token_endpoint": "http://127.0.0.1/token",
@@ -311,11 +382,11 @@ JWT_SIGN_SECRET]=]
 
         location /user-info {
             content_by_lua_block {
-                delay(USERINFO_DELAY_RESPONSE)
+                test_globals.delay(USERINFO_DELAY_RESPONSE)
                 local auth = ngx.req.get_headers()["Authorization"]
                 ngx.log(ngx.ERR, "userinfo authorization header: " .. (auth and auth or ""))
                 ngx.header.content_type = 'application/json;charset=UTF-8'
-                ngx.say(cjson.encode(USERINFO))
+                ngx.say(test_globals.cjson.encode(USERINFO))
             }
         }
 
@@ -337,8 +408,8 @@ JWT_SIGN_SECRET]=]
                   ngx.log(ngx.ERR, "no cookie in introspection call")
                 end
                 ngx.header.content_type = 'application/json;charset=UTF-8'
-                delay(INTROSPECTION_DELAY_RESPONSE)
-                ngx.say(cjson.encode(INTROSPECTION_RESPONSE))
+                test_globals.delay(INTROSPECTION_DELAY_RESPONSE)
+                ngx.say(test_globals.cjson.encode(INTROSPECTION_RESPONSE))
             }
         }
 
@@ -346,22 +417,22 @@ JWT_SIGN_SECRET]=]
             content_by_lua_block {
                 local opts = INTROSPECTION_OPTS
                 if opts.decorate then
-                  opts.http_request_decorator = body_decorator
+                  opts.http_request_decorator = test_globals.body_decorator
                 end
-                local json, err = oidc.introspect(opts)
+                local json, err = test_globals.oidc.introspect(opts)
                 if err then
                   ngx.status = 401
                   ngx.log(ngx.ERR, "Introspection error: " .. err)
                 else
                   ngx.header.content_type = 'application/json;charset=UTF-8'
-                  ngx.say(cjson.encode(json))
+                  ngx.say(test_globals.cjson.encode(json))
                 end
             }
         }
 
         location /access_token {
             content_by_lua_block {
-                local access_token, err = oidc.access_token(ACCESS_TOKEN_OPTS)
+                local access_token, err = test_globals.oidc.access_token(ACCESS_TOKEN_OPTS)
                 if not access_token then
                   ngx.status = 401
                   ngx.log(ngx.ERR, "access_token error: " .. (err or 'no message'))
@@ -375,8 +446,8 @@ JWT_SIGN_SECRET]=]
         location /revoke_tokens {
           content_by_lua_block {
               local opts = OIDC_CONFIG
-              local res, err, target, session = oidc.authenticate(opts, nil, UNAUTH_ACTION)
-              local r = oidc.revoke_tokens(opts, session)
+              local res, err, target, session = test_globals.oidc.authenticate(opts, nil, UNAUTH_ACTION)
+              local r = test_globals.oidc.revoke_tokens(opts, session)
               ngx.header.content_type = 'text/plain'
               ngx.say('revoke-result: ' .. tostring(r))
           }
@@ -393,7 +464,7 @@ JWT_SIGN_SECRET]=]
                   ngx.log(ngx.ERR, "no cookie in introspection call")
                 end
                 ngx.header.content_type = 'application/json;charset=UTF-8'
-                delay(REVOCATION_DELAY_RESPONSE)
+                test_globals.delay(REVOCATION_DELAY_RESPONSE)
                 ngx.status = 200
                 ngx.say('INVALID JSON.')
             }
@@ -424,7 +495,7 @@ end
 
 local DEFAULT_INTROSPECTION_RESPONSE = merge({active=true}, DEFAULT_ACCESS_TOKEN)
 
-local function write_config(out, custom_config)
+local function write_template(out, template, custom_config)
   custom_config = custom_config or {}
   local oidc_config = merge(merge({}, DEFAULT_OIDC_CONFIG), custom_config["oidc_opts"] or {})
   local id_token = merge(merge({}, DEFAULT_ID_TOKEN), custom_config["id_token"] or {})
@@ -432,6 +503,8 @@ local function write_config(out, custom_config)
   local verify_opts = merge(merge({}, DEFAULT_VERIFY_OPTS), custom_config["verify_opts"] or {})
   local access_token = merge(merge({}, DEFAULT_ACCESS_TOKEN), custom_config["access_token"] or {})
   local token_header = merge(merge({}, DEFAULT_TOKEN_HEADER), custom_config["token_header"] or {})
+  local jwe_token_header = merge(merge({}, DEFAULT_JWE_TOKEN_HEADER), custom_config["jwe_token_header"] or {})
+
   local userinfo = merge(merge({}, DEFAULT_ID_TOKEN), custom_config["userinfo"] or {})
   local introspection_response = merge(merge({}, DEFAULT_INTROSPECTION_RESPONSE),
                                        custom_config["introspection_response"] or {})
@@ -443,6 +516,7 @@ local function write_config(out, custom_config)
   local refreshing_token_fails = custom_config["refreshing_token_fails"] or DEFAULT_REFRESHING_TOKEN_FAILS
   local refresh_response_contains_id_token = custom_config["refresh_response_contains_id_token"] or DEFAULT_REFRESH_RESPONSE_CONTAINS_ID_TOKEN
   local access_token_opts = merge(merge({}, DEFAULT_OIDC_CONFIG), custom_config["access_token_opts"] or {})
+  
   for _, k in ipairs(custom_config["remove_id_token_claims"] or {}) do
     id_token[k] = nil
   end
@@ -464,8 +538,9 @@ local function write_config(out, custom_config)
   for _, k in ipairs(custom_config["remove_introspection_config_keys"] or {}) do
     introspection_opts[k] = nil
   end
-  local config = DEFAULT_CONFIG_TEMPLATE
+  local content = template
     :gsub("OIDC_CONFIG", serpent.block(oidc_config, {comment = false }))
+    :gsub("JWE_TOKEN_HEADER", serpent.block(jwe_token_header, {comment = false }))
     :gsub("TOKEN_HEADER", serpent.block(token_header, {comment = false }))
     :gsub("JWT_SIGN_SECRET", custom_config["jwt_sign_secret"] or DEFAULT_JWT_SIGN_SECRET)
     :gsub("VERIFY_OPTS", serpent.block(verify_opts, {comment = false }))
@@ -492,7 +567,17 @@ local function write_config(out, custom_config)
     :gsub("ID_TOKEN", serpent.block(id_token, {comment = false }))
     :gsub("ACCESS_TOKEN", serpent.block(access_token, {comment = false }))
     :gsub("UNAUTH_ACTION", custom_config["unauth_action"] and ('"' .. custom_config["unauth_action"] .. '"') or DEFAULT_UNAUTH_ACTION)
-  out:write(config)
+    :gsub("JWE_ENC_RSA_KEY", custom_config["jwe_enc_rsa_key"] or DEFAULT_JWE_ENC_RSA_KEY)
+    :gsub("JWE_ENC_RSA_KID", custom_config["jwe_enc_rsa_kid"] or DEFAULT_JWE_ENC_RSA_KID)
+    :gsub("JWE_DEC_RSA_KEY", custom_config["jwe_dec_rsa_key"] or DEFAULT_JWE_DEC_RSA_KEY)
+    :gsub("JWE_DEC_RSA_KID", custom_config["jwe_enc_rsa_kid"] or DEFAULT_JWE_ENC_RSA_KID)
+    :gsub("JWE_ENC_AES_KEY", custom_config["jwe_enc_aes_key"] or DEFAULT_JWE_ENC_AES_KEY)
+    :gsub("JWE_ENC_AES_KID", custom_config["jwe_enc_aes_kid"] or DEFAULT_JWE_ENC_AES_KID)
+    :gsub("JWE_SIGNED_PAYLOAD", custom_config["jwe_signed_payload"] or DEFAULT_JWE_SIGNED_PAYLOAD)
+    :gsub("JWE_FAKE_ALG", custom_config["jwe_fake_alg"] or DEFAULT_JWE_FAKE_ALG)
+    :gsub("JWE_FAKE_ENC", custom_config["jwe_fake_enc"] or DEFAULT_JWE_FAKE_ENC)
+    :gsub("JWE_FAKE_JWE", custom_config["jwe_fake_jwe"] or DEFAULT_JWE_FAKE_JWE)
+  out:write(content)
 end
 
 -- starts a server instance with some customizations of the configuration.
@@ -535,8 +620,11 @@ function test_support.start_server(custom_config)
   assert(os.execute("rm -rf /tmp/server"), "failed to remove old server dir")
   assert(os.execute("mkdir -p /tmp/server/conf"), "failed to create server dir")
   assert(os.execute("mkdir -p /tmp/server/logs"), "failed to create log dir")
-  local out = assert(io.open("/tmp/server/conf/nginx.conf", "w"))
-  write_config(out, custom_config)
+  local out = assert(io.open("/tmp/server/conf/test_globals.lua", "w"))
+  write_template(out, DEFAULT_INIT_TEMPLATE, custom_config)
+  assert(out:close())
+  out = assert(io.open("/tmp/server/conf/nginx.conf", "w"))
+  write_template(out, DEFAULT_CONFIG_TEMPLATE, custom_config)
   assert(out:close())
   assert(os.execute("openresty -c /tmp/server/conf/nginx.conf > /dev/null"), "failed to start nginx")
 end
@@ -592,7 +680,8 @@ end
 -- returns a Cookie header value based on all cookies requested via
 -- Set-Cookie inside headers
 function test_support.extract_cookies(headers)
-   local pair = headers["set-cookie"] or ''
+   local h = headers or {}
+   local pair = h["set-cookie"] or ''
    local semi = pair:find(";")
    if semi then
       pair = pair:sub(1, semi - 1)

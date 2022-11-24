@@ -384,3 +384,165 @@ describe("when the id token is signed by an algorithm not announced by discovery
   end)
 end)
 
+describe("when the id_token is encrypted with a pre-shared key", function()
+  describe("and the key managment algorithm is \"RSA-OAEP-256\"", function()
+    test_support.start_server({
+      jwe_enc_rsa_key = test_support.load("/spec/public_rsa_key.pem"),
+      oidc_opts = {
+        client_rsa_private_enc_key = test_support.load("/spec/private_rsa_key.pem"),
+        client_rsa_private_enc_key_id = "RSAencKID"
+      }
+    })
+    teardown(test_support.stop_server)
+    local _, status = test_support.login()
+    it("login succeeds", function()
+      assert.are.equals(302, status)
+    end)
+
+  end)
+  
+end)
+
+describe("when the id_token cannot be decrypted", function()
+  describe("because the wrong RSA key is used", function()
+    test_support.start_server({
+      jwe_enc_rsa_key = test_support.load("/spec/public_rsa_key.pem"),
+      oidc_opts = {
+        client_rsa_private_enc_key = test_support.load("/spec/private_longer_rsa_key.pem"),
+        client_rsa_private_enc_key_id = "RSAencKID"
+      }
+    })
+    teardown(test_support.stop_server)
+    local _, status = test_support.login()
+    it("authenticate returns an error", function()
+      assert.error_log_contains("jwe token cannot be decrypted")
+    end)
+  end)
+  describe("because the wrong RSA kid is used", function()
+    test_support.start_server({
+      jwe_enc_rsa_key = test_support.load("/spec/public_rsa_key.pem"),
+      oidc_opts = {
+        client_rsa_private_enc_key = test_support.load("/spec/private_rsa_key.pem"),
+        client_rsa_private_enc_key_id = "RSAWrongencKID"
+      }
+    })
+    teardown(test_support.stop_server)
+    local _, status = test_support.login()
+    it("authenticate returns an error", function()
+      assert.error_log_contains("jwe_header.kid not matching client_rsa_private_enc_key_id")
+    end)
+  end)
+  describe("because the wrong RSA kid is used", function()
+    test_support.start_server({
+      jwe_enc_rsa_key = test_support.load("/spec/public_rsa_key.pem"),
+      oidc_opts = {
+        client_rsa_private_enc_key = test_support.load("/spec/private_rsa_key.pem"),
+        client_rsa_private_enc_key_id = "RSAWrongencKID"
+      }
+    })
+    teardown(test_support.stop_server)
+    local _, status = test_support.login()
+    it("authenticate returns an error", function()
+      assert.error_log_contains("jwe_header.kid not matching client_rsa_private_enc_key_id")
+    end)
+  end)
+  describe("because an unsupported key managment algorithm is used", function()
+    test_support.start_server({
+      jwe_enc_rsa_key = test_support.load("/spec/public_rsa_key.pem"),
+      jwe_fake_alg = "true",
+      oidc_opts = {
+        client_rsa_private_enc_key = test_support.load("/spec/private_rsa_key.pem"),
+        client_rsa_private_enc_key_id = "RSAencKID"
+      }
+    })
+    teardown(test_support.stop_server)
+    local _, status = test_support.login()
+    it("authenticate returns an error", function()
+      assert.error_log_contains("jwe_header.alg not supported by the jwt.lua library")
+    end)
+  end)
+  describe("because an unsupported encryption algorithm is used", function()
+    test_support.start_server({
+      jwe_enc_rsa_key = test_support.load("/spec/public_rsa_key.pem"),
+      jwe_fake_enc = "true",
+      oidc_opts = {
+        client_rsa_private_enc_key = test_support.load("/spec/private_rsa_key.pem"),
+        client_rsa_private_enc_key_id = "RSAencKID"
+      }
+    })
+    teardown(test_support.stop_server)
+    local _, status = test_support.login()
+    it("authenticate returns an error", function()
+      assert.error_log_contains("jwe token cannot be decrypted")
+    end)
+  end)
+  describe("because the token is faked", function()
+    test_support.start_server({
+      jwe_enc_rsa_key = test_support.load("/spec/public_rsa_key.pem"),
+      jwe_fake_jwe = "true",
+      oidc_opts = {
+        client_rsa_private_enc_key = test_support.load("/spec/private_rsa_key.pem"),
+        client_rsa_private_enc_key_id = "RSAencKID"
+      }
+    })
+    teardown(test_support.stop_server)
+    local _, status = test_support.login()
+    it("authenticate returns an error", function()
+      assert.error_log_contains("jwe token cannot be decrypted")
+    end)
+  end)
+end)
+
+describe("when the id_token is encrypted and use a RSA \"alg\" and the config", function()
+  describe("is missing a private RSA key", function()
+    test_support.start_server({
+      jwe_enc_rsa_key = test_support.load("/spec/public_rsa_key.pem"),
+      oidc_opts = {
+        client_rsa_private_enc_key_id = "RSAencKID"
+      }
+    })
+    teardown(test_support.stop_server)
+    local _, status = test_support.login()
+    it("authenticate returns an error", function()
+      assert.error_log_contains("OIDC config is missing a private RSA key")
+    end)
+  end)
+  describe("is missing a private RSA kid", function()
+    test_support.start_server({
+      jwe_enc_rsa_key = test_support.load("/spec/public_rsa_key.pem"),
+      oidc_opts = {
+        client_rsa_private_enc_key = test_support.load("/spec/private_rsa_key.pem")
+      }
+    })
+    teardown(test_support.stop_server)
+    local _, status = test_support.login()
+    it("authenticate returns an error", function()
+      assert.error_log_contains("OIDC config is missing a private RSA kid")
+    end)
+  end)
+end)
+
+describe("when the id_token is encrypted but not signed", function()
+  test_support.start_server({
+    jwe_enc_rsa_key = test_support.load("/spec/public_rsa_key.pem"),
+    jwe_signed_payload = "false",
+    oidc_opts = {
+      client_rsa_private_enc_key = test_support.load("/spec/private_rsa_key.pem"),
+      client_rsa_private_enc_key_id = "RSAencKID"
+    }
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("authenticate returns an error", function()
+    assert.error_log_contains("jwe_payload must be signed before beeing encrypted")
+  end)
+end)
+
+-- TODO : Test valid 4 part JWE
+   -- Not implemented yet in openidc.lua : linked to direct symetric encryption (AES)
+
+-- TODO : Test no configured AES key
+   -- Not implemented yet in openidc.lua : linked to symetric encryption (AES)
+
+-- TODO : Test invalid JWE with AES => load_jwt fails
+  -- Not implemented yet in openidc.lua : linked to symetric encryption (AES)

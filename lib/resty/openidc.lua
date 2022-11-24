@@ -638,33 +638,20 @@ function openidc.call_userinfo_endpoint(opts, access_token)
   log(DEBUG, "userinfo response: ", res.body)
 
   -- parse the response from the user info endpoint
-  local ignore_body_on_success = true
-  local json = nil
-  json, err = openidc_parse_json_response(res, ignore_body_on_success)
+  local json
+  json, err = openidc_parse_json_response(res)
 
-  -- Decode json if response is valid
-  if not json and not err then
-    json = cjson_s.decode(res.body)
-
-    if not json then
-      -- Try to parse body as JWT
-      local r_jwt = require("resty.jwt")
-      local jwt_obj = r_jwt:load_jwt(res.body, nil)
-
-      -- Test if body successfully parsed
-      if not jwt_obj.valid then
-        err = "invalid jwt"
-        if jwt_obj.reason then
-          err = err .. ": " .. jwt_obj.reason
-        end
-        return nil, err
-      else
-        res = jwt_obj.payload
-      end
+  -- If err, try to decode as jwt
+  if not json and err then
+    local r_jwt = require("resty.jwt")
+    local jwt_obj = r_jwt:load_jwt(res.body, nil)
+    if jwt_obj.valid then
+      json = jwt_obj.payload
+      err = nil
     end
   end
 
-  return res, err
+  return json, err
 end
 
 local function can_use_token_auth_method(method, opts)
@@ -1015,7 +1002,10 @@ symmetric_secret, expected_algs, ...)
       else
         return jwt, "token uses \"none\" alg but accept_none_alg is not enabled"
       end
-    end -- otherwise the JWT is invalid and load_jwt produces an error
+    else
+      -- Return error when token look like a JWT or the token is unsigned but shouldn't (alg other than \"none\"")
+      return nil, "invalid unsigned jwt"
+    end 
 
   -- Case : is a signed JWS
   elseif part1 and part2 and part3 and not part4 and not part5 then
@@ -1034,15 +1024,26 @@ symmetric_secret, expected_algs, ...)
 
     -- Limiration imposed by lua-resty-jwt v0.2.3 :
     --    the "alg" must be either "RSA-OAEP-256" or "DIR" (function parse_jwe in lib jwt.lua, line 256 )
-    
-    if jwe_header.alg == "RSA-OAEP-256" then
+    if not jwe_header.alg then
+      return nil, "jwe_header is missing the \"alg\" parameter"
+    elseif jwe_header.alg == "RSA-OAEP-256" then
+      if not opts.client_rsa_private_enc_key then
+        return nil, "OIDC config is missing a private RSA key"
+      elseif not opts.client_rsa_private_enc_key_id then 
+        return nil, "OIDC config is missing a private RSA kid"
+      end
+
       if jwe_header.kid == opts.client_rsa_private_enc_key_id then
         jwe_obj = r_jwt:load_jwt(jwt_string, opts.client_rsa_private_enc_key)
         -- Test if JWE payload exist or not
         if jwe_obj.payload == nil and jwe_obj.internal ~= nil then
           jwt_obj = r_jwt:load_jwt(jwe_obj.internal.json_payload, nil)
-        else
-          jwt_obj = jwe_obj
+        elseif type(jwe_obj.payload) == 'string' then
+          jwt_obj = r_jwt:load_jwt(jwe_obj.payload, nil)
+        elseif type(jwe_obj.payload) == 'table' then
+          return nil, "jwe_payload must be signed before beeing encrypted"
+        else 
+          return nil, "jwe token cannot be decrypted"
         end
       else
         return nil, "jwe_header.kid not matching client_rsa_private_enc_key_id"
@@ -1051,7 +1052,7 @@ symmetric_secret, expected_algs, ...)
       return nil, "jwe_header.alg not supported by the jwt.lua library"
     end
   else
-    
+    return nil, "invalid jwt"
   end
 
   if not jwt_obj.valid then
@@ -1249,6 +1250,7 @@ local function openidc_authorization_response(opts, session)
       log(ERROR, "error calling userinfo endpoint: " .. err)
     elseif user then
       if id_token.sub ~= user.sub then
+        
         err = "\"sub\" claim in id_token (\"" .. (id_token.sub or "null") .. "\") is not equal to the \"sub\" claim returned from the userinfo endpoint (\"" .. (user.sub or "null") .. "\")"
         log(ERROR, err)
       else
