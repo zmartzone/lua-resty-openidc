@@ -68,10 +68,6 @@ local function split_string(str, delim)
   return result
 end
 
--- Test if string start with
-local function string_starts(input_string, partern)
-  return string.sub(input_string, 1, string.len(input_string)) == patern
-end
 
 local function token_auth_method_precondition(method, required_field)
   return function(opts)
@@ -419,21 +415,8 @@ local function openidc_parse_json_response(response, ignore_body_on_success)
     res = cjson_s.decode(response.body)
 
     if not res then
-       -- Try to parse body as JWT
-      local r_jwt = require("resty.jwt")
-      local jwt_obj = r_jwt:load_jwt(response.body, nil)
-
-      -- Test if body successfully parsed
-      if not jwt_obj.valid then
-        local reason = "invalid jwt"
-        if jwt_obj.reason then
-          reason = reason .. ": " .. jwt_obj.reason
-        end
-        return nil, reason
-      else
-        res = jwt_obj.payload
-      end
-
+      err = "JSON decoding failed"
+      
     end
   end
 
@@ -666,7 +649,33 @@ function openidc.call_userinfo_endpoint(opts, access_token)
   log(DEBUG, "userinfo response: ", res.body)
 
   -- parse the response from the user info endpoint
-  return openidc_parse_json_response(res)
+  local ignore_body_on_success = true
+  local json = nil
+  json, err = openidc_parse_json_response(res, ignore_body_on_success)
+
+  -- Decode json if response is valid
+  if not json and not err then
+    json = cjson_s.decode(res.body)
+
+    if not json then
+      -- Try to parse body as JWT
+      local r_jwt = require("resty.jwt")
+      local jwt_obj = r_jwt:load_jwt(res.body, nil)
+
+      -- Test if body successfully parsed
+      if not jwt_obj.valid then
+        err = "invalid jwt"
+        if jwt_obj.reason then
+          err = err .. ": " .. jwt_obj.reason
+        end
+        return nil, err
+      else
+        res = jwt_obj.payload
+      end
+    end
+  end
+
+  return res, err
 end
 
 local function can_use_token_auth_method(method, opts)
