@@ -1518,6 +1518,9 @@ local function openidc_get_path(uri)
 end
 
 local function openidc_get_redirect_uri_path(opts)
+  if opts.local_redirect_uri_path then
+    return opts.local_redirect_uri_path
+  end
   return opts.redirect_uri and openidc_get_path(opts.redirect_uri) or opts.redirect_uri_path
 end
 

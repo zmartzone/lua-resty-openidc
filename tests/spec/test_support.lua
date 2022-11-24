@@ -110,15 +110,18 @@ local DEFAULT_INIT_TEMPLATE = [[
 local test_globals = {}
 local sign_secret = [=[
 JWT_SIGN_SECRET]=]
+
 local jwe_enc_rsa_key = [=[JWE_ENC_RSA_KEY]=]
 local jwe_enc_aes_key = [=[JWE_ENC_AES_KEY]=]
   -- ground work for future implementation of JWE using AES 'alg'
+
 
 if os.getenv('coverage') then
   require("luacov.runner")("/spec/luacov/settings.luacov")
 end
 test_globals.oidc = require "resty.openidc"
 test_globals.cjson = require "cjson"
+
 
 test_globals.jwks = [=[JWK]=]
 test_globals.use_jwe = jwe_enc_rsa_key ~= "" or jwe_enc_aes_key ~= ""
@@ -190,6 +193,8 @@ test_globals.body_decorator = function(req)
   req.body = ngx.encode_args(body)
   return req
 end
+
+test_globals.jwks = [=[JWK]=]
 
 return test_globals
 ]]
@@ -577,6 +582,7 @@ local function write_template(out, template, custom_config)
     :gsub("JWE_FAKE_ALG", custom_config["jwe_fake_alg"] or DEFAULT_JWE_FAKE_ALG)
     :gsub("JWE_FAKE_ENC", custom_config["jwe_fake_enc"] or DEFAULT_JWE_FAKE_ENC)
     :gsub("JWE_FAKE_JWE", custom_config["jwe_fake_jwe"] or DEFAULT_JWE_FAKE_JWE)
+
   out:write(content)
 end
 

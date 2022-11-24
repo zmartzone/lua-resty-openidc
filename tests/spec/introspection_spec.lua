@@ -395,6 +395,7 @@ end)
 describe("when introspection endpoint is not reachable", function()
   test_support.start_server({
     introspection_opts = {
+      timeout = 40000,
       introspection_endpoint = "http://192.0.2.1/"
     },
   })

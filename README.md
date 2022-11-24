@@ -274,6 +274,45 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
 }
 ```
 
+## About `redirect_uri`
+
+The so called `redirect_uri` is an URI that is part of the OpenID
+Connect protocoll. The redirect URI is registered with your OpenID
+Connect provider and is the URI your provider will redirect the users
+to after successful login. This URI then is handelled by
+lua-resty-openidc where it obtains tokens and performs some checks and
+only after that the browser is redirected to where your user wanted to
+go initially.
+
+The `redirect_uri` is not expected to be handelled by your appication
+code at all. It must be an URI wthat lua-resty-openidc is responsible
+for so it must be in a `location` protected by lua-resty-openidc.
+
+You configure the `redirect_uri` on the lua-resty-openidc side via the
+`opts.redirect_uri` parameter (which defaults to `/redirect_uri`). If
+it starts with a `/` then lua-resty-openidc will prepend the protocoll
+and current hostname to it when sending the URI to the OpenID Connect
+provider (taking `Forwarded` and `X-Forwarded-*` HTTP headers into
+account). But you can also specify an absolute URI containing host and
+protocoll yourself.
+
+Before version 1.6.1 `opts.redirect_uri_path` has been the way to
+configure the `redirect_uri` without any option to take control over
+the protocoll and host parts.
+
+Whenever lua-resty-openidc "sees" a local path navigated that matches
+the path of `opts.redirect_uri` (or `opts.redirect_uri_path`) it will
+intercept the request and handle it itself.
+
+This works for most cases but sometimes the externally visible
+`redirect_uri` has a different path than the one locally visible to
+the server. This may happen if a reverse proxy in front of your server
+rewrites URIs before forwarding the requests. Therefore version 1.7.6
+introduced a new option `opts.local_redirect_uri_path`. If it is set
+lua-resty-opendic will intercepts requests to this path rather than
+the path of `opts.redirect_uri`.
+
+
 ## Check authentication only
 
 ```lua

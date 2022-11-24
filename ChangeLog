@@ -1,3 +1,11 @@
+11/06/2022
+- a new option local_redirect_path can be used is situations where the
+  redirect_uri as is visible to lua-resty-openidc is not simply the path
+  segment of the configured redirect_uri but something more
+  complex. This is needed for example if a reverse proxy in front of
+  your server adds a prefix of rewrites URIs in a more complex way;
+  see #453
+
 03/05/2022
 - improved error message when expecting a Bearer token header and the
   header doesn't contain a space character; see #421
