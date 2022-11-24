@@ -58,17 +58,6 @@ local DEBUG = ngx.DEBUG
 local ERROR = ngx.ERR
 local WARN = ngx.WARN
 
--- Split string in multiple parts
-local function split_string(str, delim)
-  local result = {}
-  local sep = string.format("([^%s]+)", delim)
-  for m in str:gmatch(sep) do
-    result[#result+1]=m
-  end
-  return result
-end
-
-
 local function token_auth_method_precondition(method, required_field)
   return function(opts)
     if not opts[required_field] then
@@ -997,9 +986,28 @@ end
 local function openidc_load_jwt_and_verify_crypto(opts, jwt_string, asymmetric_secret,
 symmetric_secret, expected_algs, ...)
   local r_jwt = require("resty.jwt")
-  local enc_hdr, enc_payload, enc_sign = string.match(jwt_string, '^(.+)%.(.+)%.(.*)$')
-  if enc_payload and (not enc_sign or enc_sign == "") then
-    local jwt = openidc_load_jwt_none_alg(enc_hdr, enc_payload)
+  local jwt_obj
+
+  -- Expect a JWT encoded as a JWE, extracting parts
+  local part1, part2, part3, part4, part5 = string.match(jwt_string, '^(.+)%.(.+)%.(.+)%.(.+)%.(.*)$')
+  
+  -- No parts extracted, try to extract parts of a JWS encoded JWT
+  if not part1 and not part2 then
+    part1, part2, part3= string.match(jwt_string, '^(.+)%.(.+)%.(.*)$')
+    part4, part5 = nil
+  end
+
+  log(DEBUG, "part 1 : ",part1, ", part 2 : ",part2, ", part 3 : ",part3, ", part 4 : ",part4, ", part 5 : ",part5)
+  -- Determine type of JWT (simple JWT, JWS, JWE) :
+
+  -- Case : is a simple JWT
+  if part1 and not part2 and not part3  and not part4 and not part5 then
+    return nil, "token is not secured, it's a simple JWT."
+
+  -- Case : is an unsigned JWS
+  elseif part1 and part2 and (not part3 or part3 == "") and not part4 and not part5 then
+    -- part1 = JOSE Header, part2 = Payload, part3 = Signature, others are unused
+    local jwt = openidc_load_jwt_none_alg(part1, part2)
     if jwt then
       if opts.accept_none_alg then
         log(DEBUG, "accept JWT with alg \"none\" and no signature")
@@ -1008,20 +1016,27 @@ symmetric_secret, expected_algs, ...)
         return jwt, "token uses \"none\" alg but accept_none_alg is not enabled"
       end
     end -- otherwise the JWT is invalid and load_jwt produces an error
-  end
 
-   -- dertermine if jwt uses JWS or JWE
-  local tokens = split_string(jwt_string, "%.")
-  local num_token = #tokens
-  local is_jwe = num_token > 3
+  -- Case : is a signed JWS
+  elseif part1 and part2 and part3 and not part4 and not part5 then
+    -- part1 = JOSE Header, part2 = Payload, part3 = Signature, others are unused
+    jwt_obj = r_jwt:load_jwt(jwt_string, nil)
 
-  local jwt_obj
-  if is_jwe then
-    jwe_header = cjson.decode(unb64(tokens[1]))
+  -- Case : is a JWE, without or with preshared key
+  elseif (part1 and part2 and part3 and  part4 and not part5) or 
+          (part1 and part2 and part3 and  part4 and part5) then
+    -- part1 = JOSE Header, part2 = Initialization Vector, part3 = Cyphertext, part4 = Authentication Tag , others are unused
+    -- or 
+    -- part1 = JOSE Header, part2 = Pre-shared key, part3 = Initialization Vector, part4 = Cyphertext, part5 = Authentication Tag 
+    local jwe_header = cjson.decode(unb64(part1))
+    local jwe_obj = nil
 
+
+    -- Limiration imposed by lua-resty-jwt v0.2.3 :
+    --    the "alg" must be either "RSA-OAEP-256" or "DIR" (function parse_jwe in lib jwt.lua, line 256 )
+    
     if jwe_header.alg == "RSA-OAEP-256" then
       if jwe_header.kid == opts.client_rsa_private_enc_key_id then
-        local jwe_obj = nil
         jwe_obj = r_jwt:load_jwt(jwt_string, opts.client_rsa_private_enc_key)
         -- Test if JWE payload exist or not
         if jwe_obj.payload == nil and jwe_obj.internal ~= nil then
@@ -1030,15 +1045,13 @@ symmetric_secret, expected_algs, ...)
           jwt_obj = jwe_obj
         end
       else
-        reason = "jwe_header.kid not matching client_rsa_private_enc_key_id"
-        return nil, reason
+        return nil, "jwe_header.kid not matching client_rsa_private_enc_key_id"
       end
     else
-      reason = "jwe_header.alg not supported by the jwt.lua library"
-      return nil, reason
+      return nil, "jwe_header.alg not supported by the jwt.lua library"
     end
   else
-    jwt_obj = r_jwt:load_jwt(jwt_string, nil)
+    
   end
 
   if not jwt_obj.valid then
