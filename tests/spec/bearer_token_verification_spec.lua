@@ -203,6 +203,30 @@ describe("when the JWK specifies a kid and the JWKS does not contain a key with 
   
 end)
 
+describe("when the JWKS contains a broken x5c which is not an array", function()
+  test_support.start_server({
+    verify_opts = {
+      discovery = {
+        jwks_uri = "http://127.0.0.1/jwk",
+      }
+    },
+    jwk = test_support.load("/spec/rsa_key_jwk_with_broken_x5c.json"),
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status = http.request({
+    url = "http://127.0.0.1/verify_bearer_token",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the token is invalid", function()
+    assert.are.equals(401, status)
+  end)
+  it("an error is logged", function()
+    assert.error_log_contains("Found invalid JWK with x5c claim not being an array but a string")
+  end)
+
+end)
+
 describe("when the JWK specifies no kid and the JWKS contains multiple keys", function()
   test_support.start_server({
     verify_opts = {

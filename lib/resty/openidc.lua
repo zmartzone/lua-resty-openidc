@@ -908,6 +908,10 @@ local function openidc_pem_from_jwk(opts, kid)
   end
 
   local x5c = jwk.x5c
+  if x5c and type(x5c) ~= 'table' then
+    log(WARN, "Found invalid JWK with x5c claim not being an array but a " .. type(x5c))
+    x5c = nil
+  end
   if x5c and #(jwk.x5c) == 0 then
     log(WARN, "Found invalid JWK with empty x5c array, ignoring x5c claim")
     x5c = nil
