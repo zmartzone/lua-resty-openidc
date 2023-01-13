@@ -1,3 +1,8 @@
+01/13/2023
+- when parsing JWKs with an x5c claim the claim was wronly assumed to
+  be base64url encoded instead of base64 encoded;
+  see #460
+
 11/06/2022
 - a new option local_redirect_path can be used is situations where the
   redirect_uri as is visible to lua-resty-openidc is not simply the path

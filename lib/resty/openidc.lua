@@ -844,7 +844,7 @@ end
 
 local function openidc_pem_from_x5c(x5c)
   log(DEBUG, "Found x5c, getting PEM public key from x5c entry of json public key")
-  local chunks = split_by_chunk(b64(openidc_base64_url_decode(x5c[1])), 64)
+  local chunks = split_by_chunk(x5c[1], 64)
   local pem = "-----BEGIN CERTIFICATE-----\n" ..
       table.concat(chunks, "\n") ..
       "\n-----END CERTIFICATE-----"
