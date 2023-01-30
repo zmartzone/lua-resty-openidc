@@ -49,16 +49,15 @@ introspection for access token validation.
 
 ## Installation
 
-If you're using `opm` execute the following:
-
-     opm install zmartzone/lua-resty-openidc
-
-If you're using `luarocks` execute the following:
+Using `luarocks` execute the following:
 
      luarocks install lua-resty-openidc
 
 Otherwise copy `openidc.lua` somewhere in your `lua_package_path` under a directory named `resty`.
 If you are using [OpenResty](http://openresty.org/), the default location would be `/usr/local/openresty/lualib/resty`.
+
+Older versions of lua-resty-openidc could also be installed using opm
+but this is no longer supported.
 
 
 ## Sample Configuration for Google+ Signin
