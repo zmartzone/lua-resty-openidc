@@ -1,3 +1,6 @@
+30/01/2023
+- release 1.7.6
+
 01/13/2023
 - when parsing JWKs with an x5c claim the claim was wronly assumed to
   be base64url encoded instead of base64 encoded;
