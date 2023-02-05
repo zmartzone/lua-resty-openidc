@@ -17,7 +17,7 @@ specific language governing permissions and limitations
 under the License.
 
 ***************************************************************************
-Copyright (C) 2017-2022 ZmartZone Holding B.V.
+Copyright (C) 2017-2023 ZmartZone Holding B.V.
 Copyright (C) 2015-2017 Ping Identity Corporation
 All rights reserved.
 
