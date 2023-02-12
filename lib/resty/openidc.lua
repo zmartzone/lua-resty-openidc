@@ -52,6 +52,8 @@ local type = type
 local ngx = ngx
 local b64 = ngx.encode_base64
 local unb64 = ngx.decode_base64
+local b64url = require("ngx.base64").encode_base64url
+local unb64url = require("ngx.base64").decode_base64url
 
 local log = ngx.log
 local DEBUG = ngx.DEBUG
@@ -278,23 +280,6 @@ local function openidc_get_redirect_uri(opts, session)
   return scheme .. "://" .. host .. path
 end
 
--- perform base64url decoding
-local function openidc_base64_url_decode(input)
-  local reminder = #input % 4
-  if reminder > 0 then
-    local padlen = 4 - reminder
-    input = input .. string.rep('=', padlen)
-  end
-  input = input:gsub('%-', '+'):gsub('_', '/')
-  return unb64(input)
-end
-
--- perform base64url encoding
-local function openidc_base64_url_encode(input)
-  local output = b64(input, true)
-  return output:gsub('%+', '-'):gsub('/', '_')
-end
-
 local function openidc_combine_uri(uri, params)
   if params == nil or next(params) == nil then
     return uri
@@ -310,10 +295,12 @@ local function decorate_request(http_request_decorator, req)
   return http_request_decorator and http_request_decorator(req) or req
 end
 
+local sha256 = (require 'resty.sha256'):new()
 local function openidc_s256(verifier)
-  local sha256 = (require 'resty.sha256'):new()
   sha256:update(verifier)
-  return openidc_base64_url_encode(sha256:final())
+  local s256 = b64url(sha256:final())
+  sha256:reset()
+  return s256
 end
 
 -- send the browser of to the OP's authorization endpoint
@@ -326,7 +313,7 @@ local function openidc_authorize(opts, session, target_url, prompt)
   local state = resty_string.to_hex(resty_random.bytes(16))
   local nonce = (opts.use_nonce == nil or opts.use_nonce)
     and resty_string.to_hex(resty_random.bytes(16))
-  local code_verifier = opts.use_pkce and openidc_base64_url_encode(resty_random.bytes(32))
+  local code_verifier = opts.use_pkce and b64url(resty_random.bytes(32))
 
   -- assemble the parameters to the authentication request
   local params = {
@@ -537,8 +524,8 @@ local function openidc_access_token_expires_in(opts, expires_in)
 end
 
 local function openidc_load_jwt_none_alg(enc_hdr, enc_payload)
-  local header = cjson_s.decode(openidc_base64_url_decode(enc_hdr))
-  local payload = cjson_s.decode(openidc_base64_url_decode(enc_payload))
+  local header = cjson_s.decode(unb64url(enc_hdr))
+  local payload = cjson_s.decode(unb64url(enc_payload))
   if header and payload and header.alg == "none" then
     return {
       raw_header = enc_hdr,
@@ -856,7 +843,7 @@ local function openidc_pem_from_rsa_n_and_e(n, e)
   log(DEBUG, "getting PEM public key from n and e parameters of json public key")
 
   local der_key = {
-    openidc_base64_url_decode(n), openidc_base64_url_decode(e)
+    unb64url(n), unb64url(e)
   }
   local encoded_key = encode_sequence_of_integer(der_key)
   local pem = der2pem(encode_sequence({
@@ -949,8 +936,9 @@ local function is_algorithm_expected(jwt_header, expected_algs)
     return true
   end
   if type(expected_algs) == 'string' then
-    expected_algs = { expected_algs }
+    return expected_algs == jwt_header.alg
   end
+
   for _, alg in ipairs(expected_algs) do
     if alg == jwt_header.alg then
       return true
