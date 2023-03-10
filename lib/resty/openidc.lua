@@ -1651,7 +1651,7 @@ local function openidc_get_bearer_access_token(opts)
   end
 
   local divider = header:find(' ')
-  if divider == 0 or string.lower(header:sub(0, divider - 1)) ~= string.lower("Bearer") then
+  if divider == nil or divider == 0 or string.lower(header:sub(0, divider - 1)) ~= string.lower("Bearer") then
     err = "no Bearer authorization header value found"
     log(ERROR, err)
     return nil, err

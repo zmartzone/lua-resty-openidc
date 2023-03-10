@@ -1,4 +1,9 @@
-03/02/2023
+03/10/2023
+- when looking for a bearer token an exception occured if the
+  Authorization header didn't contain any space character;
+  see #473
+
+02/03/2023
 - release 1.7.6-3 of luarock pinning lua-resty-session dependency to
   not go beyond 3.1ß
 
