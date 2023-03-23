@@ -64,6 +64,22 @@ function test_support.self_signed_jwt(payload, alg, signature)
 end
 
 local DEFAULT_JWT_SIGN_SECRET = test_support.load("/spec/private_rsa_key.pem")
+local DEFAULT_JWE_ENC_RSA_KEY = ""
+local DEFAULT_JWE_ENC_RSA_KID = "RSAencKID"
+local DEFAULT_JWE_DEC_RSA_KEY = test_support.load("/spec/private_rsa_key.pem")
+local DEFAULT_JWE_ENC_AES_KEY = ""
+local DEFAULT_JWE_ENC_AES_KID = "AESencKID"
+local DEFAULT_JWE_TOKEN_HEADER = {
+  typ = "JWE",
+  alg = "RSA-OAEP-256",
+  enc = "A128CBC-HS256",
+  kid = DEFAULT_JWE_ENC_RSA_KID
+}
+local DEFAULT_JWE_FAKE_ALG = "false"
+local DEFAULT_JWE_FAKE_ENC = "false"
+local DEFAULT_JWE_FAKE_JWE = "false"
+
+local DEFAULT_JWE_SIGNED_PAYLOAD = "true"
 
 local DEFAULT_JWK = test_support.load("/spec/rsa_key_jwk_with_x5c.json")
 
@@ -95,19 +111,31 @@ local test_globals = {}
 local sign_secret = [=[
 JWT_SIGN_SECRET]=]
 
+local jwe_enc_rsa_key = [=[JWE_ENC_RSA_KEY]=]
+local jwe_enc_aes_key = [=[JWE_ENC_AES_KEY]=]
+  -- ground work for future implementation of JWE using AES 'alg'
+
+
 if os.getenv('coverage') then
   require("luacov.runner")("/spec/luacov/settings.luacov")
 end
 test_globals.oidc = require "resty.openidc"
 test_globals.cjson = require "cjson"
+
+
+test_globals.jwks = [=[JWK]=]
+test_globals.use_jwe = jwe_enc_rsa_key ~= "" or jwe_enc_aes_key ~= ""
+
 test_globals.delay = function(delay_response)
   if delay_response > 0 then
     ngx.sleep(delay_response / 1000)
   end
 end
+
 test_globals.b64url = function(s)
   return ngx.encode_base64(test_globals.cjson.encode(s)):gsub('+','-'):gsub('/','_')
 end
+
 test_globals.create_jwt = function(payload, fake_signature)
   if not fake_signature then
     local jwt_content = {
@@ -124,17 +152,50 @@ test_globals.create_jwt = function(payload, fake_signature)
     return header .. "." .. test_globals.b64url(payload) .. ".NOT_A_VALID_SIGNATURE"
   end
 end
+
+test_globals.create_jwe = function(payload, fake_alg, fake_enc, fake_jwe)
+  if jwe_enc_rsa_key ~= "" then
+    local jwe_header = JWE_TOKEN_HEADER
+    if fake_alg then
+      jwe_header.alg = "WRONG_ALG"
+    end
+    if fake_enc then
+      jwe_header.enc = "WRONG_ENC"
+    end
+    
+    if fake_alg or fake_enc or fake_jwe then
+      return test_globals.b64url(jwe_header) .. ".NOT_A_VALID_PRESHARED_KEY.NOT_A_VALID_IV.NOT_A_VALID_CIPHERTEXT.NOT_A_VALID_MAC"
+    else
+      local jwt_content = {
+        header = jwe_header,
+        payload = payload
+      }
+      local jwt = require "resty.jwt"
+      return jwt:sign(jwe_enc_rsa_key, jwt_content)
+    end
+  elseif jwe_enc_aes_key ~= "" then
+    ngx.log(ngx.ERR, "JWE w/ AES  test not implemented yet")
+    return nil
+  else
+    ngx.log(ngx.ERR, "Something went wrong while creating the JWE")
+    return nil
+  end
+end
+
 test_globals.query_decorator = function(req)
   req.query = "foo=bar"
   return req
 end
+
 test_globals.body_decorator = function(req)
   local body = ngx.decode_args(req.body)
   body.foo = "bar"
   req.body = ngx.encode_args(body)
   return req
 end
+
 test_globals.jwks = [=[JWK]=]
+
 return test_globals
 ]]
 
@@ -266,9 +327,17 @@ http {
                   })
                   jwt_token = header .. "." .. test_globals.b64url(id_token) .. "."
                 else
-                  jwt_token = test_globals.create_jwt(id_token, FAKE_ID_TOKEN_SIGNATURE)
-                  if BREAK_ID_TOKEN_SIGNATURE then
-                    jwt_token = jwt_token:sub(1, -6) .. "XXXXX"
+                  if not test_globals.use_jwe then
+                    jwt_token = test_globals.create_jwt(id_token, FAKE_ID_TOKEN_SIGNATURE)
+                    if BREAK_ID_TOKEN_SIGNATURE then
+                      jwt_token = jwt_token:sub(1, -6) .. "XXXXX"
+                    end
+                  else 
+                    if JWE_SIGNED_PAYLOAD then 
+                      jwt_token = test_globals.create_jwe(test_globals.create_jwt(id_token), JWE_FAKE_ALG, JWE_FAKE_ENC, JWE_FAKE_JWE)
+                    else
+                      jwt_token = test_globals.create_jwe(id_token, JWE_FAKE_ALG, JWE_FAKE_ENC, JWE_fake_JWE)
+                    end
                   end
                 end
                 local token_response = {
@@ -439,6 +508,8 @@ local function write_template(out, template, custom_config)
   local verify_opts = merge(merge({}, DEFAULT_VERIFY_OPTS), custom_config["verify_opts"] or {})
   local access_token = merge(merge({}, DEFAULT_ACCESS_TOKEN), custom_config["access_token"] or {})
   local token_header = merge(merge({}, DEFAULT_TOKEN_HEADER), custom_config["token_header"] or {})
+  local jwe_token_header = merge(merge({}, DEFAULT_JWE_TOKEN_HEADER), custom_config["jwe_token_header"] or {})
+
   local userinfo = merge(merge({}, DEFAULT_ID_TOKEN), custom_config["userinfo"] or {})
   local introspection_response = merge(merge({}, DEFAULT_INTROSPECTION_RESPONSE),
                                        custom_config["introspection_response"] or {})
@@ -450,6 +521,7 @@ local function write_template(out, template, custom_config)
   local refreshing_token_fails = custom_config["refreshing_token_fails"] or DEFAULT_REFRESHING_TOKEN_FAILS
   local refresh_response_contains_id_token = custom_config["refresh_response_contains_id_token"] or DEFAULT_REFRESH_RESPONSE_CONTAINS_ID_TOKEN
   local access_token_opts = merge(merge({}, DEFAULT_OIDC_CONFIG), custom_config["access_token_opts"] or {})
+  
   for _, k in ipairs(custom_config["remove_id_token_claims"] or {}) do
     id_token[k] = nil
   end
@@ -473,6 +545,7 @@ local function write_template(out, template, custom_config)
   end
   local content = template
     :gsub("OIDC_CONFIG", serpent.block(oidc_config, {comment = false }))
+    :gsub("JWE_TOKEN_HEADER", serpent.block(jwe_token_header, {comment = false }))
     :gsub("TOKEN_HEADER", serpent.block(token_header, {comment = false }))
     :gsub("JWT_SIGN_SECRET", custom_config["jwt_sign_secret"] or DEFAULT_JWT_SIGN_SECRET)
     :gsub("VERIFY_OPTS", serpent.block(verify_opts, {comment = false }))
@@ -499,6 +572,17 @@ local function write_template(out, template, custom_config)
     :gsub("ID_TOKEN", serpent.block(id_token, {comment = false }))
     :gsub("ACCESS_TOKEN", serpent.block(access_token, {comment = false }))
     :gsub("UNAUTH_ACTION", custom_config["unauth_action"] and ('"' .. custom_config["unauth_action"] .. '"') or DEFAULT_UNAUTH_ACTION)
+    :gsub("JWE_ENC_RSA_KEY", custom_config["jwe_enc_rsa_key"] or DEFAULT_JWE_ENC_RSA_KEY)
+    :gsub("JWE_ENC_RSA_KID", custom_config["jwe_enc_rsa_kid"] or DEFAULT_JWE_ENC_RSA_KID)
+    :gsub("JWE_DEC_RSA_KEY", custom_config["jwe_dec_rsa_key"] or DEFAULT_JWE_DEC_RSA_KEY)
+    :gsub("JWE_DEC_RSA_KID", custom_config["jwe_enc_rsa_kid"] or DEFAULT_JWE_ENC_RSA_KID)
+    :gsub("JWE_ENC_AES_KEY", custom_config["jwe_enc_aes_key"] or DEFAULT_JWE_ENC_AES_KEY)
+    :gsub("JWE_ENC_AES_KID", custom_config["jwe_enc_aes_kid"] or DEFAULT_JWE_ENC_AES_KID)
+    :gsub("JWE_SIGNED_PAYLOAD", custom_config["jwe_signed_payload"] or DEFAULT_JWE_SIGNED_PAYLOAD)
+    :gsub("JWE_FAKE_ALG", custom_config["jwe_fake_alg"] or DEFAULT_JWE_FAKE_ALG)
+    :gsub("JWE_FAKE_ENC", custom_config["jwe_fake_enc"] or DEFAULT_JWE_FAKE_ENC)
+    :gsub("JWE_FAKE_JWE", custom_config["jwe_fake_jwe"] or DEFAULT_JWE_FAKE_JWE)
+
   out:write(content)
 end
 
