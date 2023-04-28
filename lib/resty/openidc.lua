@@ -351,11 +351,13 @@ local function openidc_authorize(opts, session, target_url, prompt)
   end
 
   -- store state in the session
-  session.data.original_url = target_url
-  session.data.state = state
-  session.data.nonce = nonce
-  session.data.code_verifier = code_verifier
-  session.data.last_authenticated = ngx.time()
+  local session_data = {}
+  session:set_data(session_data)
+  session_data.original_url = target_url
+  session_data.state = state
+  session_data.nonce = nonce
+  session_data.code_verifier = code_verifier
+  session_data.last_authenticated = ngx.time()
 
   if opts.lifecycle and opts.lifecycle.on_created then
     err = opts.lifecycle.on_created(session)
@@ -1061,7 +1063,7 @@ local function openidc_load_and_validate_jwt_id_token(opts, jwt_id_token, sessio
   log(DEBUG, "id_token payload: ", cjson.encode(jwt_obj.payload))
 
   -- validate the id_token contents
-  if openidc_validate_id_token(opts, id_token, session.data.nonce) == false then
+  if openidc_validate_id_token(opts, id_token, session:get_data().nonce) == false then
     err = "id_token validation failed"
     log(ERROR, err)
     return nil, err
@@ -1081,23 +1083,24 @@ local function openidc_authorization_response(opts, session)
     args = ngx.req.get_uri_args()
   end
 
+  local session_data = session:get_data()
   if not args.code or not args.state then
     err = "unhandled request to the redirect_uri: " .. ngx.var.request_uri
     log(ERROR, err)
-    return nil, err, session.data.original_url, session
+    return nil, err, session_data.original_url, session
   end
 
   -- check that the state returned in the response against the session; prevents CSRF
-  if args.state ~= session.data.state then
-    log_err = "state from argument: " .. (args.state and args.state or "nil") .. " does not match state restored from session: " .. (session.data.state and session.data.state or "nil")
+  if args.state ~= session_data.state then
+    log_err = "state from argument: " .. (args.state and args.state or "nil") .. " does not match state restored from session: " .. (session_data.state and session_data.state or "nil")
     client_err = "state from argument does not match state restored from session"
     log(ERROR, log_err)
-    return nil, client_err, session.data.original_url, session
+    return nil, client_err, session_data.original_url, session
   end
 
   err = ensure_config(opts)
   if err then
-    return nil, err, session.data.original_url, session
+    return nil, err, session_data.original_url, session
   end
 
   -- check the iss if returned from the OP
@@ -1105,7 +1108,7 @@ local function openidc_authorization_response(opts, session)
     log_err = "iss from argument: " .. args.iss .. " does not match expected issuer: " .. opts.discovery.issuer
     client_err = "iss from argument does not match expected issuer"
     log(ERROR, log_err)
-    return nil, client_err, session.data.original_url, session
+    return nil, client_err, session_data.original_url, session
   end
 
   -- check the client_id if returned from the OP
@@ -1113,7 +1116,7 @@ local function openidc_authorization_response(opts, session)
     log_err = "client_id from argument: " .. args.client_id .. " does not match expected client_id: " .. opts.client_id
     client_err = "client_id from argument does not match expected client_id"
     log(ERROR, log_err)
-    return nil, client_err, session.data.original_url, session
+    return nil, client_err, session_data.original_url, session
   end
 
   -- assemble the parameters to the token endpoint
@@ -1121,8 +1124,8 @@ local function openidc_authorization_response(opts, session)
     grant_type = "authorization_code",
     code = args.code,
     redirect_uri = openidc_get_redirect_uri(opts, session),
-    state = session.data.state,
-    code_verifier = session.data.code_verifier
+    state = session_data.state,
+    code_verifier = session_data.code_verifier
   }
 
   log(DEBUG, "Authentication with OP done -> Calling OP Token Endpoint to obtain tokens")
@@ -1132,22 +1135,21 @@ local function openidc_authorization_response(opts, session)
   local json
   json, err = openidc.call_token_endpoint(opts, opts.discovery.token_endpoint, body, opts.token_endpoint_auth_method)
   if err then
-    return nil, err, session.data.original_url, session
+    return nil, err, session_data.original_url, session
   end
 
   local id_token, err = openidc_load_and_validate_jwt_id_token(opts, json.id_token, session);
   if err then
-    return nil, err, session.data.original_url, session
+    return nil, err, session_data.original_url, session
   end
 
   -- mark this sessions as authenticated
-  session.data.authenticated = true
-  -- clear state, nonce and code_verifier to protect against potential misuse
-  session.data.nonce = nil
-  session.data.state = nil
-  session.data.code_verifier = nil
+  session_data.authenticated = true
+  session_data.nonce = nil
+  session_data.state = nil
+  session_data.code_verifier = nil
   if store_in_session(opts, 'id_token') then
-    session.data.id_token = id_token
+    session_data.id_token = id_token
   end
 
   if store_in_session(opts, 'user') then
@@ -1163,21 +1165,21 @@ local function openidc_authorization_response(opts, session)
         err = "\"sub\" claim in id_token (\"" .. (id_token.sub or "null") .. "\") is not equal to the \"sub\" claim returned from the userinfo endpoint (\"" .. (user.sub or "null") .. "\")"
         log(ERROR, err)
       else
-        session.data.user = user
+        session_data.user = user
       end
     end
   end
 
   if store_in_session(opts, 'enc_id_token') then
-    session.data.enc_id_token = json.id_token
+    session_data.enc_id_token = json.id_token
   end
 
   if store_in_session(opts, 'access_token') then
-    session.data.access_token = json.access_token
-    session.data.access_token_expiration = current_time
-        + openidc_access_token_expires_in(opts, json.expires_in)
+    session_data.access_token = json.access_token
+    session_data.access_token_expiration = current_time + openidc_access_token_expires_in(opts, json.expires_in)
+
     if json.refresh_token ~= nil then
-      session.data.refresh_token = json.refresh_token
+      session_data.refresh_token = json.refresh_token
     end
   end
 
@@ -1185,7 +1187,7 @@ local function openidc_authorization_response(opts, session)
     err = opts.lifecycle.on_authenticated(session, id_token, json)
     if err then
       log(WARN, "failed in `on_authenticated` handler: " .. err)
-      return nil, err, session.data.original_url, session
+      return nil, err, session_data.original_url, session
     end
   end
 
@@ -1193,9 +1195,9 @@ local function openidc_authorization_response(opts, session)
   session:save()
 
   -- redirect to the URL that was accessed originally
-  log(DEBUG, "OIDC Authorization Code Flow completed -> Redirecting to original URL (" .. session.data.original_url .. ")")
-  ngx.redirect(session.data.original_url)
-  return nil, nil, session.data.original_url, session
+  log(DEBUG, "OIDC Authorization Code Flow completed -> Redirecting to original URL (" .. session_data.original_url .. ")")
+  ngx.redirect(session_data.original_url)
+  return nil, nil, session_data.original_url, session
 end
 
 -- token revocation (RFC 7009)
@@ -1250,8 +1252,10 @@ function openidc.revoke_tokens(opts, session)
     return false
   end
 
-  local access_token = session.data.access_token
-  local refresh_token = session.data.refresh_token
+  local session_data = session:get_data()
+
+  local access_token = session_data.access_token
+  local refresh_token = session_data.refresh_token
 
   local access_token_revoke, refresh_token_revoke
   if refresh_token then
@@ -1271,9 +1275,11 @@ local openidc_transparent_pixel = "\137\080\078\071\013\010\026\010\000\000\000\
 
 -- handle logout
 local function openidc_logout(opts, session)
-  local session_token = session.data.enc_id_token
-  local access_token = session.data.access_token
-  local refresh_token = session.data.refresh_token
+  local session_data = session:get_data()
+
+  local session_token = session_data.enc_id_token
+  local access_token = session_data.access_token
+  local refresh_token = session_data.refresh_token
   local err
 
   if opts.lifecycle and opts.lifecycle.on_logout then
@@ -1341,22 +1347,23 @@ end
 local function openidc_access_token(opts, session, try_to_renew)
 
   local err
+  local session_data = session:get_data()
 
-  if session.data.access_token == nil then
+  if session_data.access_token == nil then
     return nil, err
   end
   local current_time = ngx.time()
-  if current_time < session.data.access_token_expiration then
-    return session.data.access_token, err
+  if current_time < session_data.access_token_expiration then
+    return session_data.access_token, err
   end
   if not try_to_renew then
     return nil, "token expired"
   end
-  if session.data.refresh_token == nil then
+  if session_data.refresh_token == nil then
     return nil, "token expired and no refresh token available"
   end
 
-  log(DEBUG, "refreshing expired access_token: ", session.data.access_token, " with: ", session.data.refresh_token)
+  log(DEBUG, "refreshing expired access_token: ", session_data.access_token, " with: ", session_data.refresh_token)
 
   -- retrieve token endpoint URL from discovery endpoint if necessary
   err = ensure_config(opts)
@@ -1367,7 +1374,7 @@ local function openidc_access_token(opts, session, try_to_renew)
   -- assemble the parameters to the token endpoint
   local body = {
     grant_type = "refresh_token",
-    refresh_token = session.data.refresh_token,
+    refresh_token = session_data.refresh_token,
     scope = opts.scope and opts.scope or "openid email profile"
   }
 
@@ -1386,26 +1393,26 @@ local function openidc_access_token(opts, session, try_to_renew)
   end
   log(DEBUG, "access_token refreshed: ", json.access_token, " updated refresh_token: ", json.refresh_token)
 
-  session.data.access_token = json.access_token
-  session.data.access_token_expiration = current_time + openidc_access_token_expires_in(opts, json.expires_in)
+  session_data.access_token = json.access_token
+  session_data.access_token_expiration = current_time + openidc_access_token_expires_in(opts, json.expires_in)
   if json.refresh_token then
-    session.data.refresh_token = json.refresh_token
+    session_data.refresh_token = json.refresh_token
   end
 
   if json.id_token and
       (store_in_session(opts, 'enc_id_token') or store_in_session(opts, 'id_token')) then
     log(DEBUG, "id_token refreshed: ", json.id_token)
     if store_in_session(opts, 'enc_id_token') then
-      session.data.enc_id_token = json.id_token
+      session_data.enc_id_token = json.id_token
     end
     if store_in_session(opts, 'id_token') then
-      session.data.id_token = id_token
+      session_data.id_token = id_token
     end
   end
 
   -- save the session with the new access_token and optionally the new refresh_token and id_token using a new sessionid
   local regenerated
-  regenerated, err = session:regenerate()
+  regenerated, err = session:refresh()
   if err then
     log(ERROR, "failed to regenerate session: " .. err)
     return nil, err
@@ -1418,7 +1425,7 @@ local function openidc_access_token(opts, session, try_to_renew)
     end
   end
 
-  return session.data.access_token, err
+  return session_data.access_token, err
 end
 
 local function openidc_get_path(uri)
@@ -1451,7 +1458,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_or_opts)
     session = session_or_opts
   else
     local session_error
-    session, session_error = r_session.start(session_or_opts)
+    session, session_error, session_present = r_session.start(session_or_opts)
     if session == nil then
       log(ERROR, "Error starting session: " .. session_error)
       return nil, session_error, target_url, session
@@ -1467,7 +1474,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_or_opts)
   if path == openidc_get_redirect_uri_path(opts) then
     log(DEBUG, "Redirect URI path (" .. path .. ") is currently navigated -> Processing authorization response coming from OP")
 
-    if not session.present then
+    if not session_present then
       err = "request to the redirect_uri path but there's no session state found"
       log(ERROR, err)
       return nil, err, target_url, session
@@ -1476,13 +1483,15 @@ function openidc.authenticate(opts, target_url, unauth_action, session_or_opts)
     return openidc_authorization_response(opts, session)
   end
 
+  local session_data = session:get_data()
+
   -- see if this is a request to logout
   if path == (opts.logout_path or "/logout") then
     log(DEBUG, "Logout path (" .. path .. ") is currently navigated -> Processing local session removal before redirecting to next step of logout process")
 
     err = ensure_config(opts)
     if err then
-      return nil, err, session.data.original_url, session
+      return nil, err, session_data.original_url, session
     end
 
     openidc_logout(opts, session)
@@ -1491,7 +1500,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_or_opts)
 
   local token_expired = false
   local try_to_renew = opts.renew_access_token_on_expiry == nil or opts.renew_access_token_on_expiry
-  if session.present and session.data.authenticated
+  if session_present and session_data.authenticated
       and store_in_session(opts, 'access_token') then
 
     -- refresh access_token if necessary
@@ -1506,9 +1515,9 @@ function openidc.authenticate(opts, target_url, unauth_action, session_or_opts)
   end
 
   log(DEBUG,
-    "session.present=", session.present,
-    ", session.data.id_token=", session.data.id_token ~= nil,
-    ", session.data.authenticated=", session.data.authenticated,
+    "session_present=", session_present,
+    ", session.data.id_token=", session_data.id_token ~= nil,
+    ", session.data.authenticated=", session_data.authenticated,
     ", opts.force_reauthorize=", opts.force_reauthorize,
     ", opts.renew_access_token_on_expiry=", opts.renew_access_token_on_expiry,
     ", try_to_renew=", try_to_renew,
@@ -1516,13 +1525,13 @@ function openidc.authenticate(opts, target_url, unauth_action, session_or_opts)
 
   -- if we are not authenticated then redirect to the OP for authentication
   -- the presence of the id_token is check for backwards compatibility
-  if not session.present
-      or not (session.data.id_token or session.data.authenticated)
+  if not session_present
+      or not (session_data.id_token or session_data.authenticated)
       or opts.force_reauthorize
       or (try_to_renew and token_expired) then
     if unauth_action == "pass" then
       if token_expired then
-        session.data.authenticated = false
+        session_data.authenticated = false
         return nil, 'token refresh failed', target_url, session
       end
       return nil, err, target_url, session
@@ -1533,7 +1542,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_or_opts)
 
     err = ensure_config(opts)
     if err then
-      return nil, err, session.data.original_url, session
+      return nil, err, session_data.original_url, session
     end
 
     log(DEBUG, "Authentication is required - Redirecting to OP Authorization endpoint")
@@ -1543,10 +1552,10 @@ function openidc.authenticate(opts, target_url, unauth_action, session_or_opts)
 
   -- silently reauthenticate if necessary (mainly used for session refresh/getting updated id_token data)
   if opts.refresh_session_interval ~= nil then
-    if session.data.last_authenticated == nil or (session.data.last_authenticated + opts.refresh_session_interval) < ngx.time() then
+    if session_data.last_authenticated == nil or (session_data.last_authenticated + opts.refresh_session_interval) < ngx.time() then
       err = ensure_config(opts)
       if err then
-        return nil, err, session.data.original_url, session
+        return nil, err, session_data.original_url, session
       end
 
       log(DEBUG, "Silent authentication is required - Redirecting to OP Authorization endpoint")
@@ -1557,15 +1566,15 @@ function openidc.authenticate(opts, target_url, unauth_action, session_or_opts)
 
   if store_in_session(opts, 'id_token') then
     -- log id_token contents
-    log(DEBUG, "id_token=", cjson.encode(session.data.id_token))
+    log(DEBUG, "id_token=", cjson.encode(session_data.id_token))
   end
 
   -- return the id_token to the caller Lua script for access control purposes
   return
   {
-    id_token = session.data.id_token,
+    id_token = session_data.id_token,
     access_token = access_token,
-    user = session.data.user
+    user = session_data.user
   },
   err,
   target_url,
