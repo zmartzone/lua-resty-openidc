@@ -552,3 +552,20 @@ describe("when revoke_tokens_on_logout is not defined and a revocation_endpoint 
     assert.is_not.error_log_contains("revoke")
   end)
 end)
+
+describe("when the configured logout uri is invoked with no active session", function()
+  test_support.start_server()
+  teardown(test_support.stop_server)
+  local _, status, headers = http.request({
+                                            url = "http://127.0.0.1/default/logout",
+                                            redirect = false
+                                          })
+  it("the response contains a default HTML-page", function()
+    assert.are.equals(200, status)
+    assert.are.equals("text/html", headers["content-type"])
+    -- TODO should there be a Cache-Control header?
+  end)
+  it("the session cookie has been revoked", function()
+    assert.is.Nil(headers["set-cookie"])
+  end)
+end)

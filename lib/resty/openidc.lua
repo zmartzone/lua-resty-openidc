@@ -91,6 +91,14 @@ local function store_in_session(opts, feature)
   return opts.session_contents[feature]
 end
 
+local function is_session(o)
+  return o ~= nil and o.save and type(o.save) == "function"
+end
+
+local function is_session_present(session)
+  return session ~= nil and next(session:get_data()) ~= nil
+end
+
 -- set value in server-wide cache if available
 local function openidc_cache_set(type, key, value, exp)
   local dict = ngx.shared[type]
@@ -1305,7 +1313,9 @@ local function openidc_logout(opts, session)
     end
   end
 
-  session:destroy()
+  if is_session_present(session) then
+    session:destroy()
+  end
 
   if opts.revoke_tokens_on_logout then
     log(DEBUG, "revoke_tokens_on_logout is enabled. " ..
@@ -1460,10 +1470,6 @@ local function openidc_get_redirect_uri_path(opts)
   return opts.redirect_uri and openidc_get_path(opts.redirect_uri) or opts.redirect_uri_path
 end
 
-local function is_session(o)
-  return o ~= nil and o.save and type(o.save) == "function"
-end
-
 -- main routine for OpenID Connect user authentication
 function openidc.authenticate(opts, target_url, unauth_action, session_or_opts)
 
@@ -1485,7 +1491,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_or_opts)
     end
   end
 
-  local session_present = next(session:get_data()) ~= nil
+  local session_present = is_session_present(session)
 
   target_url = target_url or ngx.var.request_uri
 
