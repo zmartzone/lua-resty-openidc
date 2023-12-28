@@ -358,7 +358,7 @@ local function openidc_authorize(opts, session, target_url, prompt)
   session:set("last_authenticated", ngx.time())
 
   if opts.lifecycle and opts.lifecycle.on_created then
-    err = opts.lifecycle.on_created(session)
+    err = opts.lifecycle.on_created(session, params)
     if err then
       log(WARN, "failed in `on_created` handler: " .. err)
       return err
