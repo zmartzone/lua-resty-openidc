@@ -160,7 +160,7 @@ http {
     server {
         log_subrequest on;
 
-        listen      80;
+        listen      127.0.0.1:80;
         #listen     443 ssl;
         #ssl_certificate     certificate-chain.crt;
         #ssl_certificate_key private.key;
