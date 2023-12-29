@@ -267,7 +267,8 @@ local function extract_jwt_from_error_log()
   local enc_hdr, enc_payload, enc_sign = string.match(encoded_jwt, '^(.+)%.(.+)%.(.*)$')
   local base64_url_decode = function(s)
     local mime = require "mime"
-    return mime.unb64(s:gsub('-','+'):gsub('_','/'))
+    local padding = (4 - #s % 4) % 4
+    return mime.unb64(s:gsub('-','+'):gsub('_','/') .. string.rep("=", padding))
   end
   local dkjson = require "dkjson"
   return {
