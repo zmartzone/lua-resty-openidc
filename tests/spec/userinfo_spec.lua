@@ -169,3 +169,26 @@ describe("when userinfo endpoint doesn't return proper JSON", function()
     assert.error_log_contains("JSON decoding failed")
   end)
 end)
+
+describe("when userinfo endpoint returns a JWT", function()
+  test_support.start_server({
+    oidc_opts = {
+      discovery = {
+        userinfo_endpoint = "http://127.0.0.1/user-info-signed",
+        token_endpoint_auth_methods_supported = { "private_key_jwt" },
+      },
+      token_endpoint_auth_method = "private_key_jwt",
+      client_rsa_private_key = test_support.load("/spec/private_rsa_key.pem"),
+      public_key = test_support.load("/spec/public_rsa_key.pem"),
+    },
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login succeeds", function()
+    assert.are.equals(302, status)
+  end)
+  it("an error has not been logged", function()
+    assert.is_not.error_log_contains("JSON decoding failed")
+    assert.is_not.error_log_contains("userinfo jwt could not be verified")
+  end)
+end)

@@ -326,6 +326,15 @@ http {
             }
         }
 
+        location /user-info-signed {
+            content_by_lua_block {
+                local auth = ngx.req.get_headers()["Authorization"]
+                ngx.header.content_type = 'application/jwt;charset=UTF-8'
+                local signed_userinfo = test_globals.create_jwt(USERINFO)
+                ngx.print(signed_userinfo)
+            }
+        }
+
         location /introspection {
             content_by_lua_block {
                 ngx.req.read_body()

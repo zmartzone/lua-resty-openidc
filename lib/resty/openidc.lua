@@ -623,6 +623,17 @@ function openidc.call_userinfo_endpoint(opts, access_token)
 
   log(DEBUG, "userinfo response: ", res.body)
 
+  -- handle if the response type is a jwt/signed payload
+  local responseType = string.lower(res.headers["Content-Type"])
+  if string.find(responseType, "application/jwt") then
+    local json, err = openidc.jwt_verify(res.body, opts)
+    if err then
+      err = "userinfo jwt could not be verified: " .. err
+      return nil, err
+    end
+    return json
+  end
+
   -- parse the response from the user info endpoint
   return openidc_parse_json_response(res)
 end
