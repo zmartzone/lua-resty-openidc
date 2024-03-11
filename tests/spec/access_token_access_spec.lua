@@ -202,7 +202,7 @@ describe("when token endpoint is not reachable", function()
     access_token_opts = {
       timeout = 40000,
       discovery = {
-        token_endpoint = "http://192.0.2.1/"
+        token_endpoint = "http://127.1.2.3/"
       }
     },
     token_response_expires_in = 0
@@ -219,7 +219,7 @@ describe("when token endpoint is not reachable", function()
     assert.are.equals(401, status)
   end)
   it("an error has been logged", function()
-    assert.error_log_contains("access_token error: accessing token endpoint.*%(http://192.0.2.1/%) failed")
+    assert.error_log_contains("access_token error: accessing token endpoint.*%(http://127.1.2.3/%) failed")
   end)
 end)
 

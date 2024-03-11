@@ -136,7 +136,7 @@ describe("when discovery endpoint is not reachable", function()
   test_support.start_server({
     oidc_opts = {
       timeout = 40000,
-      discovery = "http://192.0.2.1/"
+      discovery = "http://127.1.2.3/"
     },
   })
   teardown(test_support.stop_server)
@@ -148,7 +148,7 @@ describe("when discovery endpoint is not reachable", function()
     assert.are.equals(401, status)
   end)
   it("an error has been logged", function()
-    assert.error_log_contains("authenticate failed: accessing discovery url.*%(http://192.0.2.1/%) failed")
+    assert.error_log_contains("authenticate failed: accessing discovery url.*%(http://127.1.2.3/%) failed")
   end)
 end)
 
