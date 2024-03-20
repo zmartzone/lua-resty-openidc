@@ -18,7 +18,7 @@ describe("when the configured logout uri is invoked with a non-image request", f
   end)
   it("the session cookie has been revoked", function()
     assert.truthy(string.match(headers["set-cookie"],
-                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+            "session=; Path=/; SameSite=Lax; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:01 GMT; .*"))
   end)
 end)
 
@@ -45,7 +45,7 @@ describe("when the configured logout uri is invoked with a png request", functio
   end)
   it("the session cookie has been revoked", function()
     assert.truthy(string.match(headers["set-cookie"],
-                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+            "session=; Path=/; SameSite=Lax; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:01 GMT; .*"))
   end)
 end)
 
@@ -76,7 +76,7 @@ describe("when logout is invoked and a callback with hint has been configured", 
   end)
   it("the session cookie has been revoked", function()
     assert.truthy(string.match(headers["set-cookie"],
-                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+            "session=; Path=/; SameSite=Lax; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:01 GMT; .*"))
   end)
 end)
 
@@ -107,7 +107,7 @@ describe("when logout is invoked and a callback with hint has been configured - 
   end)
   it("the session cookie has been revoked", function()
     assert.truthy(string.match(headers["set-cookie"],
-                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+            "session=; Path=/; SameSite=Lax; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:01 GMT; .*"))
   end)
 end)
 
@@ -141,7 +141,7 @@ describe("when logout is invoked and a callback with hint has been configured bu
   end)
   it("the session cookie has been revoked", function()
     assert.truthy(string.match(headers["set-cookie"],
-                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+            "session=; Path=/; SameSite=Lax; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:01 GMT; .*"))
   end)
 end)
 
@@ -171,7 +171,7 @@ describe("when logout is invoked and a callback without hint has been configured
   end)
   it("the session cookie has been revoked", function()
     assert.truthy(string.match(headers["set-cookie"],
-                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+            "session=; Path=/; SameSite=Lax; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:01 GMT; .*"))
   end)
 end)
 
@@ -200,7 +200,7 @@ describe("when logout is invoked and discovery contains end_session_endpoint and
   end)
   it("the session cookie has been revoked", function()
     assert.truthy(string.match(headers["set-cookie"],
-                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+            "session=; Path=/; SameSite=Lax; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:01 GMT; .*"))
   end)
 end)
 
@@ -232,7 +232,7 @@ describe("when logout is invoked and discovery contains end_session_endpoint and
   end)
   it("the session cookie has been revoked", function()
     assert.truthy(string.match(headers["set-cookie"],
-                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+            "session=; Path=/; SameSite=Lax; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:01 GMT; .*"))
   end)
 end)
 
@@ -257,7 +257,7 @@ describe("when logout is invoked and discovery contains ping_end_session_endpoin
   end)
   it("the session cookie has been revoked", function()
     assert.truthy(string.match(headers["set-cookie"],
-                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+            "session=; Path=/; SameSite=Lax; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:01 GMT; .*"))
   end)
 end)
 
@@ -294,7 +294,7 @@ describe("when logout is invoked and a callback with hint and a post_logout_uri 
   end)
   it("the session cookie has been revoked", function()
     assert.truthy(string.match(headers["set-cookie"],
-                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+            "session=; Path=/; SameSite=Lax; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:01 GMT; .*"))
   end)
 end)
 
@@ -330,7 +330,7 @@ describe("when logout is invoked and discovery contains end_session_endpoint and
   end)
   it("the session cookie has been revoked", function()
     assert.truthy(string.match(headers["set-cookie"],
-                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+            "session=; Path=/; SameSite=Lax; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:01 GMT; .*"))
   end)
 end)
 
@@ -361,7 +361,7 @@ describe("when logout is invoked and discovery contains ping_end_session_endpoin
   end)
   it("the session cookie has been revoked", function()
     assert.truthy(string.match(headers["set-cookie"],
-                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+            "session=; Path=/; SameSite=Lax; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:01 GMT; .*"))
   end)
 end)
 
@@ -390,7 +390,7 @@ describe("when revoke_tokens_on_logout is enabled and a valid revocation endpoin
 
   it("the session cookie has been revoked", function()
     assert.truthy(string.match(headers["set-cookie"],
-                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+            "session=; Path=/; SameSite=Lax; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:01 GMT; .*"))
   end)
 
   it("authorization credentials have not been passed on as post parameters to the revocation endpoint", function()
@@ -436,7 +436,7 @@ describe("when revoke_tokens_on_logout is enabled and a valid revocation endpoin
 
   it("the session cookie has been revoked", function()
     assert.truthy(string.match(headers["set-cookie"],
-                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+            "session=; Path=/; SameSite=Lax; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:01 GMT; .*"))
   end)
 
   it("authorization header has not been passed on to the revocation endpoint", function()
@@ -480,7 +480,7 @@ describe("when revoke_tokens_on_logout is enabled and an invalid revocation endp
 
   it("the session cookie still has been revoked", function()
     assert.truthy(string.match(headers["set-cookie"],
-                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+            "session=; Path=/; SameSite=Lax; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:01 GMT; .*"))
   end)
 
   it("error messages concerning unseccussful revocation have been logged", function()
@@ -512,7 +512,7 @@ describe("when revoke_tokens_on_logout is enabled but no revocation endpoint is 
 
   it("the session cookie still has been revoked", function()
     assert.truthy(string.match(headers["set-cookie"],
-                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+            "session=; Path=/; SameSite=Lax; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:01 GMT; .*"))
   end)
 
   it("debug messages concerning unseccussful revocation have been logged", function()
@@ -544,7 +544,7 @@ describe("when revoke_tokens_on_logout is not defined and a revocation_endpoint 
 
   it("the session cookie still has been revoked", function()
     assert.truthy(string.match(headers["set-cookie"],
-                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+            "session=; Path=/; SameSite=Lax; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:01 GMT; .*"))
   end)
 
   it("no messages concerning revocation have been logged", function()
