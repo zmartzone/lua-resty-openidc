@@ -1302,7 +1302,7 @@ local function request_prefers_png_over_html()
   end)
 
   for _, a in ipairs(accepted) do
-    if a.media_range:find("text/html") then
+    if a.media_range:find("text/html") or a.media_range:find("application/xhtml%+xml") then
       return false
     end
     if a.media_range:find("image/png") then
