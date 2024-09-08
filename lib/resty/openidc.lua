@@ -1280,6 +1280,38 @@ local openidc_transparent_pixel = "\137\080\078\071\013\010\026\010\000\000\000\
     "\002\007\001\002\154\028\049\113\000\000\000\000\073\069\078\068" ..
     "\174\066\096\130"
 
+local function request_prefers_png_over_html()
+  local headers = ngx.req.get_headers()
+  local header = get_first(headers['Accept'])
+  if not header then return false end
+
+  -- https://httpwg.org/specs/rfc9110.html#field.accept
+  local accepted = {}
+  local function append_accepted_type(media_range_and_quality)
+    local media_range, quality = media_range_and_quality:match("(.+)%s*;%s*q=%s*([^%s]+)")
+    if media_range and quality then
+      accepted[#accepted + 1] = {media_range=media_range, quality=tonumber(quality)}
+    else
+      accepted[#accepted + 1] = {media_range=media_range_and_quality, quality=1}
+    end
+  end
+  header:gsub("[^,]+", append_accepted_type)
+
+  table.sort(accepted, function(a1, a2)
+      return a1.quality > a2.quality
+  end)
+
+  for _, a in ipairs(accepted) do
+    if a.media_range:find("text/html") or a.media_range:find("application/xhtml%+xml") then
+      return false
+    end
+    if a.media_range:find("image/png") then
+      return true
+    end
+  end
+  return false
+end
+
 -- handle logout
 local function openidc_logout(opts, session)
   local session_token = session.data.enc_id_token
@@ -1308,9 +1340,8 @@ local function openidc_logout(opts, session)
     end
   end
 
-  local headers = ngx.req.get_headers()
-  local header = get_first(headers['Accept'])
-  if header and header:find("image/png") then
+  if request_prefers_png_over_html() then
+    -- support for Ping Federate's proprietary logout protocol
     ngx.header["Cache-Control"] = "no-cache, no-store"
     ngx.header["Pragma"] = "no-cache"
     ngx.header["P3P"] = "CAO PSA OUR"

@@ -1,3 +1,7 @@
+08/25/2024
+- don't return a zero-pixel image in logout for Firefox 128 and later
+  see #521
+
 03/10/2023
 - when looking for a bearer token an exception occured if the
   Authorization header didn't contain any space character;

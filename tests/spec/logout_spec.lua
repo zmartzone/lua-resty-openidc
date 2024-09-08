@@ -22,6 +22,26 @@ describe("when the configured logout uri is invoked with a non-image request", f
   end)
 end)
 
+describe("when the configured logout uri is invoked with Firefox 128's default Accept", function()
+  test_support.start_server()
+  teardown(test_support.stop_server)
+  local _, _, cookie = test_support.login()
+  local _, status, headers = http.request({
+      url = "http://127.0.0.1/default/logout",
+      headers = { cookie = cookie, accept = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/png,image/svg+xml,*/*;q=0.8" },
+      redirect = false
+  })
+  it("the response contains a default HTML-page", function()
+    assert.are.equals(200, status)
+    assert.are.equals("text/html", headers["content-type"])
+    -- TODO should there be a Cache-Control header?
+  end)
+  it("the session cookie has been revoked", function()
+    assert.truthy(string.match(headers["set-cookie"],
+                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+  end)
+end)
+
 describe("when the configured logout uri is invoked with a png request", function()
   -- TODO should this really take precedence over a configured end_session_endpoint?
   test_support.start_server({
@@ -38,7 +58,7 @@ describe("when the configured logout uri is invoked with a png request", functio
       headers = { cookie = cookie, accept = "image/png" },
       redirect = false
   })
-  it("the response contains a default HTML-page", function()
+  it("the response contains a default PNG image", function()
     assert.are.equals(200, status)
     assert.are.equals("image/png", headers["content-type"])
     assert.are.equals("no-cache, no-store", headers["cache-control"])
