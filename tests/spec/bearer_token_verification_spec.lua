@@ -464,7 +464,7 @@ describe("when jwks endpoint is not reachable", function()
     verify_opts = {
       timeout = 40000,
       discovery = {
-        jwks_uri = "http://192.0.2.1/"
+        jwks_uri = "http://127.1.2.3/"
       }
     },
   })
@@ -478,7 +478,7 @@ describe("when jwks endpoint is not reachable", function()
     assert.are.equals(401, status)
   end)
   it("an error has been logged", function()
-    assert.error_log_contains("Invalid token: accessing jwks url.*%(http://192.0.2.1/%) failed")
+    assert.error_log_contains("Invalid token: accessing jwks url.*%(http://127.1.2.3/%) failed")
   end)
 end)
 

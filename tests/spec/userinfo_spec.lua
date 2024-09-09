@@ -75,7 +75,7 @@ describe("when userinfo endpoint is not reachable", function()
     oidc_opts = {
       timeout = 40000,
       discovery = {
-        userinfo_endpoint = "http://192.0.2.1/"
+        userinfo_endpoint = "http://127.1.2.3/"
       }
     },
   })
@@ -85,7 +85,7 @@ describe("when userinfo endpoint is not reachable", function()
     assert.are.equals(302, status)
   end)
   it("an error has been logged", function()
-    assert.error_log_contains(".*error calling userinfo endpoint: accessing %(http://192.0.2.1/%) failed")
+    assert.error_log_contains(".*error calling userinfo endpoint: accessing %(http://127.1.2.3/%) failed")
   end)
 end)
 

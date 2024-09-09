@@ -206,7 +206,9 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
              -- }
              --
              -- where `handle_created`, `handle_authenticated`, `handle_regenerated` and `handle_logout` are callables
-             -- accepting a single argument `session`
+             -- accepting argument `session`. `handle_created` accepts also second argument `params` which is a table
+             -- containing the query parameters of the authorization request used to redirect the user to the OpenID
+             -- Connect provider endpoint.
              --
              --  -- `on_created` hook is invoked *after* a session has been created in
              --     `openidc_authorize` immediately prior to saving the session
