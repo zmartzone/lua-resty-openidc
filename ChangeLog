@@ -1,3 +1,7 @@
+09/09/2024
+- merge support for lua-resty-session 4.x; see #489; closes #464 #480 #503; thanks @oldium @balajiv113
+- add @oldium to the primary AUTHORS
+
 08/25/2024
 - don't return a zero-pixel image in logout for Firefox 128 and later
   see #521
