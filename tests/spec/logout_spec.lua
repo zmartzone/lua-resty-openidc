@@ -38,7 +38,7 @@ describe("when the configured logout uri is invoked with Firefox 128's default A
   end)
   it("the session cookie has been revoked", function()
     assert.truthy(string.match(headers["set-cookie"],
-                               "session=; Expires=Thu, 01 Jan 1970 00:00:01 GMT.*"))
+            "session=; Path=/; SameSite=Lax; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:01 GMT; .*"))
   end)
 end)
 
