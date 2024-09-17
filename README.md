@@ -384,6 +384,19 @@ from the cache. In order to avoid cache confusion it is recommended to
 set `opts.cache_segment` to unique strings for each set of related
 locations.
 
+## Caching of negative Introspection responses
+
+By default `introspection` cache will not store negative responses.
+This means that bad actor can potentialy try to exhaust introspection 
+endpoint by flooding service with a lot of calls with inproper token.
+To prevent this situation `opts.introspection_enable_negative_cache`
+can be set to `true`. This will enable `introspection` cache to store
+negative responses for time defined in `exp` field.
+Caching negative introspection responses will offload traffic from
+introspection endpoint but also will expose NGINX for resource exhaustion
+attacks as storing negative introspection responses will use extra
+cache storage.
+
 ## Revoke tokens
 
 The `revoke_tokens(opts, session)` function revokes the current refresh and access token. In contrast to a full logout, the session cookie will not be destroyed and the endsession endpoint will not be called. The function returns `true` if both tokens were revoked successfully. This function might be helpful in scenarios where you want to destroy/remove a session from the server side.

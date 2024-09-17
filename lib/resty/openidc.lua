@@ -1819,6 +1819,13 @@ function openidc.introspect(opts)
     return json, err
   end
 
+  -- check if negative cache should be in use
+  local introspection_enable_negative_cache = opts.introspection_enable_negative_cache or false
+  if not json.active and not introspection_enable_negative_cache then
+    err = "invalid token"
+    return json, err
+  end
+
   -- cache the results
   local introspection_cache_ignore = opts.introspection_cache_ignore or false
   local expiry_claim = opts.introspection_expiry_claim or "exp"
