@@ -153,7 +153,7 @@ describe("if token endpoint is not reachable", function()
     oidc_opts = {
       timeout = 40000,
       discovery = {
-        token_endpoint = "http://192.0.2.1/"
+        token_endpoint = "http://127.1.2.3/"
       }
     },
   })
@@ -163,7 +163,7 @@ describe("if token endpoint is not reachable", function()
     assert.are.equals(401, status)
   end)
   it("an error has been logged", function()
-    assert.error_log_contains("authenticate failed:.*accessing token endpoint %(http://192.0.2.1/%) failed")
+    assert.error_log_contains("authenticate failed:.*accessing token endpoint %(http://127.1.2.3/%) failed")
   end)
 end)
 
@@ -267,7 +267,8 @@ local function extract_jwt_from_error_log()
   local enc_hdr, enc_payload, enc_sign = string.match(encoded_jwt, '^(.+)%.(.+)%.(.*)$')
   local base64_url_decode = function(s)
     local mime = require "mime"
-    return mime.unb64(s:gsub('-','+'):gsub('_','/'))
+    local padding = (4 - #s % 4) % 4
+    return mime.unb64(s:gsub('-','+'):gsub('_','/') .. string.rep("=", padding))
   end
   local dkjson = require "dkjson"
   return {

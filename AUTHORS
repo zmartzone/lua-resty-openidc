@@ -2,6 +2,7 @@ The primary authors of lua-resty-openidc are:
 
 	Hans Zandbelt <https://github.com/zandbelt>
 	Stefan Bodewig <https://github.com/bodewig>
+	Oldřich Jedlička <https://github.com/oldium>
 
 Thanks to the following people for contributing to lua-resty-openidc by
 reporting bugs, providing fixes, suggesting useful features or other:
@@ -37,4 +38,8 @@ reporting bugs, providing fixes, suggesting useful features or other:
 	Thorsten Fleischmann <https://github.com/thorstenfleischmann>
 	Tilmann Hars <https://github.com/usysrc>
 	Junlong Li <https://github.com/zhuizhuhaomeng>
+	Nate <https://github.com/realnate>
+	Balaji Vijayakumar <https://github.com/balajiv113>
+	
+	
 
