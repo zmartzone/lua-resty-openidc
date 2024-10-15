@@ -1381,7 +1381,7 @@ local function openidc_logout(opts, session)
     local params = {}
     if (opts.redirect_after_logout_with_id_token_hint or not opts.redirect_after_logout_uri) and session_token then
       params["id_token_hint"] = session_token
-    else
+    elseif opts.redirect_after_logout_with_client_id and opts.client_id then
       params["client_id"] = opts.client_id
     end
     if opts.post_logout_redirect_uri then

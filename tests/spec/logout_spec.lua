@@ -589,3 +589,36 @@ describe("when the configured logout uri is invoked with no active session", fun
     assert.is.Nil(headers["set-cookie"])
   end)
 end)
+
+describe("when logout is invoked and a callback with client id has been configured", function()
+  test_support.start_server({
+      oidc_opts = {
+        discovery = {
+          end_session_endpoint = "http://127.0.0.1/end-session",
+          ping_end_session_endpoint = "http://127.0.0.1/ping-end-session",
+        },
+        redirect_after_logout_uri = "http://127.0.0.1/after-logout",
+        redirect_after_logout_with_id_token_hint = false,
+        redirect_after_logout_with_client_id = true,
+        client_id = "client_id",
+      }
+  })
+  teardown(test_support.stop_server)
+  local _, _, cookie = test_support.login()
+  local _, status, headers = http.request({
+      url = "http://127.0.0.1/default/logout",
+      headers = { cookie = cookie },
+      redirect = false
+  })
+  it("the response redirects to the callback", function()
+    assert.are.equals(302, status)
+    assert.truthy(string.match(headers["location"], "http://127.0.0.1/after%-logout.*"))
+  end)
+  it("the redirect contains the client_id", function()
+    assert.truthy(string.match(headers["location"], ".*%?client_id=.*"))
+  end)
+  it("the session cookie has been revoked", function()
+    assert.truthy(string.match(headers["set-cookie"],
+            "session=; Path=/; SameSite=Lax; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:01 GMT; .*"))
+  end)
+end)
