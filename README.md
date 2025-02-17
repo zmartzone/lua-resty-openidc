@@ -83,10 +83,6 @@ http {
   # cache for JWKs
   lua_shared_dict jwks 1m;
 
-  # NB: if you have "lua_code_cache off;", use:
-  # set $session_secret xxxxxxxxxxxxxxxxxxx;
-  # see: https://github.com/bungle/lua-resty-session#notes-about-turning-lua-code-cache-off
-
   server {
     listen 8080;
 
@@ -242,8 +238,26 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
 
           }
 
+          -- Configure lua-resty-session
+          -- The full list of configuration options is documented in the lua-resty-session GitHub repository: https://github.com/bungle/lua-resty-session?tab=readme-ov-file#session-configuration
+          local session_opts = {
+               -- When using cookies to store sessions, set a shared secret for session cookie encryption. This allows sessions to remain valid after a restart of nginx.
+               -- It also enables "stateless" session management, so multiple instances of nginx can handle requests without the need for "sticky" load balancing techniques.
+               -- secret = "xxxxxxxxxxxxxxxxxxx",
+               -- Optionally, set the cookie prefix to prevent accidental overwriting of the session cookie
+               -- cookie_prefix = "__Host-",
+               -- Login session cookies should be HTTP Only
+               cookie_http_only = true,
+               -- Login session cookies should be marked as "Secure"
+               cookie_secure = true,
+               -- Set the same site cookie policy
+               cookie_same_site = "Lax",
+               -- Set this to true if you want login session cookies to persist a browser restart
+               remember = true
+          }
+
           -- call authenticate for OpenID Connect user authentication
-          local res, err = require("resty.openidc").authenticate(opts)
+          local res, err = require("resty.openidc").authenticate(opts, nil, nil, session_opts)
 
           if err then
             ngx.status = 500
