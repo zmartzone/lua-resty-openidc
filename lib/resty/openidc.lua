@@ -1724,7 +1724,7 @@ local function openidc_get_bearer_access_token(opts)
   end
 
   local access_token = header:sub(divider + 1)
-  if access_token == nil then
+  if access_token == "" then
     err = "no Bearer access token value found"
     log(ERROR, err)
     return nil, err
