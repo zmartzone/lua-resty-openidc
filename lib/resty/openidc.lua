@@ -222,6 +222,13 @@ local function get_first_header_and_strip_whitespace(headers, header_name)
   return header and header:gsub('%s', '')
 end
 
+local function trim(s)
+  if s then
+    return s:match("^%s*(.-)%s*$")
+  end
+  return s
+end
+
 local function get_forwarded_parameter(headers, param_name)
   local forwarded = get_first_header(headers, 'Forwarded')
   local params = {}
@@ -1701,7 +1708,7 @@ local function openidc_get_bearer_access_token(opts)
   -- get the access token from the Authorization header
   local headers = ngx.req.get_headers()
   local header_name = opts.auth_accept_token_as_header_name or "Authorization"
-  local header = get_first(headers[header_name])
+  local header = trim(get_first(headers[header_name]))
 
   if header == nil then
     err = "no Authorization header found"
@@ -1717,7 +1724,7 @@ local function openidc_get_bearer_access_token(opts)
   end
 
   local access_token = header:sub(divider + 1)
-  if access_token == nil then
+  if access_token == "" then
     err = "no Bearer access token value found"
     log(ERROR, err)
     return nil, err
