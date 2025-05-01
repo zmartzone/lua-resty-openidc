@@ -951,13 +951,14 @@ end
 local function is_algorithm_supported(jwt_header)
   return jwt_header and jwt_header.alg and (jwt_header.alg == "none"
       or string.sub(jwt_header.alg, 1, 2) == "RS"
+      or string.sub(jwt_header.alg, 1, 2) == "ES"
       or string.sub(jwt_header.alg, 1, 2) == "HS")
 end
 
 -- is the JWT signing algorithm an asymmetric one whose key might be
 -- obtained from the discovery endpoint?
 local function uses_asymmetric_algorithm(jwt_header)
-  return string.sub(jwt_header.alg, 1, 2) == "RS"
+  return string.sub(jwt_header.alg, 1, 2) == "RS" or string.sub(jwt_header.alg, 1, 2) == "ES"
 end
 
 -- is the JWT signing algorithm one that has been expected?
