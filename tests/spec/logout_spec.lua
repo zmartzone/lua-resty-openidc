@@ -590,7 +590,7 @@ describe("when the configured logout uri is invoked with no active session", fun
   end)
 end)
 
-describe("when logout is invoked and a callback with client id has been configured", function()
+describe("when logout is invoked and a callback with client id has been configured but id_token hasn't been cached", function()
   test_support.start_server({
       oidc_opts = {
         discovery = {
@@ -598,9 +598,12 @@ describe("when logout is invoked and a callback with client id has been configur
           ping_end_session_endpoint = "http://127.0.0.1/ping-end-session",
         },
         redirect_after_logout_uri = "http://127.0.0.1/after-logout",
-        redirect_after_logout_with_id_token_hint = false,
+        redirect_after_logout_with_id_token_hint = true,
         redirect_after_logout_with_client_id = true,
         client_id = "client_id",
+        session_contents = {
+          access_token = true
+        }
       }
   })
   teardown(test_support.stop_server)
@@ -616,6 +619,9 @@ describe("when logout is invoked and a callback with client id has been configur
   end)
   it("the redirect contains the client_id", function()
     assert.truthy(string.match(headers["location"], ".*%?client_id=.*"))
+  end)
+  it("the redirect doesn't contain the id_token_hint", function()
+    assert.falsy(string.match(headers["location"], ".*id_token_hint=.*"))
   end)
   it("the session cookie has been revoked", function()
     assert.truthy(string.match(headers["set-cookie"],

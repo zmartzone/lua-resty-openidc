@@ -149,7 +149,7 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
              --redirect_after_logout_with_id_token_hint = true,
              -- Whether the redirection after logout should include the id token as an hint (if available). This option is used only if redirect_after_logout_uri is set.
              --redirect_after_logout_with_client_id = true,
-             -- Whether the redirection after logout should include the client id (if available).
+             -- Whether the redirection after logout should include the client id when no id_token_hint is sent (if available).
              --post_logout_redirect_uri = "https://www.zmartzone.eu/logoutSuccessful",
              -- Where does the RP requests that the OP redirects the user after logout. If this option is set to a relative URI, it will be relative to the OP's logout endpoint, not the RP's.
 

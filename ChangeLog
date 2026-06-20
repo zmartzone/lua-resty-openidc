@@ -5,6 +5,8 @@ unreleased
   RFC 9126) through the opt-in use_par option.
 - propagate errors returned by the `lifecycle.on_created` hook during
   authorization redirects.
+- add redirect_after_logout_with_client_id option to send client_id on
+  logout when id_token_hint is not available; see #518
 
 09/13/204
 - cross-tenant requests are fixed with lua-resty session 4.0.x; closes #526
