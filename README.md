@@ -208,9 +208,9 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
 
              --use_nonce = false
              -- By default the authorization request includes the
-             -- nonce paramter. You can use this option to disable it
+             -- nonce parameter. You can use this option to disable it
              -- which may be necessary when talking to a broken OpenID
-             -- Connect provider that ignores the paramter as the
+             -- Connect provider that ignores the parameter as the
              -- id_token will be rejected otherwise.
 
              --authorization_state_expires_in = 300
