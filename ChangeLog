@@ -1,4 +1,9 @@
 09/05/2026
+- propagate session destroy and closed-mode revocation-store failures from
+  logout, session initialization, and access-token retrieval; see #571;
+  thanks @Hockenba
+- require lua-resty-session 4.2.0-1, which provides the propagated
+  revocation-store failure behavior
 - release 1.9.1
 
 07/01/2026
