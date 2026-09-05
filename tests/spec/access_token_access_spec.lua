@@ -39,6 +39,59 @@ describe("if there is an active non-expired login", function()
   end)
 end)
 
+describe("if revocation_fail_mode is closed and the revocation store read fails", function()
+  test_support.start_server({
+    revocation_test = {
+      fail_mode = "closed",
+      get_fails_after = 1,
+    },
+  })
+  teardown(test_support.stop_server)
+
+  local _, _, cookies = test_support.login()
+  local content_table = {}
+  local _, status = http.request({
+    url = "http://localhost/access_token",
+    redirect = false,
+    headers = { cookie = cookies },
+    sink = ltn12.sink.table(content_table)
+  })
+  local body = table.concat(content_table)
+
+  it("returns the session start failure", function()
+    assert.are.equals(401, status)
+    assert.truthy(string.find(body, "unable to check session revocation", 1, true))
+  end)
+
+  it("does not return the access token", function()
+    assert.is_nil(string.find(body, "a_token", 1, true))
+  end)
+end)
+
+describe("if revocation_fail_mode is open and the revocation store read fails", function()
+  test_support.start_server({
+    revocation_test = {
+      fail_mode = "open",
+      get_fails_after = 1,
+    },
+  })
+  teardown(test_support.stop_server)
+
+  local _, _, cookies = test_support.login()
+  local content_table = {}
+  local _, status = http.request({
+    url = "http://localhost/access_token",
+    redirect = false,
+    headers = { cookie = cookies },
+    sink = ltn12.sink.table(content_table)
+  })
+
+  it("returns the access token", function()
+    assert.are.equals(200, status)
+    assert.are.equals("a_token\n", table.concat(content_table))
+  end)
+end)
+
 describe("if there is an active non-expired login but access token is not stored in session", function()
   test_support.start_server({
     access_token_opts = {

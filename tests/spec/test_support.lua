@@ -95,6 +95,12 @@ local DEFAULT_SHARE_OIDC_OPTS = "false"
 
 local DEFAULT_DELAY_RESPONSE = "0"
 
+local DEFAULT_REVOCATION_TEST_ENABLED = "false"
+local DEFAULT_REVOCATION_FAIL_MODE = '"closed"'
+local DEFAULT_REVOCATION_SET_FAILS = "false"
+local DEFAULT_REVOCATION_GET_FAILS_AFTER = "nil"
+local DEFAULT_SESSION_START_FAILS = "false"
+
 local DEFAULT_INIT_TEMPLATE = [[
 local test_globals = {}
 local sign_secret = [=[
@@ -102,6 +108,11 @@ JWT_SIGN_SECRET]=]
 
 if os.getenv('coverage') then
   require("luacov.runner")("/spec/luacov/settings.luacov")
+end
+if SESSION_START_FAILS then
+  require("resty.session").start = function()
+    return nil, "session start failed"
+  end
 end
 test_globals.oidc = require "resty.openidc"
 test_globals.cjson = require "cjson"
@@ -146,6 +157,30 @@ test_globals.body_decorator = function(req)
   return req
 end
 test_globals.jwks = [=[JWK]=]
+test_globals.session_opts = nil
+if REVOCATION_TEST_ENABLED then
+  local revoked = ngx.shared.revocation_test
+  test_globals.session_opts = {
+    storage = "cookie",
+    revocation_fail_mode = REVOCATION_FAIL_MODE,
+    revocation = {
+      set = function(_, key, value, ttl)
+        if REVOCATION_SET_FAILS then
+          return nil, "connection refused"
+        end
+        revoked:set(key, value, ttl)
+        return true
+      end,
+      get = function(_, key)
+        local calls = revoked:incr("get_calls", 1, 0)
+        if REVOCATION_GET_FAILS_AFTER and calls > REVOCATION_GET_FAILS_AFTER then
+          return nil, "connection refused"
+        end
+        return revoked:get(key)
+      end,
+    },
+  }
+end
 return test_globals
 ]]
 
@@ -163,6 +198,7 @@ http {
     lua_package_path '~/lua/?.lua;/tmp/server/conf/?.lua;;';
     lua_shared_dict discovery 1m;
     lua_shared_dict jwt_verification 1m;
+    lua_shared_dict revocation_test 1m;
     init_by_lua_block {
         test_globals = require("test_globals")
     }
@@ -213,7 +249,7 @@ http {
               if opts.decorate then
                 opts.http_request_decorator = opts.decorate == "body" and test_globals.body_decorator or test_globals.query_decorator
               end
-              local res, err, target, session = test_globals.oidc.authenticate(opts, nil, UNAUTH_ACTION)
+              local res, err, target, session = test_globals.oidc.authenticate(opts, nil, UNAUTH_ACTION, test_globals.session_opts)
               if err then
                 ngx.status = 401
                 ngx.log(ngx.ERR, "authenticate failed: " .. err)
@@ -514,10 +550,11 @@ http {
 
         location /access_token {
             content_by_lua_block {
-                local access_token, err = test_globals.oidc.access_token(ACCESS_TOKEN_OPTS)
+                local access_token, err = test_globals.oidc.access_token(ACCESS_TOKEN_OPTS, test_globals.session_opts)
                 if not access_token then
                   ngx.status = 401
                   ngx.log(ngx.ERR, "access_token error: " .. (err or 'no message'))
+                  ngx.say("access_token failed: " .. (err or 'no message'))
                 else
                   ngx.header.content_type = 'text/plain'
                   ngx.say(access_token)
@@ -654,6 +691,14 @@ local function write_template(out, template, custom_config)
     :gsub("FIXED_NGX_TIME", custom_config["fixed_ngx_time"] or "nil")
     :gsub("UNAUTH_ACTION", custom_config["unauth_action"] and ('"' .. custom_config["unauth_action"] .. '"') or DEFAULT_UNAUTH_ACTION)
     :gsub("SHARE_OIDC_OPTS", custom_config["share_oidc_opts"] and "true" or DEFAULT_SHARE_OIDC_OPTS)
+    :gsub("REVOCATION_TEST_ENABLED", custom_config["revocation_test"] and "true" or DEFAULT_REVOCATION_TEST_ENABLED)
+    :gsub("REVOCATION_FAIL_MODE", custom_config["revocation_test"] and
+      ('"' .. (custom_config["revocation_test"].fail_mode or "closed") .. '"') or DEFAULT_REVOCATION_FAIL_MODE)
+    :gsub("REVOCATION_SET_FAILS", custom_config["revocation_test"] and
+      (custom_config["revocation_test"].set_fails and "true" or "false") or DEFAULT_REVOCATION_SET_FAILS)
+    :gsub("REVOCATION_GET_FAILS_AFTER", custom_config["revocation_test"] and
+      tostring(custom_config["revocation_test"].get_fails_after) or DEFAULT_REVOCATION_GET_FAILS_AFTER)
+    :gsub("SESSION_START_FAILS", custom_config["session_start_fails"] and "true" or DEFAULT_SESSION_START_FAILS)
   out:write(content)
 end
 

@@ -292,6 +292,37 @@ local function is_session_present(session)
   return session ~= nil and next(session:get_data()) ~= nil
 end
 
+-- start a session; propagate closed-mode revocation store failures
+local function openidc_start_session(session_opts)
+  local session, err = r_session.start(session_opts)
+  if not session then
+    log(ERROR, "Error starting session: " .. (err or "unknown error"))
+    return nil, err
+  end
+
+  -- session uses either message when revocation_fail_mode is closed and the
+  -- revocation store is unavailable (on open or destroy)
+  if err and session.revocation_fail_mode == "closed"
+      and (err:find("unable to check session revocation", 1, true)
+        or err:find("unable to mark session revoked", 1, true)) then
+    log(ERROR, "Error starting session: " .. err)
+    return session, err
+  end
+
+  return session, nil
+end
+
+-- destroy an open session; propagate destroy() failures
+local function openidc_destroy_session(session)
+  if session and session.state == "open" and is_session_present(session) then
+    local ok, err = session:destroy()
+    if not ok then
+      log(ERROR, "failed to destroy session: " .. err)
+      return err
+    end
+  end
+end
+
 -- set value in server-wide cache if available
 local function openidc_cache_set(type, key, value, exp)
   local dict = ngx.shared[type]
@@ -1870,8 +1901,9 @@ local function openidc_logout(opts, session)
     end
   end
 
-  if is_session_present(session) then
-    session:destroy()
+  err = openidc_destroy_session(session)
+  if err then
+    return err
   end
 
   if opts.revoke_tokens_on_logout then
@@ -2047,11 +2079,9 @@ function openidc.authenticate(opts, target_url, unauth_action, session_or_opts)
   if is_session(session_or_opts) then
     session = session_or_opts
   else
-    local session_error
-    session, session_error = r_session.start(session_or_opts)
-    if session == nil then
-      log(ERROR, "Error starting session: " .. session_error)
-      return nil, session_error, target_url, session
+    session, err = openidc_start_session(session_or_opts)
+    if err then
+      return nil, err, target_url, session
     end
   end
 
@@ -2084,7 +2114,10 @@ function openidc.authenticate(opts, target_url, unauth_action, session_or_opts)
       return nil, err, session:get("original_url"), session
     end
 
-    openidc_logout(opts, session)
+    err = openidc_logout(opts, session)
+    if err then
+      return nil, err, target_url, session
+    end
     return nil, nil, target_url, session
   end
 
@@ -2185,7 +2218,13 @@ end
 -- get a valid access_token (eventually refreshing the token), or nil if there's no valid access_token
 function openidc.access_token(opts, session_opts)
 
-  local session = r_session.start(session_opts)
+  local session, err = openidc_start_session(session_opts)
+  if err then
+    if session then
+      session:close()
+    end
+    return nil, err
+  end
   local token, err = openidc_access_token(opts, session, true)
   session:close()
   return token, err

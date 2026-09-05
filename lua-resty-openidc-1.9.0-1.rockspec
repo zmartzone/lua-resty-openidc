@@ -24,7 +24,7 @@ description = {
 dependencies = {
     "lua >= 5.1",
     "lua-resty-http >= 0.08",
-    "lua-resty-session >= 4.0.3",
+    "lua-resty-session == 4.2.0-1",
     "lua-resty-jwt >= 0.2.0",
     "lua-resty-openssl >= 1.8.0"
 }

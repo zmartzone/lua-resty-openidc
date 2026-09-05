@@ -1,4 +1,6 @@
 07/01/2026
+- propagate session destroy and closed-mode revocation store failures from
+  logout and session start instead of continuing as if logout succeeded
 - do not use the shared JWT verification cache for bearer JWT validation
   calls that pass additional claim validators, preventing a token accepted
   by one validator set from bypassing a stricter validator set on cache hit.

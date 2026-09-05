@@ -1,13 +1,13 @@
 FROM openresty/openresty:focal
 
 # install dependencies
-RUN ["luarocks", "install", "lua-resty-session", "4.0.3"]
+RUN ["luarocks", "install", "lua-resty-session", "4.2.0-1"]
 RUN ["luarocks", "install", "lua-resty-http"]
 RUN ["luarocks", "install", "lua-resty-jwt"]
 
 # install test dependencies
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git \
+    && apt-get install -y --no-install-recommends ca-certificates git \
     && rm -rf /var/lib/apt/lists/*
 RUN ["luarocks", "install", "busted"]
 RUN ["luarocks", "install", "LuaSocket"]
