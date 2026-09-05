@@ -4,6 +4,8 @@
   thanks @Hockenba
 - require lua-resty-session 4.2.0-1, which provides the propagated
   revocation-store failure behavior
+- update the Docker CI image to Ubuntu Jammy and vendor its test-only
+  Serpent dependency, removing a flaky Ubuntu Focal APT/Git dependency
 - release 1.9.1
 
 07/01/2026

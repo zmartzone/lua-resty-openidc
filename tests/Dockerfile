@@ -1,4 +1,4 @@
-FROM openresty/openresty:focal
+FROM openresty/openresty:jammy
 
 # install dependencies
 RUN ["luarocks", "install", "lua-resty-session", "4.2.0-1"]
@@ -6,16 +6,13 @@ RUN ["luarocks", "install", "lua-resty-http"]
 RUN ["luarocks", "install", "lua-resty-jwt"]
 
 # install test dependencies
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates git \
-    && rm -rf /var/lib/apt/lists/*
 RUN ["luarocks", "install", "busted"]
 RUN ["luarocks", "install", "LuaSocket"]
-RUN ["luarocks", "install", "serpent"]
 RUN ["luarocks", "install", "dkjson"]
 RUN ["luarocks", "install", "luacov"]
 
 ADD lib/resty/openidc.lua /usr/local/openresty/lualib/resty/openidc.lua
+ADD tests/vendor/serpent.lua /usr/local/openresty/lualib/serpent.lua
 
 # mount tests
 ADD tests/spec /spec
