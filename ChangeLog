@@ -1,3 +1,6 @@
+09/05/2026
+- release 1.9.1
+
 07/01/2026
 - propagate session destroy and closed-mode revocation store failures from
   logout and session start instead of continuing as if logout succeeded

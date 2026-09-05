@@ -85,7 +85,7 @@ local function can_use_token_auth_method(method, opts)
 end
 
 local openidc = {
-  _VERSION = "1.9.0"
+  _VERSION = "1.9.1"
 }
 
 local supported_dpop_signing_algs = {
