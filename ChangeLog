@@ -1,3 +1,9 @@
+09/11/2026
+- coalesce concurrent introspection cache misses for the same token, allowing
+  waiting requests to share successful and failed results
+- make introspection coordination honor explicit cache bypass and isolate
+  temporary results and lock release by lock generation
+
 09/05/2026
 - propagate session destroy and closed-mode revocation-store failures from
   logout, session initialization, and access-token retrieval; see #571;
