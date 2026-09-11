@@ -74,6 +74,8 @@ local DEFAULT_INTROSPECTION_OPTS = {
   introspection_endpoint = "http://127.0.0.1/introspection",
   client_id = "client_id",
   client_secret = "client_secret",
+  -- Most specs inspect the outgoing request, so caching is opt-in in tests.
+  introspection_cache_ignore = true,
 }
 
 local DEFAULT_TOKEN_RESPONSE_EXPIRES_IN = "3600"
@@ -94,6 +96,7 @@ local DEFAULT_UNAUTH_ACTION = "nil"
 local DEFAULT_SHARE_OIDC_OPTS = "false"
 
 local DEFAULT_DELAY_RESPONSE = "0"
+local DEFAULT_INTROSPECTION_RESPONSE_STATUS = "200"
 
 local DEFAULT_REVOCATION_TEST_ENABLED = "false"
 local DEFAULT_REVOCATION_FAIL_MODE = '"closed"'
@@ -120,6 +123,12 @@ if FIXED_NGX_TIME ~= nil then
   local fixed_ngx_time = FIXED_NGX_TIME
   ngx.time = function()
     return fixed_ngx_time
+  end
+end
+if FIXED_NGX_NOW ~= nil then
+  local fixed_ngx_now = FIXED_NGX_NOW
+  ngx.now = function()
+    return fixed_ngx_now
   end
 end
 test_globals.delay = function(delay_response)
@@ -197,6 +206,7 @@ http {
     access_log /tmp/server/logs/access.log;
     lua_package_path '~/lua/?.lua;/tmp/server/conf/?.lua;;';
     lua_shared_dict discovery 1m;
+    lua_shared_dict introspection 1m;
     lua_shared_dict jwt_verification 1m;
     lua_shared_dict revocation_test 1m;
     init_by_lua_block {
@@ -527,6 +537,7 @@ http {
                 end
                 ngx.header.content_type = 'application/json;charset=UTF-8'
                 test_globals.delay(INTROSPECTION_DELAY_RESPONSE)
+                ngx.status = INTROSPECTION_RESPONSE_STATUS
                 ngx.say(test_globals.cjson.encode(INTROSPECTION_RESPONSE))
             }
         }
@@ -661,6 +672,8 @@ local function write_template(out, template, custom_config)
     :gsub("TOKEN_HEADER", serpent.block(token_header, {comment = false }))
     :gsub("JWT_SIGN_SECRET", custom_config["jwt_sign_secret"] or DEFAULT_JWT_SIGN_SECRET)
     :gsub("VERIFY_OPTS", serpent.block(verify_opts, {comment = false }))
+    :gsub("INTROSPECTION_RESPONSE_STATUS", tostring(custom_config["introspection_response_status"] or
+      DEFAULT_INTROSPECTION_RESPONSE_STATUS))
     :gsub("INTROSPECTION_RESPONSE", serpent.block(introspection_response, {comment = false }))
     :gsub("INTROSPECTION_OPTS", serpent.block(introspection_opts, {comment = false }))
     :gsub("TOKEN_RESPONSE_EXPIRES_IN", token_response_expires_in)
@@ -688,6 +701,7 @@ local function write_template(out, template, custom_config)
     :gsub("REFRESH_ID_TOKEN", serpent.block(refresh_id_token, {comment = false }))
     :gsub("ID_TOKEN", serpent.block(id_token, {comment = false }))
     :gsub("ACCESS_TOKEN", serpent.block(access_token, {comment = false }))
+    :gsub("FIXED_NGX_NOW", custom_config["fixed_ngx_now"] or "nil")
     :gsub("FIXED_NGX_TIME", custom_config["fixed_ngx_time"] or "nil")
     :gsub("UNAUTH_ACTION", custom_config["unauth_action"] and ('"' .. custom_config["unauth_action"] .. '"') or DEFAULT_UNAUTH_ACTION)
     :gsub("SHARE_OIDC_OPTS", custom_config["share_oidc_opts"] and "true" or DEFAULT_SHARE_OIDC_OPTS)

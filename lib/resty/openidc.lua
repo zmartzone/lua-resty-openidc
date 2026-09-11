@@ -2326,11 +2326,15 @@ local function get_introspection_cache_prefix(opts)
     .. (opts.client_secret and 'secret' or 'no-client_secret') .. ':'
 end
 
+local function get_introspection_cache_key(opts, access_token)
+  return get_introspection_cache_prefix(opts) .. access_token
+end
+
 local function get_cached_introspection(opts, access_token)
   local introspection_cache_ignore = opts.introspection_cache_ignore or false
   if not introspection_cache_ignore then
     return openidc_cache_get("introspection",
-                             get_introspection_cache_prefix(opts) .. access_token)
+                             get_introspection_cache_key(opts, access_token))
   end
 end
 
@@ -2338,34 +2342,12 @@ local function set_cached_introspection(opts, access_token, encoded_json, ttl)
   local introspection_cache_ignore = opts.introspection_cache_ignore or false
   if not introspection_cache_ignore then
     openidc_cache_set("introspection",
-                      get_introspection_cache_prefix(opts) .. access_token,
+                      get_introspection_cache_key(opts, access_token),
                       encoded_json, ttl)
   end
 end
 
--- main routine for OAuth 2.0 token introspection
-function openidc.introspect(opts)
-
-  -- get the access token from the request
-  local access_token, err = openidc_get_bearer_access_token(opts)
-  if access_token == nil then
-    return nil, err
-  end
-
-  -- see if we've previously cached the introspection result for this access token
-  local json
-  local v = get_cached_introspection(opts, access_token)
-
-  if v then
-    json = cjson.decode(v)
-
-    if not json or not json.active then
-        err = "invalid cached token"
-    end
-
-    return json, err
-  end
-
+local function introspect_access_token(opts, access_token)
   -- assemble the parameters to the introspection (token) endpoint
   local token_param_name = opts.introspection_token_param_name and opts.introspection_token_param_name or "token"
 
@@ -2396,10 +2378,12 @@ function openidc.introspect(opts)
 
   -- call the introspection endpoint
   local introspection_endpoint
+  local err
   introspection_endpoint, err = get_introspection_endpoint(opts)
   if err then
     return nil, err
   end
+  local json
   json, err = openidc.call_token_endpoint(opts, introspection_endpoint, body, opts.introspection_endpoint_auth_method, "introspection")
 
   if not json then
@@ -2437,6 +2421,155 @@ function openidc.introspect(opts)
     err = "invalid token"
   end
 
+  return json, err
+end
+
+local function decode_cached_introspection(value)
+  local json = cjson.decode(value)
+  local err
+
+  if not json or not json.active then
+    err = "invalid cached token"
+  end
+
+  return json, err
+end
+
+local function acquire_introspection_lock(dict, key, owner, timeout, exptime)
+  local ok, err = dict:add(key, owner, exptime)
+  if ok then
+    return true
+  end
+  if err ~= "exists" then
+    return nil, err
+  end
+
+  local observed_owner = dict:get(key)
+  local elapsed = 0
+  local step = 0.001
+  while elapsed < timeout do
+    step = math.min(step, timeout - elapsed)
+    ngx.sleep(step)
+    elapsed = elapsed + step
+
+    ok, err = dict:add(key, owner, exptime)
+    if ok then
+      return true, nil, observed_owner
+    end
+    if err ~= "exists" then
+      return nil, err
+    end
+    observed_owner = dict:get(key) or observed_owner
+
+    step = math.min(step * 2, 0.5)
+  end
+
+  return nil, "timeout"
+end
+
+local function release_introspection_lock(dict, key, owner)
+  if dict:get(key) == owner then
+    dict:delete(key)
+  end
+end
+
+local function publish_introspection_result(dict, key, value, ttl)
+  local ok, err = dict:set(key, value, ttl)
+  if not ok then
+    log(WARN, "failed to publish introspection result: " .. err)
+  end
+end
+
+-- main routine for OAuth 2.0 token introspection
+function openidc.introspect(opts)
+
+  -- get the access token from the request
+  local access_token, err = openidc_get_bearer_access_token(opts)
+  if access_token == nil then
+    return nil, err
+  end
+
+  if opts.introspection_cache_ignore then
+    return introspect_access_token(opts, access_token)
+  end
+
+  -- avoid lock overhead for normal cache hits
+  local value = get_cached_introspection(opts, access_token)
+  if value then
+    return decode_cached_introspection(value)
+  end
+
+  -- Without the shared cache there is nowhere to coordinate workers. Preserve
+  -- the existing uncached behavior for configurations that omit the dictionary.
+  local introspection_cache = ngx.shared.introspection
+  if not introspection_cache then
+    return introspect_access_token(opts, access_token)
+  end
+
+  local cache_key = get_introspection_cache_key(opts, access_token)
+  local digest = b64url(openidc_sha256(cache_key))
+  local lock_key = "openidc-introspection-lock:" .. digest
+  local result_key_prefix = "openidc-introspection-result:" .. digest .. ":"
+  local lock_owner = openidc_random_jti()
+  local lock_timeout = opts.introspection_lock_timeout or 5
+  local lock_exptime = opts.introspection_lock_exptime or 30
+
+  if type(lock_timeout) ~= "number" or lock_timeout < 0 then
+    return nil, "introspection_lock_timeout must be a non-negative number"
+  end
+  if type(lock_exptime) ~= "number" or lock_exptime <= 0 then
+    return nil, "introspection_lock_exptime must be a positive number"
+  end
+
+  local locked
+  local observed_owner
+  locked, err, observed_owner = acquire_introspection_lock(
+    introspection_cache, lock_key, lock_owner, lock_timeout, lock_exptime)
+  if not locked then
+    return nil, "failed to acquire introspection lock: " .. err
+  end
+
+  -- Another request may have populated the regular cache while this request
+  -- waited for the lock.
+  value = get_cached_introspection(opts, access_token)
+  if value then
+    release_introspection_lock(introspection_cache, lock_key, lock_owner)
+    return decode_cached_introspection(value)
+  end
+
+  -- Responses which cannot enter the regular cache (including endpoint
+  -- failures) are published briefly under the lock generation. Only requests
+  -- which observed that generation while waiting can share the outcome.
+  local completed_value = observed_owner and
+    introspection_cache:get(result_key_prefix .. observed_owner)
+  if completed_value and observed_owner then
+    local completed = cjson_s.decode(completed_value)
+    if completed then
+      publish_introspection_result(
+        introspection_cache, result_key_prefix .. lock_owner,
+        completed_value, math.max(lock_timeout, 1))
+      release_introspection_lock(introspection_cache, lock_key, lock_owner)
+      return completed.json, completed.err
+    end
+  end
+
+  local json
+  json, err = introspect_access_token(opts, access_token)
+
+  -- A cacheable response is already visible to waiters. Publish only outcomes
+  -- that the regular introspection cache did not retain.
+  if not introspection_cache:get(cache_key) then
+    local completed, encode_err = cjson_s.encode({ json = json, err = err })
+    if completed then
+      publish_introspection_result(
+        introspection_cache, result_key_prefix .. lock_owner,
+        completed, math.max(lock_timeout, 1))
+    else
+      log(WARN, "failed to encode introspection result: " .. encode_err)
+    end
+  end
+
+  release_introspection_lock(introspection_cache, lock_key, lock_owner)
   return json, err
 
 end

@@ -423,7 +423,12 @@ Currently up to four caches are used
   introspection. Cache items expire when the corresponding token
   expires. Tokens with unknown expiry are not cached at all. This
   cache will contain one entry per introspected access token - usually
-  this will be a few kB per token.
+  this will be a few kB per token. Concurrent cache misses for the same
+  token and cache segment are coalesced within an NGINX instance. One
+  request calls the introspection endpoint while the others wait for and
+  share its result, including endpoint failures and responses without an
+  expiry claim. Setting `introspection_cache_ignore` disables both caching
+  and request coalescing.
 * the cache named `jwt_verification` stores the result of JWT
   verification.  Cache items expire when the corresponding token
   expires. Tokens with unknown expiry are not cached for two
@@ -688,6 +693,15 @@ http {
              -- When not defined the value is 0, which means it only expires after the `exp` (or alternative,
              -- see introspection_expiry_claim) hint as returned by the Authorization Server
              -- introspection_interval = 60,
+
+             -- Maximum time in seconds that a concurrent introspection waits
+             -- for the request which owns the per-token lock. Defaults to 5.
+             -- introspection_lock_timeout = 5,
+
+             -- Time in seconds after which an abandoned per-token lock expires.
+             -- This should exceed the maximum introspection request duration.
+             -- Defaults to 30.
+             -- introspection_lock_exptime = 30,
 
              -- Defines the way in which bearer OAuth 2.0 access tokens can be passed to this Resource Server.
              -- "cookie" as a cookie header called "PA.global" or using the name specified after ":"
