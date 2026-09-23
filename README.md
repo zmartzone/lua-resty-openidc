@@ -427,8 +427,10 @@ Currently up to four caches are used
   token and cache segment are coalesced within an NGINX instance. One
   request calls the introspection endpoint while the others wait for and
   share its result, including endpoint failures and responses without an
-  expiry claim. Setting `introspection_cache_ignore` disables both caching
-  and request coalescing.
+  expiry claim. If coordination times out or fails, the request rechecks the
+  cache and then falls back to direct introspection, preserving the behavior
+  without coordination. Setting `introspection_cache_ignore` disables both
+  caching and request coalescing.
 * the cache named `jwt_verification` stores the result of JWT
   verification.  Cache items expire when the corresponding token
   expires. Tokens with unknown expiry are not cached for two
@@ -696,11 +698,13 @@ http {
 
              -- Maximum time in seconds that a concurrent introspection waits
              -- for the request which owns the per-token lock. Defaults to 5.
+             -- On timeout, the request falls back to direct introspection.
              -- introspection_lock_timeout = 5,
 
-             -- Time in seconds after which an abandoned per-token lock expires.
-             -- This should exceed the maximum introspection request duration.
-             -- Defaults to 30.
+             -- Lease duration in seconds for the per-token lock. This must
+             -- exceed the maximum introspection request duration; an owner
+             -- continuing after its lease expires is not supported. Defaults
+             -- to 30.
              -- introspection_lock_exptime = 30,
 
              -- Defines the way in which bearer OAuth 2.0 access tokens can be passed to this Resource Server.

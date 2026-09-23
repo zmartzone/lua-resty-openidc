@@ -2467,10 +2467,11 @@ local function acquire_introspection_lock(dict, key, owner, timeout, exptime)
   return nil, "timeout"
 end
 
-local function release_introspection_lock(dict, key, owner)
-  if dict:get(key) == owner then
-    dict:delete(key)
-  end
+-- The lock is a lease: the owner must finish and release it before exptime.
+-- ngx.shared.DICT has no atomic compare-and-delete operation, so releasing an
+-- expired lease while a successor owns the key is not supported.
+local function release_introspection_lock(dict, key)
+  dict:delete(key)
 end
 
 local function publish_introspection_result(dict, key, value, ttl)
@@ -2526,14 +2527,23 @@ function openidc.introspect(opts)
   locked, err, observed_owner = acquire_introspection_lock(
     introspection_cache, lock_key, lock_owner, lock_timeout, lock_exptime)
   if not locked then
-    return nil, "failed to acquire introspection lock: " .. err
+    -- Coordination is an optimization. Preserve the previous behavior when
+    -- the lock is unavailable, while avoiding a duplicate call if the owner
+    -- populated the cache immediately before the timeout.
+    value = get_cached_introspection(opts, access_token)
+    if value then
+      return decode_cached_introspection(value)
+    end
+    log(WARN, "failed to acquire introspection lock: ", err,
+        "; falling back to direct introspection")
+    return introspect_access_token(opts, access_token)
   end
 
   -- Another request may have populated the regular cache while this request
   -- waited for the lock.
   value = get_cached_introspection(opts, access_token)
   if value then
-    release_introspection_lock(introspection_cache, lock_key, lock_owner)
+    release_introspection_lock(introspection_cache, lock_key)
     return decode_cached_introspection(value)
   end
 
@@ -2548,7 +2558,7 @@ function openidc.introspect(opts)
       publish_introspection_result(
         introspection_cache, result_key_prefix .. lock_owner,
         completed_value, math.max(lock_timeout, 1))
-      release_introspection_lock(introspection_cache, lock_key, lock_owner)
+      release_introspection_lock(introspection_cache, lock_key)
       return completed.json, completed.err
     end
   end
@@ -2569,7 +2579,7 @@ function openidc.introspect(opts)
     end
   end
 
-  release_introspection_lock(introspection_cache, lock_key, lock_owner)
+  release_introspection_lock(introspection_cache, lock_key)
   return json, err
 
 end

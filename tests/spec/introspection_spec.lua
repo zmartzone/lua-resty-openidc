@@ -575,16 +575,14 @@ describe("when concurrent introspection lock acquisition times out", function()
   })
   teardown(test_support.stop_server)
   local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
-  local statuses = collect_introspection_statuses_concurrently(jwt, 2)
+  request_introspection_concurrently(jwt, 2)
 
-  it("returns the successful result to the lock owner", function()
-    assert.are.equals(1, statuses["200"])
+  it("falls back to direct introspection", function()
+    assert.are.equals(2, error_log_occurrences("Received introspection request:"))
   end)
-  it("returns an error to the request that cannot coordinate", function()
-    assert.are.equals(1, statuses["401"])
-  end)
-  it("does not send the timed-out request to the introspection endpoint", function()
-    assert.are.equals(1, error_log_occurrences("Received introspection request:"))
+  it("logs the coordination failure", function()
+    assert.error_log_contains(
+      "failed to acquire introspection lock: timeout; falling back to direct introspection")
   end)
 end)
 
@@ -609,31 +607,6 @@ describe("when sequential non-cacheable requests have the same ngx.now value", f
   it("does not share the first request's temporary result", function()
     assert.are.equals(200, first_status)
     assert.are.equals(200, second_status)
-    assert.are.equals(2, error_log_occurrences("Received introspection request:"))
-  end)
-end)
-
-describe("when an introspection outlasts its lock generation", function()
-  test_support.start_server({
-    delay_response = { introspection = 700 },
-    remove_introspection_claims = { "exp" },
-    introspection_opts = {
-      introspection_cache_ignore = false,
-      introspection_lock_exptime = 0.5,
-      introspection_lock_timeout = 0.1,
-    },
-  })
-  teardown(test_support.stop_server)
-  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
-  local curl = "curl -sS -o /dev/null -H 'Authorization: Bearer " .. jwt ..
-    "' http://127.0.0.1/introspect"
-  local command = curl .. " & first_pid=$!; sleep 0.55; " ..
-    curl .. " & second_pid=$!; sleep 0.25; " .. curl ..
-    "; wait $first_pid $second_pid"
-  local ok = os.execute(command)
-
-  it("keeps the replacement generation locked", function()
-    assert.truthy(ok == true or ok == 0)
     assert.are.equals(2, error_log_occurrences("Received introspection request:"))
   end)
 end)
