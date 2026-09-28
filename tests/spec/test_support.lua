@@ -194,7 +194,7 @@ return test_globals
 ]]
 
 local DEFAULT_CONFIG_TEMPLATE = [[
-worker_processes  1;
+worker_processes  WORKER_PROCESSES;
 pid       /tmp/server/logs/nginx.pid;
 error_log /tmp/server/logs/error.log debug;
 
@@ -206,7 +206,7 @@ http {
     access_log /tmp/server/logs/access.log;
     lua_package_path '~/lua/?.lua;/tmp/server/conf/?.lua;;';
     lua_shared_dict discovery 1m;
-    lua_shared_dict introspection 1m;
+    lua_shared_dict introspection INTROSPECTION_SHARED_DICT_SIZE;
     lua_shared_dict jwt_verification 1m;
     lua_shared_dict revocation_test 1m;
     init_by_lua_block {
@@ -544,6 +544,9 @@ http {
 
         location /introspect {
             content_by_lua_block {
+                if LOG_INTROSPECTION_WORKER then
+                  ngx.log(ngx.ERR, "Introspection client worker: " .. ngx.worker.pid())
+                end
                 local opts = INTROSPECTION_OPTS
                 if opts.decorate then
                   opts.http_request_decorator = test_globals.body_decorator
@@ -556,6 +559,39 @@ http {
                   ngx.header.content_type = 'application/json;charset=UTF-8'
                   ngx.say(test_globals.cjson.encode(json))
                 end
+            }
+        }
+
+        location /evict-introspection-coordination {
+            content_by_lua_block {
+                local dict = ngx.shared.introspection
+                local filler = string.rep("x", 1024)
+                local forced = false
+                for i = 1, 4096 do
+                  local ok, err, forcible = dict:set(
+                    "introspection-test-filler:" .. i, filler)
+                  if not ok then
+                    ngx.status = 500
+                    ngx.say("failed to fill introspection dictionary: " .. err)
+                    return
+                  end
+                  forced = forced or forcible
+
+                  local has_coordination_state = false
+                  for _, key in ipairs(dict:get_keys(0)) do
+                    if key:find("^openidc%-introspection%-lock:") or
+                        key:find("^openidc%-introspection%-result:") then
+                      has_coordination_state = true
+                      break
+                    end
+                  end
+                  if forced and not has_coordination_state then
+                    ngx.say("evicted")
+                    return
+                  end
+                end
+                ngx.status = 500
+                ngx.say("coordination state was not evicted")
             }
         }
 
@@ -668,6 +704,11 @@ local function write_template(out, template, custom_config)
     introspection_opts[k] = nil
   end
   local content = template
+    :gsub("WORKER_PROCESSES", tostring(custom_config["worker_processes"] or 1))
+    :gsub("INTROSPECTION_SHARED_DICT_SIZE",
+      custom_config["introspection_shared_dict_size"] or "1m")
+    :gsub("LOG_INTROSPECTION_WORKER",
+      custom_config["log_introspection_worker"] and "true" or "false")
     :gsub("OIDC_CONFIG", serpent.block(oidc_config, {comment = false }))
     :gsub("TOKEN_HEADER", serpent.block(token_header, {comment = false }))
     :gsub("JWT_SIGN_SECRET", custom_config["jwt_sign_secret"] or DEFAULT_JWT_SIGN_SECRET)
@@ -747,6 +788,10 @@ end
 -- - access_token_opts is a table containing options that are accepted by oidc.access_token
 -- - delay_response is a table specifying a delay for the response of various endpoint in ms
 --   { jwk = 1, token = 1, discovery = 1, userinfo = 1, introspection = 1}
+-- - worker_processes configures the number of nginx workers; defaults to 1
+-- - introspection_shared_dict_size configures the introspection shared dictionary size;
+--   defaults to 1m
+-- - log_introspection_worker logs the worker handling each /introspect request
 -- - refreshing_token_fails whether to grant an access token via the refresh token grant
 -- - fake_access_token_signature whether to fake a JWT signature with unknown algorithm for the
 --   JWT returned by /jwt

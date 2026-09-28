@@ -2435,16 +2435,37 @@ local function decode_cached_introspection(value)
   return json, err
 end
 
-local function acquire_introspection_lock(dict, key, owner, timeout, exptime)
+local function get_introspection_coordination_result(dict, cache_key,
+    result_key_prefix, observed_owner)
+  local cached_value = dict:get(cache_key)
+  if cached_value then
+    return "cached", cached_value
+  end
+
+  local completed_value = observed_owner and
+    dict:get(result_key_prefix .. observed_owner)
+  if completed_value then
+    return "completed", completed_value
+  end
+end
+
+local function acquire_introspection_lock(dict, key, owner, timeout, exptime,
+    cache_key, result_key_prefix)
   local ok, err = dict:add(key, owner, exptime)
   if ok then
-    return true
+    return "locked"
   end
   if err ~= "exists" then
     return nil, err
   end
 
   local observed_owner = dict:get(key)
+  local state, value = get_introspection_coordination_result(
+    dict, cache_key, result_key_prefix, observed_owner)
+  if state then
+    return state, value
+  end
+
   local elapsed = 0
   local step = 0.001
   while elapsed < timeout do
@@ -2452,26 +2473,44 @@ local function acquire_introspection_lock(dict, key, owner, timeout, exptime)
     ngx.sleep(step)
     elapsed = elapsed + step
 
+    -- The owner publishes before releasing its lock. Check its generation
+    -- after sleeping and before attempting to become a new owner.
+    state, value = get_introspection_coordination_result(
+      dict, cache_key, result_key_prefix, observed_owner)
+    if state then
+      return state, value
+    end
+
     ok, err = dict:add(key, owner, exptime)
     if ok then
-      return true, nil, observed_owner
+      return "locked", nil, observed_owner
     end
     if err ~= "exists" then
       return nil, err
     end
-    observed_owner = dict:get(key) or observed_owner
+    -- add() and get() are not atomic. If the first owner disappeared before
+    -- it could be observed, remember the first later generation we can see.
+    observed_owner = observed_owner or dict:get(key)
 
     step = math.min(step * 2, 0.5)
+  end
+
+  state, value = get_introspection_coordination_result(
+    dict, cache_key, result_key_prefix, observed_owner)
+  if state then
+    return state, value
   end
 
   return nil, "timeout"
 end
 
--- The lock is a lease: the owner must finish and release it before exptime.
--- ngx.shared.DICT has no atomic compare-and-delete operation, so releasing an
--- expired lease while a successor owns the key is not supported.
-local function release_introspection_lock(dict, key)
-  dict:delete(key)
+-- ngx.shared.DICT has no atomic compare-and-delete operation, so this owner
+-- check only narrows the race window. The lock remains a lease: the owner must
+-- normally finish and release it before exptime.
+local function release_introspection_lock(dict, key, owner)
+  if dict:get(key) == owner then
+    dict:delete(key)
+  end
 end
 
 local function publish_introspection_result(dict, key, value, ttl)
@@ -2522,11 +2561,26 @@ function openidc.introspect(opts)
     return nil, "introspection_lock_exptime must be a positive number"
   end
 
-  local locked
+  local lock_state
+  local coordination_value
   local observed_owner
-  locked, err, observed_owner = acquire_introspection_lock(
-    introspection_cache, lock_key, lock_owner, lock_timeout, lock_exptime)
-  if not locked then
+  lock_state, coordination_value, observed_owner = acquire_introspection_lock(
+    introspection_cache, lock_key, lock_owner, lock_timeout, lock_exptime,
+    cache_key, result_key_prefix)
+  if lock_state == "cached" then
+    return decode_cached_introspection(coordination_value)
+  end
+  if lock_state == "completed" then
+    local completed = cjson_s.decode(coordination_value)
+    if completed then
+      return completed.json, completed.err
+    end
+    log(WARN, "failed to decode published introspection result; " ..
+        "falling back to direct introspection")
+    return introspect_access_token(opts, access_token)
+  end
+  if lock_state ~= "locked" then
+    err = coordination_value
     -- Coordination is an optimization. Preserve the previous behavior when
     -- the lock is unavailable, while avoiding a duplicate call if the owner
     -- populated the cache immediately before the timeout.
@@ -2543,7 +2597,7 @@ function openidc.introspect(opts)
   -- waited for the lock.
   value = get_cached_introspection(opts, access_token)
   if value then
-    release_introspection_lock(introspection_cache, lock_key)
+    release_introspection_lock(introspection_cache, lock_key, lock_owner)
     return decode_cached_introspection(value)
   end
 
@@ -2555,10 +2609,7 @@ function openidc.introspect(opts)
   if completed_value and observed_owner then
     local completed = cjson_s.decode(completed_value)
     if completed then
-      publish_introspection_result(
-        introspection_cache, result_key_prefix .. lock_owner,
-        completed_value, math.max(lock_timeout, 1))
-      release_introspection_lock(introspection_cache, lock_key)
+      release_introspection_lock(introspection_cache, lock_key, lock_owner)
       return completed.json, completed.err
     end
   end
@@ -2579,7 +2630,7 @@ function openidc.introspect(opts)
     end
   end
 
-  release_introspection_lock(introspection_cache, lock_key)
+  release_introspection_lock(introspection_cache, lock_key, lock_owner)
   return json, err
 
 end
