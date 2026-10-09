@@ -103,7 +103,7 @@ describe("when the introspection endpoint is invoked", function()
   teardown(test_support.stop_server)
   local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
   describe("without any Authorization header", function()
-    local _, status = http.request({
+    local _, status, headers = http.request({
       url = "http://127.0.0.1/introspect"
     })
     it("the token is invalid", function()
@@ -112,9 +112,13 @@ describe("when the introspection endpoint is invoked", function()
     it("an error is logged", function()
       assert.error_log_contains("no Authorization header found")
     end)
+    it("classifies the malformed credential", function()
+      assert.are.equals("invalid_request", headers["x-introspection-failure-kind"])
+      assert.are.equals("401", headers["x-introspection-client-status"])
+    end)
   end)
   describe("with a bearer token", function()
-    local _, status = http.request({
+    local _, status, headers = http.request({
       url = "http://127.0.0.1/introspect",
       headers = { authorization = "Bearer " .. jwt }
     })
@@ -135,6 +139,9 @@ describe("when the introspection endpoint is invoked", function()
     end)
     it("the response is valid", function()
       assert.are.equals(200, status)
+    end)
+    it("returns the introspection endpoint status", function()
+      assert.are.equals("200", headers["x-introspection-endpoint-status"])
     end)
   end)
 end)
@@ -509,7 +516,7 @@ describe("when the response is inactive", function()
   })
   teardown(test_support.stop_server)
   local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
-  local _, status = http.request({
+  local _, status, headers = http.request({
     url = "http://127.0.0.1/introspect",
     headers = { authorization = "Bearer " .. jwt }
   })
@@ -518,6 +525,46 @@ describe("when the response is inactive", function()
   end)
   it("an error has been logged", function()
     assert.error_log_contains("Introspection error: invalid token")
+  end)
+  it("classifies the inactive token", function()
+    assert.are.equals("invalid_token", headers["x-introspection-failure-kind"])
+    assert.are.equals("401", headers["x-introspection-client-status"])
+    assert.are.equals("200", headers["x-introspection-endpoint-status"])
+  end)
+end)
+
+describe("when the response lacks the active claim", function()
+  test_support.start_server({
+    remove_introspection_claims = { "active" },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status, headers = http.request({
+    url = "http://127.0.0.1/introspect",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+
+  it("treats the response as unavailable rather than an inactive token", function()
+    assert.are.equals(503, status)
+    assert.are.equals("invalid_response", headers["x-introspection-failure-kind"])
+    assert.are.equals("200", headers["x-introspection-endpoint-status"])
+  end)
+end)
+
+describe("when the response has a non-boolean active claim", function()
+  test_support.start_server({
+    introspection_response = { active = "true" },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status, headers = http.request({
+    url = "http://127.0.0.1/introspect",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+
+  it("rejects the malformed response", function()
+    assert.are.equals(503, status)
+    assert.are.equals("invalid_response", headers["x-introspection-failure-kind"])
   end)
 end)
 
@@ -596,7 +643,7 @@ describe("when a batch receives an introspection endpoint failure", function()
   })
   teardown(test_support.stop_server)
   local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
-  request_introspection_concurrently(jwt, 35, "401")
+  request_introspection_concurrently(jwt, 35, "503")
 
   it("coalesces the batch into one introspection endpoint call", function()
     assert.are.equals(1, error_log_occurrences("Received introspection request:"))
@@ -604,6 +651,7 @@ describe("when a batch receives an introspection endpoint failure", function()
   it("shares the endpoint failure with every request", function()
     assert.are.equals(35, error_log_occurrences(
       "Introspection error: response indicates failure, status=503,"))
+    assert.are.equals(35, error_log_occurrences("kind=endpoint_unavailable"))
   end)
 end)
 
@@ -713,12 +761,16 @@ describe("when introspection endpoint is not resolvable", function()
   })
   teardown(test_support.stop_server)
   local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
-  local _, status = http.request({
+  local _, status, headers = http.request({
     url = "http://127.0.0.1/introspect",
     headers = { authorization = "Bearer " .. jwt }
   })
-  it("the response is invalid", function()
-    assert.are.equals(401, status)
+  it("the service is unavailable", function()
+    assert.are.equals(503, status)
+  end)
+  it("classifies the endpoint failure", function()
+    assert.are.equals("endpoint_unavailable", headers["x-introspection-failure-kind"])
+    assert.is_nil(headers["x-introspection-endpoint-status"])
   end)
   it("an error has been logged", function()
     assert.error_log_contains("Introspection error:.*foo.example.org could not be resolved.*")
@@ -738,8 +790,8 @@ describe("when introspection endpoint is not reachable", function()
     url = "http://127.0.0.1/introspect",
     headers = { authorization = "Bearer " .. jwt }
   })
-  it("the response is invalid", function()
-    assert.are.equals(401, status)
+  it("the service is unavailable", function()
+    assert.are.equals(503, status)
   end)
   it("an error has been logged", function()
     assert.error_log_contains("Introspection error:.*accessing introspection endpoint %(http://127.1.2.3/%) failed")
@@ -774,8 +826,8 @@ describe("when introspection endpoint is slow and a simple timeout is configured
     url = "http://127.0.0.1/introspect",
     headers = { authorization = "Bearer " .. jwt }
   })
-  it("the response is invalid", function()
-    assert.are.equals(401, status)
+  it("the service is unavailable", function()
+    assert.are.equals(503, status)
   end)
   it("an error has been logged", function()
     assert.error_log_contains("Introspection error:.*accessing introspection endpoint %(http://127.0.0.1/introspection%) failed: timeout")
@@ -795,8 +847,8 @@ describe("when introspection endpoint is slow and a table timeout is configured"
     url = "http://127.0.0.1/introspect",
     headers = { authorization = "Bearer " .. jwt }
   })
-  it("the response is invalid", function()
-    assert.are.equals(401, status)
+  it("the service is unavailable", function()
+    assert.are.equals(503, status)
   end)
   it("an error has been logged", function()
     assert.error_log_contains("Introspection error:.*accessing introspection endpoint %(http://127.0.0.1/introspection%) failed: timeout")
@@ -811,15 +863,19 @@ describe("when introspection endpoint sends a 4xx status", function()
   })
   teardown(test_support.stop_server)
   local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
-  local _, status = http.request({
+  local _, status, headers = http.request({
     url = "http://127.0.0.1/introspect",
     headers = { authorization = "Bearer " .. jwt }
   })
-  it("the response is invalid", function()
-    assert.are.equals(401, status)
+  it("the service is unavailable", function()
+    assert.are.equals(503, status)
   end)
   it("an error has been logged", function()
     assert.error_log_contains("Introspection error:.*response indicates failure, status=404,")
+  end)
+  it("preserves the endpoint status separately", function()
+    assert.are.equals("404", headers["x-introspection-endpoint-status"])
+    assert.are.equals("endpoint_unavailable", headers["x-introspection-failure-kind"])
   end)
 end)
 
@@ -831,15 +887,19 @@ describe("when introspection endpoint doesn't return proper JSON", function()
   })
   teardown(test_support.stop_server)
   local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
-  local _, status = http.request({
+  local _, status, headers = http.request({
     url = "http://127.0.0.1/introspect",
     headers = { authorization = "Bearer " .. jwt }
   })
-  it("the response is invalid", function()
-    assert.are.equals(401, status)
+  it("the service is unavailable", function()
+    assert.are.equals(503, status)
   end)
   it("an error has been logged", function()
     assert.error_log_contains("Introspection error: JSON decoding failed")
+  end)
+  it("classifies the successful but malformed response", function()
+    assert.are.equals("200", headers["x-introspection-endpoint-status"])
+    assert.are.equals("invalid_response", headers["x-introspection-failure-kind"])
   end)
 end)
 
@@ -866,15 +926,18 @@ describe("when introspection endpoint hasn't been specified", function()
   })
   teardown(test_support.stop_server)
   local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
-  local _, status = http.request({
+  local _, status, headers = http.request({
     url = "http://127.0.0.1/introspect",
     headers = { authorization = "Bearer " .. jwt }
   })
-  it("the response is invalid", function()
-    assert.are.equals(401, status)
+  it("the configuration is invalid", function()
+    assert.are.equals(500, status)
   end)
   it("an error has been logged", function()
     assert.error_log_contains("Introspection error: no endpoint URI for introspection")
+  end)
+  it("classifies the configuration failure", function()
+    assert.are.equals("configuration_error", headers["x-introspection-failure-kind"])
   end)
 end)
 

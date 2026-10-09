@@ -3,6 +3,8 @@
   waiting requests to share successful and failed results
 - make introspection coordination honor explicit cache bypass, treat locks as
   bounded leases, and fall back to direct introspection on coordination failure
+- return structured introspection failure details so callers can distinguish
+  invalid tokens from unavailable endpoints and configuration failures
 - release 1.9.2
 
 09/05/2026
