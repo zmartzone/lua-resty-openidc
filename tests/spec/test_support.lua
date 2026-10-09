@@ -54,7 +54,7 @@ function test_support.self_signed_jwt(payload, alg, signature)
   local function b64url(s)
     local dkjson = require "dkjson"
     local mime = require "mime"
-    return mime.b64(dkjson.encode(s)):gsub('+','-'):gsub('/','_')
+    return mime.b64(dkjson.encode(s)):gsub('+','-'):gsub('/','_'):gsub('=', '')
   end
   local header = b64url({
       typ = "JWT",
@@ -137,7 +137,7 @@ test_globals.delay = function(delay_response)
   end
 end
 test_globals.b64url = function(s)
-  return ngx.encode_base64(test_globals.cjson.encode(s)):gsub('+','-'):gsub('/','_')
+  return ngx.encode_base64(test_globals.cjson.encode(s)):gsub('+','-'):gsub('/','_'):gsub('=', '')
 end
 test_globals.create_jwt = function(payload, fake_signature)
   if not fake_signature then
@@ -146,13 +146,26 @@ test_globals.create_jwt = function(payload, fake_signature)
       payload = payload
     }
     local jwt = require "resty.jwt"
+    if JWT_SIGN_WITH_RAW_HMAC then
+      -- Construct an algorithm-confusion fixture without the JWT signer's
+      -- intentional rejection of PEM key material as an HMAC secret.
+      assert(jwt_content.header.alg == "HS256")
+      local input = test_globals.b64url(jwt_content.header) .. "." ..
+        test_globals.b64url(payload)
+      local hmac = assert(require("resty.openssl.hmac").new(sign_secret, "sha256"))
+      assert(hmac:update(input))
+      local signature = ngx.encode_base64(assert(hmac:final()))
+        :gsub('+', '-'):gsub('/', '_'):gsub('=', '')
+      return input .. "." .. signature
+    end
     return jwt:sign(sign_secret, jwt_content)
   else
     local header = test_globals.b64url({
         typ = "JWT",
         alg = "AB256"
     })
-    return header .. "." .. test_globals.b64url(payload) .. ".NOT_A_VALID_SIGNATURE"
+    return header .. "." .. test_globals.b64url(payload) .. "." ..
+      test_globals.b64url("NOT_A_VALID_SIGNATURE")
   end
 end
 test_globals.query_decorator = function(req)
@@ -351,7 +364,10 @@ http {
                 else
                   jwt_token = test_globals.create_jwt(id_token, FAKE_ID_TOKEN_SIGNATURE)
                   if BREAK_ID_TOKEN_SIGNATURE then
-                    jwt_token = jwt_token:sub(1, -6) .. "XXXXX"
+                    -- Change a full six-bit group, preserving canonical Base64URL.
+                    jwt_token = jwt_token:gsub("^(.-%..-%.)(.)", function(prefix, first)
+                      return prefix .. (first == "A" and "B" or "A")
+                    end, 1)
                   end
                 end
                 local token_response = {
@@ -712,6 +728,7 @@ local function write_template(out, template, custom_config)
     :gsub("OIDC_CONFIG", serpent.block(oidc_config, {comment = false }))
     :gsub("TOKEN_HEADER", serpent.block(token_header, {comment = false }))
     :gsub("JWT_SIGN_SECRET", custom_config["jwt_sign_secret"] or DEFAULT_JWT_SIGN_SECRET)
+    :gsub("JWT_SIGN_WITH_RAW_HMAC", custom_config["jwt_sign_with_raw_hmac"] and "true" or "false")
     :gsub("VERIFY_OPTS", serpent.block(verify_opts, {comment = false }))
     :gsub("INTROSPECTION_RESPONSE_STATUS", tostring(custom_config["introspection_response_status"] or
       DEFAULT_INTROSPECTION_RESPONSE_STATUS))
@@ -769,6 +786,7 @@ end
 -- - verify_opts is a table containing options that are accepted by oidc.bearer_jwt_verify
 -- - jwt_signature_alg algorithm to use for signing JWTs
 -- - jwt_sign_secret the secret to use when signing JWTs
+-- - jwt_sign_with_raw_hmac builds an HS256 attack fixture using raw HMAC
 -- - access_token is a table containing claims for the access token provided by /jwt
 -- - token_header is a table containing claims for the header used by /jwt
 --   as well as the id token

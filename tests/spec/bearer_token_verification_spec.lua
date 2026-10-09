@@ -46,9 +46,13 @@ local function base_checks()
     end)
   end)
   describe("and sending a JWT with broken signature", function()
+    -- Corrupt the signature without introducing invalid Base64URL trailing bits.
+    local broken_jwt = jwt:gsub("^(.-%..-%.)(.)", function(prefix, first)
+      return prefix .. (first == "A" and "B" or "A")
+    end, 1)
     local _, status = http.request({
       url = "http://127.0.0.1/verify_bearer_token",
-      headers = { authorization = "Bearer " ..  jwt:sub(1, -6) .. "XXXXX" }
+      headers = { authorization = "Bearer " .. broken_jwt }
     })
     it("the token is invalid", function()
       assert.are.equals(401, status)
@@ -668,6 +672,7 @@ describe("when expecting an RSA signature but token uses HMAC", function()
       token_signing_alg_values_expected = "RS256"
     },
     jwt_sign_secret = test_support.load("/spec/public_rsa_key.pem"),
+    jwt_sign_with_raw_hmac = true,
     token_header = {
       alg = "HS256",
     }
