@@ -26,6 +26,75 @@ local function error_log_occurrences(s)
   end
 end
 
+local function count_introspection_client_workers()
+  local workers = {}
+  local log = test_support.load("/tmp/server/logs/error.log")
+  for pid in log:gmatch("Introspection client worker: (%d+)") do
+    workers[pid] = true
+  end
+
+  local count = 0
+  for _ in pairs(workers) do
+    count = count + 1
+  end
+  return count
+end
+
+local function count_statuses(statuses)
+  local seen = 0
+  local counts = {}
+  for status in statuses:gmatch("%d+") do
+    counts[status] = (counts[status] or 0) + 1
+    seen = seen + 1
+  end
+  return counts, seen
+end
+
+local function collect_introspection_statuses_concurrently(jwt, count)
+  local output = "/tmp/introspection-statuses"
+  os.remove(output)
+  local command = "seq 1 " .. count .. " | xargs -P " .. count ..
+    " -I '{}' curl -sS -o /dev/null -w '%{http_code}\\n'" ..
+    " -H 'Authorization: Bearer " .. jwt .. "'" ..
+    " http://127.0.0.1/introspect > " .. output
+  local ok = os.execute(command)
+  assert.truthy(ok == true or ok == 0)
+
+  local counts, seen = count_statuses(test_support.load(output))
+  assert.are.equals(count, seen)
+  return counts
+end
+
+local function collect_introspection_statuses_with_eviction(jwt, count)
+  local owner_output = "/tmp/introspection-owner-status"
+  local waiters_output = "/tmp/introspection-waiter-statuses"
+  os.remove(owner_output)
+  os.remove(waiters_output)
+  local request = "curl -sS -o /dev/null -w '%{http_code}\\n'" ..
+    " -H 'Authorization: Bearer " .. jwt .. "'" ..
+    " http://127.0.0.1/introspect"
+  local command = request .. " > " .. owner_output .. " & owner_pid=$!;" ..
+    " sleep 0.1;" ..
+    " curl -fsS http://127.0.0.1/evict-introspection-coordination > /dev/null &&" ..
+    " seq 1 " .. (count - 1) .. " | xargs -P " .. (count - 1) ..
+    " -I '{}' " .. request .. " > " .. waiters_output .. ";" ..
+    " wait $owner_pid"
+  local ok = os.execute(command)
+  assert.truthy(ok == true or ok == 0)
+
+  local statuses = test_support.load(owner_output) ..
+    test_support.load(waiters_output)
+  local counts, seen = count_statuses(statuses)
+  assert.are.equals(count, seen)
+  return counts
+end
+
+local function request_introspection_concurrently(jwt, count, expected_status)
+  expected_status = expected_status or "200"
+  local counts = collect_introspection_statuses_concurrently(jwt, count)
+  assert.are.equals(count, counts[expected_status])
+end
+
 local legacy_introspection_body_auth_warning = "introspection_endpoint_auth_method is not set; " ..
   "sending introspection client credentials in the POST body is deprecated"
 
@@ -467,7 +536,174 @@ describe("when the response is active but lacks the exp claim", function()
   end)
 end)
 
--- TODO find a way to assert caching
+describe("when a batch sends 35 concurrent requests with the same uncached token", function()
+  test_support.start_server({
+    -- Keep the first lookup in flight long enough for the whole batch to
+    -- arrive inside the same cache-miss window.
+    delay_response = { introspection = 1000 },
+    introspection_opts = { introspection_cache_ignore = false },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  request_introspection_concurrently(jwt, 35)
+
+  it("coalesces the batch into one introspection endpoint call", function()
+    assert.are.equals(1, error_log_occurrences("Received introspection request:"))
+  end)
+end)
+
+describe("when concurrent requests explicitly bypass the introspection cache", function()
+  test_support.start_server({
+    delay_response = { introspection = 300 },
+    introspection_opts = { introspection_cache_ignore = true },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  request_introspection_concurrently(jwt, 10)
+
+  it("introspects every request independently", function()
+    assert.are.equals(10, error_log_occurrences("Received introspection request:"))
+  end)
+end)
+
+describe("when concurrent requests introspect a response without an expiry", function()
+  test_support.start_server({
+    delay_response = { introspection = 300 },
+    remove_introspection_claims = { "exp" },
+    introspection_opts = { introspection_cache_ignore = false },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  request_introspection_concurrently(jwt, 20)
+
+  it("shares the in-flight response without caching it for later requests", function()
+    assert.are.equals(1, error_log_occurrences("Received introspection request:"))
+    os.execute("sleep 0.1")
+    local _, status = http.request({
+      url = "http://127.0.0.1/introspect",
+      headers = { authorization = "Bearer " .. jwt }
+    })
+    assert.are.equals(200, status)
+    assert.are.equals(2, error_log_occurrences("Received introspection request:"))
+  end)
+end)
+
+describe("when a batch receives an introspection endpoint failure", function()
+  test_support.start_server({
+    delay_response = { introspection = 1000 },
+    introspection_response_status = 503,
+    introspection_opts = { introspection_cache_ignore = false },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  request_introspection_concurrently(jwt, 35, "401")
+
+  it("coalesces the batch into one introspection endpoint call", function()
+    assert.are.equals(1, error_log_occurrences("Received introspection request:"))
+  end)
+  it("shares the endpoint failure with every request", function()
+    assert.are.equals(35, error_log_occurrences(
+      "Introspection error: response indicates failure, status=503,"))
+  end)
+end)
+
+describe("when concurrent introspection lock acquisition times out", function()
+  test_support.start_server({
+    delay_response = { introspection = 1000 },
+    introspection_opts = {
+      introspection_cache_ignore = false,
+      introspection_lock_timeout = 0,
+    },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  request_introspection_concurrently(jwt, 2)
+
+  it("falls back to direct introspection", function()
+    assert.are.equals(2, error_log_occurrences("Received introspection request:"))
+  end)
+  it("logs the coordination failure", function()
+    assert.error_log_contains(
+      "failed to acquire introspection lock: timeout; falling back to direct introspection")
+  end)
+end)
+
+describe("when an introspection lock lease expires across workers", function()
+  test_support.start_server({
+    worker_processes = 4,
+    log_introspection_worker = true,
+    delay_response = { introspection = 300 },
+    introspection_opts = {
+      introspection_cache_ignore = false,
+      introspection_lock_timeout = 2,
+      introspection_lock_exptime = 0.05,
+    },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local counts = collect_introspection_statuses_concurrently(jwt, 20)
+
+  it("does not turn lease expiry into authentication failures", function()
+    assert.are.equals(20, counts["200"])
+  end)
+  it("allows duplicate upstream calls after the lease expires", function()
+    assert.is_true(error_log_occurrences("Received introspection request:") > 1)
+  end)
+  it("exercises more than one nginx worker", function()
+    assert.is_true(count_introspection_client_workers() > 1)
+  end)
+end)
+
+describe("when introspection coordination state is evicted across workers", function()
+  test_support.start_server({
+    worker_processes = 4,
+    log_introspection_worker = true,
+    introspection_shared_dict_size = "64k",
+    delay_response = { introspection = 500 },
+    introspection_opts = {
+      introspection_cache_ignore = false,
+      introspection_lock_timeout = 2,
+    },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local counts = collect_introspection_statuses_with_eviction(jwt, 16)
+
+  it("does not turn coordination eviction into authentication failures", function()
+    assert.are.equals(16, counts["200"])
+  end)
+  it("allows duplicate upstream calls after coordination is evicted", function()
+    assert.is_true(error_log_occurrences("Received introspection request:") > 1)
+  end)
+  it("exercises more than one nginx worker", function()
+    assert.is_true(count_introspection_client_workers() > 1)
+  end)
+end)
+
+describe("when sequential non-cacheable requests have the same ngx.now value", function()
+  test_support.start_server({
+    fixed_ngx_now = 1000,
+    remove_introspection_claims = { "exp" },
+    introspection_opts = { introspection_cache_ignore = false },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local headers = { authorization = "Bearer " .. jwt }
+  local _, first_status = http.request({
+    url = "http://127.0.0.1/introspect",
+    headers = headers,
+  })
+  local _, second_status = http.request({
+    url = "http://127.0.0.1/introspect",
+    headers = headers,
+  })
+
+  it("does not share the first request's temporary result", function()
+    assert.are.equals(200, first_status)
+    assert.are.equals(200, second_status)
+    assert.are.equals(2, error_log_occurrences("Received introspection request:"))
+  end)
+end)
 
 describe("when introspection endpoint is not resolvable", function()
   test_support.start_server({
@@ -661,4 +897,3 @@ describe("when introspection endpoint hasn't been specified but discovery doc pr
      assert.are.equals(200, status)
   end)
 end)
-

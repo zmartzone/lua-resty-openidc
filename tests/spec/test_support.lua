@@ -74,6 +74,8 @@ local DEFAULT_INTROSPECTION_OPTS = {
   introspection_endpoint = "http://127.0.0.1/introspection",
   client_id = "client_id",
   client_secret = "client_secret",
+  -- Most specs inspect the outgoing request, so caching is opt-in in tests.
+  introspection_cache_ignore = true,
 }
 
 local DEFAULT_TOKEN_RESPONSE_EXPIRES_IN = "3600"
@@ -94,6 +96,7 @@ local DEFAULT_UNAUTH_ACTION = "nil"
 local DEFAULT_SHARE_OIDC_OPTS = "false"
 
 local DEFAULT_DELAY_RESPONSE = "0"
+local DEFAULT_INTROSPECTION_RESPONSE_STATUS = "200"
 
 local DEFAULT_REVOCATION_TEST_ENABLED = "false"
 local DEFAULT_REVOCATION_FAIL_MODE = '"closed"'
@@ -120,6 +123,12 @@ if FIXED_NGX_TIME ~= nil then
   local fixed_ngx_time = FIXED_NGX_TIME
   ngx.time = function()
     return fixed_ngx_time
+  end
+end
+if FIXED_NGX_NOW ~= nil then
+  local fixed_ngx_now = FIXED_NGX_NOW
+  ngx.now = function()
+    return fixed_ngx_now
   end
 end
 test_globals.delay = function(delay_response)
@@ -185,7 +194,7 @@ return test_globals
 ]]
 
 local DEFAULT_CONFIG_TEMPLATE = [[
-worker_processes  1;
+worker_processes  WORKER_PROCESSES;
 pid       /tmp/server/logs/nginx.pid;
 error_log /tmp/server/logs/error.log debug;
 
@@ -197,6 +206,7 @@ http {
     access_log /tmp/server/logs/access.log;
     lua_package_path '~/lua/?.lua;/tmp/server/conf/?.lua;;';
     lua_shared_dict discovery 1m;
+    lua_shared_dict introspection INTROSPECTION_SHARED_DICT_SIZE;
     lua_shared_dict jwt_verification 1m;
     lua_shared_dict revocation_test 1m;
     init_by_lua_block {
@@ -527,12 +537,16 @@ http {
                 end
                 ngx.header.content_type = 'application/json;charset=UTF-8'
                 test_globals.delay(INTROSPECTION_DELAY_RESPONSE)
+                ngx.status = INTROSPECTION_RESPONSE_STATUS
                 ngx.say(test_globals.cjson.encode(INTROSPECTION_RESPONSE))
             }
         }
 
         location /introspect {
             content_by_lua_block {
+                if LOG_INTROSPECTION_WORKER then
+                  ngx.log(ngx.ERR, "Introspection client worker: " .. ngx.worker.pid())
+                end
                 local opts = INTROSPECTION_OPTS
                 if opts.decorate then
                   opts.http_request_decorator = test_globals.body_decorator
@@ -545,6 +559,39 @@ http {
                   ngx.header.content_type = 'application/json;charset=UTF-8'
                   ngx.say(test_globals.cjson.encode(json))
                 end
+            }
+        }
+
+        location /evict-introspection-coordination {
+            content_by_lua_block {
+                local dict = ngx.shared.introspection
+                local filler = string.rep("x", 1024)
+                local forced = false
+                for i = 1, 4096 do
+                  local ok, err, forcible = dict:set(
+                    "introspection-test-filler:" .. i, filler)
+                  if not ok then
+                    ngx.status = 500
+                    ngx.say("failed to fill introspection dictionary: " .. err)
+                    return
+                  end
+                  forced = forced or forcible
+
+                  local has_coordination_state = false
+                  for _, key in ipairs(dict:get_keys(0)) do
+                    if key:find("^openidc%-introspection%-lock:") or
+                        key:find("^openidc%-introspection%-result:") then
+                      has_coordination_state = true
+                      break
+                    end
+                  end
+                  if forced and not has_coordination_state then
+                    ngx.say("evicted")
+                    return
+                  end
+                end
+                ngx.status = 500
+                ngx.say("coordination state was not evicted")
             }
         }
 
@@ -657,10 +704,17 @@ local function write_template(out, template, custom_config)
     introspection_opts[k] = nil
   end
   local content = template
+    :gsub("WORKER_PROCESSES", tostring(custom_config["worker_processes"] or 1))
+    :gsub("INTROSPECTION_SHARED_DICT_SIZE",
+      custom_config["introspection_shared_dict_size"] or "1m")
+    :gsub("LOG_INTROSPECTION_WORKER",
+      custom_config["log_introspection_worker"] and "true" or "false")
     :gsub("OIDC_CONFIG", serpent.block(oidc_config, {comment = false }))
     :gsub("TOKEN_HEADER", serpent.block(token_header, {comment = false }))
     :gsub("JWT_SIGN_SECRET", custom_config["jwt_sign_secret"] or DEFAULT_JWT_SIGN_SECRET)
     :gsub("VERIFY_OPTS", serpent.block(verify_opts, {comment = false }))
+    :gsub("INTROSPECTION_RESPONSE_STATUS", tostring(custom_config["introspection_response_status"] or
+      DEFAULT_INTROSPECTION_RESPONSE_STATUS))
     :gsub("INTROSPECTION_RESPONSE", serpent.block(introspection_response, {comment = false }))
     :gsub("INTROSPECTION_OPTS", serpent.block(introspection_opts, {comment = false }))
     :gsub("TOKEN_RESPONSE_EXPIRES_IN", token_response_expires_in)
@@ -688,6 +742,7 @@ local function write_template(out, template, custom_config)
     :gsub("REFRESH_ID_TOKEN", serpent.block(refresh_id_token, {comment = false }))
     :gsub("ID_TOKEN", serpent.block(id_token, {comment = false }))
     :gsub("ACCESS_TOKEN", serpent.block(access_token, {comment = false }))
+    :gsub("FIXED_NGX_NOW", custom_config["fixed_ngx_now"] or "nil")
     :gsub("FIXED_NGX_TIME", custom_config["fixed_ngx_time"] or "nil")
     :gsub("UNAUTH_ACTION", custom_config["unauth_action"] and ('"' .. custom_config["unauth_action"] .. '"') or DEFAULT_UNAUTH_ACTION)
     :gsub("SHARE_OIDC_OPTS", custom_config["share_oidc_opts"] and "true" or DEFAULT_SHARE_OIDC_OPTS)
@@ -733,6 +788,10 @@ end
 -- - access_token_opts is a table containing options that are accepted by oidc.access_token
 -- - delay_response is a table specifying a delay for the response of various endpoint in ms
 --   { jwk = 1, token = 1, discovery = 1, userinfo = 1, introspection = 1}
+-- - worker_processes configures the number of nginx workers; defaults to 1
+-- - introspection_shared_dict_size configures the introspection shared dictionary size;
+--   defaults to 1m
+-- - log_introspection_worker logs the worker handling each /introspect request
 -- - refreshing_token_fails whether to grant an access token via the refresh token grant
 -- - fake_access_token_signature whether to fake a JWT signature with unknown algorithm for the
 --   JWT returned by /jwt
