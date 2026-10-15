@@ -579,7 +579,10 @@ http {
                 if err then
                   ngx.status = failure and failure.http_status or 500
                   ngx.log(ngx.ERR, "Introspection error: " .. err ..
-                    ", kind=" .. (failure and failure.kind or "unknown"))
+                    ", endpoint_status=" .. tostring(endpoint_status) ..
+                    ", kind=" .. (failure and failure.kind or "unknown") ..
+                    ", client_status=" ..
+                      tostring(failure and failure.http_status))
                 else
                   ngx.header.content_type = 'application/json;charset=UTF-8'
                   ngx.say(test_globals.cjson.encode(json))

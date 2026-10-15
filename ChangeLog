@@ -5,6 +5,8 @@
   bounded leases, and fall back to direct introspection on coordination failure
 - return structured introspection failure details so callers can distinguish
   invalid tokens from unavailable endpoints and configuration failures
+- require introspection responses to contain a boolean `active` claim, treating
+  truthy non-boolean values as invalid responses
 - release 1.9.2
 
 09/05/2026

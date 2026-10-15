@@ -533,6 +533,39 @@ describe("when the response is inactive", function()
   end)
 end)
 
+describe("when an inactive response is served from the negative cache", function()
+  test_support.start_server({
+    introspection_response = {
+      active = false
+    },
+    introspection_opts = {
+      introspection_cache_ignore = false,
+      introspection_enable_negative_cache = true,
+    },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local request = {
+    url = "http://127.0.0.1/introspect",
+    headers = { authorization = "Bearer " .. jwt }
+  }
+  local _, first_status, first_headers = http.request(request)
+  local _, cached_status, cached_headers = http.request(request)
+
+  it("retains the invalid-token classification", function()
+    assert.are.equals(401, first_status)
+    assert.are.equals(401, cached_status)
+    assert.are.equals("invalid_token",
+      cached_headers["x-introspection-failure-kind"])
+    assert.are.equals("401", cached_headers["x-introspection-client-status"])
+  end)
+  it("omits the endpoint status because the cached request made no call", function()
+    assert.are.equals("200", first_headers["x-introspection-endpoint-status"])
+    assert.is_nil(cached_headers["x-introspection-endpoint-status"])
+    assert.are.equals(1, error_log_occurrences("Received introspection request:"))
+  end)
+end)
+
 describe("when the response lacks the active claim", function()
   test_support.start_server({
     remove_introspection_claims = { "active" },
@@ -651,7 +684,9 @@ describe("when a batch receives an introspection endpoint failure", function()
   it("shares the endpoint failure with every request", function()
     assert.are.equals(35, error_log_occurrences(
       "Introspection error: response indicates failure, status=503,"))
+    assert.are.equals(35, error_log_occurrences("endpoint_status=503"))
     assert.are.equals(35, error_log_occurrences("kind=endpoint_unavailable"))
+    assert.are.equals(35, error_log_occurrences("client_status=503"))
   end)
 end)
 
