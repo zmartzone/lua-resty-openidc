@@ -585,6 +585,14 @@ lAc5Csj0o5Q+oEhPUAVBIF07m4rd0OvAVPOCQ2NJhQSL1oWASbf+fg==
 
 Sample `nginx.conf` configuration for validating Bearer Access Tokens against a PingFederate OAuth 2.0 Authorization Server.
 
+`introspect` returns `res, err, endpoint_status, failure`. On failure,
+`failure.kind` classifies the cause and `failure.http_status` recommends the
+client response status. The classifications are `invalid_request`,
+`invalid_token`, `endpoint_unavailable`, `invalid_response`, and
+`configuration_error`. The numeric `endpoint_status` is preserved separately
+because an authorization server's status is not necessarily the correct status
+for the protected resource to return to its client.
+
 ```nginx
 events {
   worker_connections 128;
@@ -625,12 +633,12 @@ http {
           }
 
           -- call introspect for OAuth 2.0 Bearer Access Token validation
-          local res, err = require("resty.openidc").introspect(opts)
+          local res, err, endpoint_status, failure = require("resty.openidc").introspect(opts)
 
           if err then
-            ngx.status = 403
+            ngx.status = failure and failure.http_status or 500
             ngx.say(err)
-            ngx.exit(ngx.HTTP_FORBIDDEN)
+            ngx.exit(ngx.status)
           end
 
           -- at this point res is a Lua table that represents the JSON
@@ -740,12 +748,12 @@ http {
           }
 
           -- call introspect for OAuth 2.0 Bearer Access Token validation
-          local res, err = require("resty.openidc").introspect(opts)
+          local res, err, endpoint_status, failure = require("resty.openidc").introspect(opts)
 
           if err then
-            ngx.status = 403
+            ngx.status = failure and failure.http_status or 500
             ngx.say(err)
-            ngx.exit(ngx.HTTP_FORBIDDEN)
+            ngx.exit(ngx.status)
           end
 
           -- at this point res is a Lua table that represents the JSON

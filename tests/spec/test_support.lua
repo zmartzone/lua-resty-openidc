@@ -567,10 +567,22 @@ http {
                 if opts.decorate then
                   opts.http_request_decorator = test_globals.body_decorator
                 end
-                local json, err = test_globals.oidc.introspect(opts)
+                local json, err, endpoint_status, failure =
+                  test_globals.oidc.introspect(opts)
+                if endpoint_status then
+                  ngx.header["X-Introspection-Endpoint-Status"] = endpoint_status
+                end
+                if failure then
+                  ngx.header["X-Introspection-Failure-Kind"] = failure.kind
+                  ngx.header["X-Introspection-Client-Status"] = failure.http_status
+                end
                 if err then
-                  ngx.status = 401
-                  ngx.log(ngx.ERR, "Introspection error: " .. err)
+                  ngx.status = failure and failure.http_status or 500
+                  ngx.log(ngx.ERR, "Introspection error: " .. err ..
+                    ", endpoint_status=" .. tostring(endpoint_status) ..
+                    ", kind=" .. (failure and failure.kind or "unknown") ..
+                    ", client_status=" ..
+                      tostring(failure and failure.http_status))
                 else
                   ngx.header.content_type = 'application/json;charset=UTF-8'
                   ngx.say(test_globals.cjson.encode(json))
