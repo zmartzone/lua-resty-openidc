@@ -1,8 +1,8 @@
 package = "lua-resty-openidc"
-version = "1.9.2-1"
+version = "1.9.3-1"
 source = {
     url = "git+https://github.com/zmartzone/lua-resty-openidc",
-    tag = "v1.9.2",
+    tag = "v1.9.3",
     dir = "lua-resty-openidc"
 }
 description = {
