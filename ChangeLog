@@ -1,3 +1,7 @@
+10/26/2026
+- reject unsupported ID Token audience claim types instead of accepting them
+  without comparing the audience against client_id
+
 10/24/2026
 - return structured introspection failure details so callers can distinguish
   invalid tokens from unavailable endpoints and configuration failures;
