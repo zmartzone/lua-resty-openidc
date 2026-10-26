@@ -160,6 +160,30 @@ describe("when the id_token obtained from the token endpoint doesn't contain an 
   end)
 end)
 
+describe("when the id_token obtained from the token endpoint contains a numeric aud claim",
+         function()
+  test_support.start_server({
+    id_token = { aud = 123 }
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login has failed", function()
+    assert.are.equals(401, status)
+  end)
+end)
+
+describe("when the id_token obtained from the token endpoint contains a boolean aud claim",
+         function()
+  test_support.start_server({
+    id_token = { aud = true }
+  })
+  teardown(test_support.stop_server)
+  local _, status = test_support.login()
+  it("login has failed", function()
+    assert.are.equals(401, status)
+  end)
+end)
+
 describe("when the scalar value aud claim of the id_token obtained from the token endpoint doesn't contain client_id",
          function()
   test_support.start_server({
