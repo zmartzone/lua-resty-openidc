@@ -1,3 +1,9 @@
+11/03/2026
+- resolve the introspection endpoint once per introspection instead of
+  rediscovering it while building cache keys, so an unavailable discovery
+  endpoint is requested once rather than four times; see #579;
+  thanks @shreemaan-abhishek
+
 10/24/2026
 - return structured introspection failure details so callers can distinguish
   invalid tokens from unavailable endpoints and configuration failures;

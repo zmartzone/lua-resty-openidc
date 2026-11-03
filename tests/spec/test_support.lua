@@ -499,6 +499,14 @@ http {
             }
         }
 
+        location /discovery-unavailable {
+            content_by_lua_block {
+                ngx.log(ngx.ERR, "discovery-unavailable request")
+                ngx.status = 503
+                ngx.say("service unavailable")
+            }
+        }
+
         location /user-info {
             content_by_lua_block {
                 test_globals.delay(USERINFO_DELAY_RESPONSE)
