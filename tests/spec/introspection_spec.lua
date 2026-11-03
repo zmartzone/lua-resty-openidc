@@ -976,6 +976,34 @@ describe("when introspection endpoint hasn't been specified", function()
   end)
 end)
 
+describe("when introspection endpoint hasn't been specified and discovery is unavailable", function()
+  test_support.start_server({
+    remove_introspection_config_keys = { 'introspection_endpoint' },
+    introspection_opts = {
+      discovery = "http://127.0.0.1/discovery-unavailable",
+      introspection_cache_ignore = false
+    },
+  })
+  teardown(test_support.stop_server)
+  local jwt = test_support.trim(http.request("http://127.0.0.1/jwt"))
+  local _, status, headers = http.request({
+    url = "http://127.0.0.1/introspect",
+    headers = { authorization = "Bearer " .. jwt }
+  })
+  it("the endpoint is reported as unavailable", function()
+    assert.are.equals(503, status)
+  end)
+  it("classifies the endpoint failure", function()
+    assert.are.equals("endpoint_unavailable", headers["x-introspection-failure-kind"])
+  end)
+  it("the discovery endpoint is requested once per introspection", function()
+    assert.are.equals(1, error_log_occurrences("discovery-unavailable request"))
+  end)
+  it("no introspection request is sent", function()
+    assert.is_not.error_log_contains("Received introspection request")
+  end)
+end)
+
 describe("when introspection endpoint hasn't been specified but discovery doc provides introspection_endpoint claim", function()
   test_support.start_server({
     remove_introspection_config_keys = { 'introspection_endpoint' },

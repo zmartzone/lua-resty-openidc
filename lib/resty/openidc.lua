@@ -2323,30 +2323,35 @@ local function get_introspection_endpoint(opts)
   return introspection_endpoint
 end
 
-local function get_introspection_cache_prefix(opts)
+-- The endpoint is part of the cache key, so callers resolve it once per
+-- introspection and pass it down instead of rediscovering it per key.
+local function get_introspection_cache_prefix(opts, introspection_endpoint)
   return (opts.cache_segment and opts.cache_segment:gsub(',', '_') or 'DEFAULT') .. ','
-    .. (get_introspection_endpoint(opts) or 'nil-endpoint') .. ','
+    .. introspection_endpoint .. ','
     .. (opts.client_id or 'no-client_id') .. ','
     .. (opts.client_secret and 'secret' or 'no-client_secret') .. ':'
 end
 
-local function get_introspection_cache_key(opts, access_token)
-  return get_introspection_cache_prefix(opts) .. access_token
+local function get_introspection_cache_key(opts, access_token, introspection_endpoint)
+  return get_introspection_cache_prefix(opts, introspection_endpoint) .. access_token
 end
 
-local function get_cached_introspection(opts, access_token)
+local function get_cached_introspection(opts, access_token, introspection_endpoint)
   local introspection_cache_ignore = opts.introspection_cache_ignore or false
   if not introspection_cache_ignore then
     return openidc_cache_get("introspection",
-                             get_introspection_cache_key(opts, access_token))
+                             get_introspection_cache_key(opts, access_token,
+                                                         introspection_endpoint))
   end
 end
 
-local function set_cached_introspection(opts, access_token, encoded_json, ttl)
+local function set_cached_introspection(opts, access_token, introspection_endpoint,
+                                        encoded_json, ttl)
   local introspection_cache_ignore = opts.introspection_cache_ignore or false
   if not introspection_cache_ignore then
     openidc_cache_set("introspection",
-                      get_introspection_cache_key(opts, access_token),
+                      get_introspection_cache_key(opts, access_token,
+                                                  introspection_endpoint),
                       encoded_json, ttl)
   end
 end
@@ -2358,7 +2363,26 @@ local function introspection_failure(kind, http_status)
   }
 end
 
-local function introspect_access_token(opts, access_token)
+-- Resolve the introspection endpoint once and classify the failure modes.
+-- A failed discovery leaves opts.discovery as a URL string, so repeating this
+-- within one introspection would repeat the discovery request as well.
+local function resolve_introspection_endpoint(opts)
+  local introspection_endpoint, err = get_introspection_endpoint(opts)
+  if err then
+    local kind = type(opts.discovery) == "string" and
+      "endpoint_unavailable" or "configuration_error"
+    local http_status = kind == "endpoint_unavailable" and
+      ngx.HTTP_SERVICE_UNAVAILABLE or ngx.HTTP_INTERNAL_SERVER_ERROR
+    return nil, err, introspection_failure(kind, http_status)
+  end
+  if not introspection_endpoint then
+    return nil, "no endpoint URI for introspection",
+      introspection_failure("configuration_error", ngx.HTTP_INTERNAL_SERVER_ERROR)
+  end
+  return introspection_endpoint
+end
+
+local function introspect_access_token(opts, access_token, introspection_endpoint)
   -- assemble the parameters to the introspection (token) endpoint
   local token_param_name = opts.introspection_token_param_name and opts.introspection_token_param_name or "token"
 
@@ -2388,20 +2412,7 @@ local function introspect_access_token(opts, access_token)
   end
 
   -- call the introspection endpoint
-  local introspection_endpoint
   local err
-  introspection_endpoint, err = get_introspection_endpoint(opts)
-  if err then
-    local kind = type(opts.discovery) == "string" and
-      "endpoint_unavailable" or "configuration_error"
-    local http_status = kind == "endpoint_unavailable" and
-      ngx.HTTP_SERVICE_UNAVAILABLE or ngx.HTTP_INTERNAL_SERVER_ERROR
-    return nil, err, nil, introspection_failure(kind, http_status)
-  end
-  if not introspection_endpoint then
-    return nil, "no endpoint URI for introspection", nil,
-      introspection_failure("configuration_error", ngx.HTTP_INTERNAL_SERVER_ERROR)
-  end
   local json
   local endpoint_status
   local failure_kind
@@ -2448,7 +2459,8 @@ local function introspect_access_token(opts, access_token)
       end
     end
     log(DEBUG, "cache token ttl: " .. ttl)
-    set_cached_introspection(opts, access_token, cjson.encode(json), ttl)
+    set_cached_introspection(opts, access_token, introspection_endpoint,
+                             cjson.encode(json), ttl)
   end
 
   if json.active == false then
@@ -2574,12 +2586,21 @@ function openidc.introspect(opts)
       introspection_failure("invalid_request", ngx.HTTP_UNAUTHORIZED)
   end
 
+  -- Resolve the endpoint once. The cache keys and the token call all reuse
+  -- this result, so an unavailable discovery endpoint is requested once per
+  -- introspection rather than once per key.
+  local introspection_endpoint, endpoint_err, endpoint_failure =
+    resolve_introspection_endpoint(opts)
+  if not introspection_endpoint then
+    return nil, endpoint_err, nil, endpoint_failure
+  end
+
   if opts.introspection_cache_ignore then
-    return introspect_access_token(opts, access_token)
+    return introspect_access_token(opts, access_token, introspection_endpoint)
   end
 
   -- avoid lock overhead for normal cache hits
-  local value = get_cached_introspection(opts, access_token)
+  local value = get_cached_introspection(opts, access_token, introspection_endpoint)
   if value then
     return decode_cached_introspection(value)
   end
@@ -2588,10 +2609,11 @@ function openidc.introspect(opts)
   -- the existing uncached behavior for configurations that omit the dictionary.
   local introspection_cache = ngx.shared.introspection
   if not introspection_cache then
-    return introspect_access_token(opts, access_token)
+    return introspect_access_token(opts, access_token, introspection_endpoint)
   end
 
-  local cache_key = get_introspection_cache_key(opts, access_token)
+  local cache_key = get_introspection_cache_key(opts, access_token,
+                                                introspection_endpoint)
   local digest = b64url(openidc_sha256(cache_key))
   local lock_key = "openidc-introspection-lock:" .. digest
   local result_key_prefix = "openidc-introspection-result:" .. digest .. ":"
@@ -2625,25 +2647,25 @@ function openidc.introspect(opts)
     end
     log(WARN, "failed to decode published introspection result; " ..
         "falling back to direct introspection")
-    return introspect_access_token(opts, access_token)
+    return introspect_access_token(opts, access_token, introspection_endpoint)
   end
   if lock_state ~= "locked" then
     err = coordination_value
     -- Coordination is an optimization. Preserve the previous behavior when
     -- the lock is unavailable, while avoiding a duplicate call if the owner
     -- populated the cache immediately before the timeout.
-    value = get_cached_introspection(opts, access_token)
+    value = get_cached_introspection(opts, access_token, introspection_endpoint)
     if value then
       return decode_cached_introspection(value)
     end
     log(WARN, "failed to acquire introspection lock: ", err,
         "; falling back to direct introspection")
-    return introspect_access_token(opts, access_token)
+    return introspect_access_token(opts, access_token, introspection_endpoint)
   end
 
   -- Another request may have populated the regular cache while this request
   -- waited for the lock.
-  value = get_cached_introspection(opts, access_token)
+  value = get_cached_introspection(opts, access_token, introspection_endpoint)
   if value then
     release_introspection_lock(introspection_cache, lock_key, lock_owner)
     return decode_cached_introspection(value)
@@ -2666,7 +2688,8 @@ function openidc.introspect(opts)
   local json
   local endpoint_status
   local failure
-  json, err, endpoint_status, failure = introspect_access_token(opts, access_token)
+  json, err, endpoint_status, failure = introspect_access_token(
+    opts, access_token, introspection_endpoint)
 
   -- A cacheable response is already visible to waiters. Publish only outcomes
   -- that the regular introspection cache did not retain.
