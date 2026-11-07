@@ -424,6 +424,9 @@ local function openidc_validate_id_token(opts, id_token, nonce)
       log(ERROR, "token audience does not match: id_token.aud=", id_token.aud, ", client_id=", opts.client_id)
       return false
     end
+  else
+    log(ERROR, "invalid token audience type: ", type(id_token.aud))
+    return false
   end
   return true
 end
