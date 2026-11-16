@@ -102,6 +102,7 @@ local DEFAULT_REVOCATION_TEST_ENABLED = "false"
 local DEFAULT_REVOCATION_FAIL_MODE = '"closed"'
 local DEFAULT_REVOCATION_SET_FAILS = "false"
 local DEFAULT_REVOCATION_GET_FAILS_AFTER = "nil"
+local DEFAULT_REVOCATION_ROLLING_TIMEOUT = "nil"
 local DEFAULT_SESSION_START_FAILS = "false"
 
 local DEFAULT_INIT_TEMPLATE = [[
@@ -184,16 +185,20 @@ if REVOCATION_TEST_ENABLED then
   local revoked = ngx.shared.revocation_test
   test_globals.session_opts = {
     storage = "cookie",
+    rolling_timeout = REVOCATION_ROLLING_TIMEOUT,
+    -- observe the stub store directly instead of worker-local cached lookups
+    revocation_cache_ttl = 0,
+    revocation_error_cache_ttl = 0,
     revocation_fail_mode = REVOCATION_FAIL_MODE,
     revocation = {
-      set = function(_, key, value, ttl)
+      set = function(_, _, key, value, ttl)
         if REVOCATION_SET_FAILS then
           return nil, "connection refused"
         end
         revoked:set(key, value, ttl)
         return true
       end,
-      get = function(_, key)
+      get = function(_, _, key)
         local calls = revoked:incr("get_calls", 1, 0)
         if REVOCATION_GET_FAILS_AFTER and calls > REVOCATION_GET_FAILS_AFTER then
           return nil, "connection refused"
@@ -782,6 +787,8 @@ local function write_template(out, template, custom_config)
       (custom_config["revocation_test"].set_fails and "true" or "false") or DEFAULT_REVOCATION_SET_FAILS)
     :gsub("REVOCATION_GET_FAILS_AFTER", custom_config["revocation_test"] and
       tostring(custom_config["revocation_test"].get_fails_after) or DEFAULT_REVOCATION_GET_FAILS_AFTER)
+    :gsub("REVOCATION_ROLLING_TIMEOUT", custom_config["revocation_test"] and
+      tostring(custom_config["revocation_test"].rolling_timeout) or DEFAULT_REVOCATION_ROLLING_TIMEOUT)
     :gsub("SESSION_START_FAILS", custom_config["session_start_fails"] and "true" or DEFAULT_SESSION_START_FAILS)
   out:write(content)
 end

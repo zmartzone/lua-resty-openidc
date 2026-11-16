@@ -292,9 +292,17 @@ local function is_session_present(session)
   return session ~= nil and next(session:get_data()) ~= nil
 end
 
--- start a session; propagate closed-mode revocation store failures
-local function openidc_start_session(session_opts)
-  local session, err = r_session.start(session_opts)
+-- start a session; propagate closed-mode revocation store failures. When
+-- `open_only` is set the session is opened but not refreshed: a refresh saves
+-- the session under a new session id, which a logout must not do before it
+-- revokes the id of the cookie the client actually presented.
+local function openidc_start_session(session_opts, open_only)
+  local session, err
+  if open_only then
+    session, err = r_session.open(session_opts)
+  else
+    session, err = r_session.start(session_opts)
+  end
   if not session then
     log(ERROR, "Error starting session: " .. (err or "unknown error"))
     return nil, err
@@ -2082,11 +2090,16 @@ function openidc.authenticate(opts, target_url, unauth_action, session_or_opts)
 
   local err
 
+  target_url = target_url or ngx.var.request_uri
+  local path = openidc_get_path(target_url)
+  local redirect_uri_path = openidc_get_redirect_uri_path(opts)
+  local is_logout = path == (opts.logout_path or "/logout") and path ~= redirect_uri_path
+
   local session
   if is_session(session_or_opts) then
     session = session_or_opts
   else
-    session, err = openidc_start_session(session_or_opts)
+    session, err = openidc_start_session(session_or_opts, is_logout)
     if err then
       return nil, err, target_url, session
     end
@@ -2094,13 +2107,10 @@ function openidc.authenticate(opts, target_url, unauth_action, session_or_opts)
 
   local session_present = is_session_present(session)
 
-  target_url = target_url or ngx.var.request_uri
-
   local access_token
 
   -- see if this is a request to the redirect_uri i.e. an authorization response
-  local path = openidc_get_path(target_url)
-  if path == openidc_get_redirect_uri_path(opts) then
+  if path == redirect_uri_path then
     log(DEBUG, "Redirect URI path (" .. path .. ") is currently navigated -> Processing authorization response coming from OP")
 
     if not session_present then
@@ -2113,7 +2123,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_or_opts)
   end
 
   -- see if this is a request to logout
-  if path == (opts.logout_path or "/logout") then
+  if is_logout then
     log(DEBUG, "Logout path (" .. path .. ") is currently navigated -> Processing local session removal before redirecting to next step of logout process")
 
     err = ensure_config(opts)

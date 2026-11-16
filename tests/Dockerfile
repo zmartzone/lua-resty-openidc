@@ -1,7 +1,7 @@
 FROM openresty/openresty:jammy
 
 # install dependencies
-RUN ["luarocks", "install", "lua-resty-session", "4.2.0-1"]
+RUN ["luarocks", "install", "lua-resty-session", "4.3.0-1"]
 RUN ["luarocks", "install", "lua-resty-http"]
 RUN ["luarocks", "install", "lua-resty-jwt"]
 
