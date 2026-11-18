@@ -294,10 +294,19 @@ end
 
 -- Closed-mode revocation store failures are reported by the session library when
 -- it opens a session (check) and when it destroys one (mark); propagate them.
+-- lua-resty-session 4.3.0 and earlier have no is_revocation_error, so fall back
+-- to recognizing the error message.
+local function is_revocation_error(err)
+  if r_session.is_revocation_error then
+    return r_session.is_revocation_error(err)
+  end
+
+  return err:find("unable to check session revocation", 1, true)
+      or err:find("unable to mark session revoked", 1, true)
+end
+
 local function propagate_revocation_failure(session, err)
-  if err and session.revocation_fail_mode == "closed"
-      and (err:find("unable to check session revocation", 1, true)
-        or err:find("unable to mark session revoked", 1, true)) then
+  if err and session.revocation_fail_mode == "closed" and is_revocation_error(err) then
     log(ERROR, "Error starting session: " .. err)
     return session, err
   end
