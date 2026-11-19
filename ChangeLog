@@ -3,7 +3,7 @@
   logout revokes the session id of the cookie the client presented instead of
   one issued by a rolling refresh
 - require lua-resty-session 4.3.0-1, which also revokes the other cookies of the
-  same login on logout; thanks @Hockenba
+  same login on logout
 
 10/26/2026
 - reject unsupported ID Token audience claim types instead of accepting them
