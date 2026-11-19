@@ -2096,9 +2096,9 @@ function openidc.authenticate(opts, target_url, unauth_action, session_or_opts)
   else
     -- a refresh saves the session under a new session id, and a logout has to
     -- revoke the id of the cookie the client sent, so a logout only opens it
-    local logout = path == (opts.logout_path or "/logout")
+    local is_logout = path == (opts.logout_path or "/logout")
                    and path ~= openidc_get_redirect_uri_path(opts)
-    session, err = openidc_start_session(session_or_opts, logout)
+    session, err = openidc_start_session(session_or_opts, is_logout)
     if err then
       return nil, err, target_url, session
     end
