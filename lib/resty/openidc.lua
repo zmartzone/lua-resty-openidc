@@ -292,8 +292,7 @@ local function is_session_present(session)
   return session ~= nil and next(session:get_data()) ~= nil
 end
 
--- Closed-mode revocation store failures are reported by the session library when
--- it opens a session (check) and when it destroys one (mark); propagate them.
+-- Propagate the closed-mode revocation store failures of the session library.
 local function propagate_revocation_failure(session, err)
   if err and session.revocation_fail_mode == "closed"
       and (err:find("unable to check session revocation", 1, true)
@@ -316,9 +315,8 @@ local function openidc_start_session(session_opts)
   return propagate_revocation_failure(session, err)
 end
 
--- Open a session without refreshing it. A refresh saves the session under a new
--- session id, so a logout, which revokes the id of the session it works on, has
--- to open the session this way to revoke the id of the cookie the client sent.
+-- Open a session without refreshing it: a refresh saves it under a new session id,
+-- and a logout must revoke the id of the cookie the client sent.
 local function openidc_open_session(session_opts)
   local session, err = r_session.open(session_opts)
   if not session then
