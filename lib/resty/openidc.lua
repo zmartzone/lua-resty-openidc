@@ -2089,7 +2089,7 @@ local function openidc_get_redirect_uri_path(opts)
 end
 
 -- A request to the redirect URI is never a logout, even if both paths are equal.
-local function is_logout_request(opts, path, redirect_uri_path)
+local function is_logout_path(opts, path, redirect_uri_path)
   return path == (opts.logout_path or "/logout") and path ~= redirect_uri_path
 end
 
@@ -2106,7 +2106,7 @@ function openidc.authenticate(opts, target_url, unauth_action, session_or_opts)
   target_url = target_url or ngx.var.request_uri
   local path = openidc_get_path(target_url)
   local redirect_uri_path = openidc_get_redirect_uri_path(opts)
-  local is_logout = is_logout_request(opts, path, redirect_uri_path)
+  local is_logout = is_logout_path(opts, path, redirect_uri_path)
 
   local session
   if is_session(session_or_opts) then
