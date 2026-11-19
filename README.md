@@ -166,7 +166,6 @@ h2JHukolz9xf6qN61QMLSd83+kwoBr2drp6xg3eGDLIkQCQLrkY=
              --iat_slack = 600,
              --redirect_uri_scheme = "https",
              --logout_path = "/logout",
-             -- The path that logs the user out. The session is opened without being refreshed for it, so that the session id that gets revoked is the one of the cookie the client sent.
              --redirect_after_logout_uri = "/",
              -- Where should the user be redirected after logout from the RP. This option overides any end_session_endpoint that the OP may have provided in the discovery response.
              --redirect_after_logout_with_id_token_hint = true,
