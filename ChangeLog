@@ -1,9 +1,9 @@
-11/17/2026
-- open the session without refreshing it when handling a logout request: the
-  refresh of a session that is due for a rolling refresh saves it under a new
-  session id, so the logout revoked that id and left the cookie the client
-  presented usable; thanks @Hockenba
-- require lua-resty-session 4.3.0-1; thanks @Hockenba
+11/19/2026
+- open the session without refreshing it when handling a logout request, so the
+  logout revokes the session id of the cookie the client presented instead of
+  one issued by a rolling refresh; thanks @Hockenba
+- require lua-resty-session 4.3.0-1, which also revokes the other cookies of the
+  same login on logout
 
 10/26/2026
 - reject unsupported ID Token audience claim types instead of accepting them
