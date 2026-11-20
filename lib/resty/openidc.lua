@@ -292,9 +292,14 @@ local function is_session_present(session)
   return session ~= nil and next(session:get_data()) ~= nil
 end
 
--- start a session; propagate closed-mode revocation store failures
-local function openidc_start_session(session_opts)
-  local session, err = r_session.start(session_opts)
+-- start a session, or only open it; propagate closed-mode revocation store failures
+local function openidc_start_session(session_opts, open_only)
+  local session, err
+  if open_only then
+    session, err = r_session.open(session_opts)
+  else
+    session, err = r_session.start(session_opts)
+  end
   if not session then
     log(ERROR, "Error starting session: " .. (err or "unknown error"))
     return nil, err
@@ -2082,11 +2087,18 @@ function openidc.authenticate(opts, target_url, unauth_action, session_or_opts)
 
   local err
 
+  target_url = target_url or ngx.var.request_uri
+  local path = openidc_get_path(target_url)
+
   local session
   if is_session(session_or_opts) then
     session = session_or_opts
   else
-    session, err = openidc_start_session(session_or_opts)
+    -- a refresh saves the session under a new session id, and a logout has to
+    -- revoke the id of the cookie the client sent, so a logout only opens it
+    local is_logout = path == (opts.logout_path or "/logout")
+                   and path ~= openidc_get_redirect_uri_path(opts)
+    session, err = openidc_start_session(session_or_opts, is_logout)
     if err then
       return nil, err, target_url, session
     end
@@ -2094,12 +2106,9 @@ function openidc.authenticate(opts, target_url, unauth_action, session_or_opts)
 
   local session_present = is_session_present(session)
 
-  target_url = target_url or ngx.var.request_uri
-
   local access_token
 
   -- see if this is a request to the redirect_uri i.e. an authorization response
-  local path = openidc_get_path(target_url)
   if path == openidc_get_redirect_uri_path(opts) then
     log(DEBUG, "Redirect URI path (" .. path .. ") is currently navigated -> Processing authorization response coming from OP")
 

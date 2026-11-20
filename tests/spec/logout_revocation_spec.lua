@@ -26,12 +26,12 @@ describe("when revocation_fail_mode is closed and the revocation store read fail
   test_support.start_server({
     revocation_test = {
       fail_mode = "closed",
-      get_fails_after = 1,
     },
   })
   teardown(test_support.stop_server)
 
   local _, _, cookie = test_support.login()
+  test_support.fail_revocation_reads()
 
   local response_body = {}
   local _, status = http.request({
@@ -56,12 +56,12 @@ describe("when revocation_fail_mode is open and the revocation store read fails"
   test_support.start_server({
     revocation_test = {
       fail_mode = "open",
-      get_fails_after = 1,
     },
   })
   teardown(test_support.stop_server)
 
   local _, _, cookie = test_support.login()
+  test_support.fail_revocation_reads()
 
   local response_body = {}
   local _, status = http.request({
@@ -131,5 +131,40 @@ describe("when revocation_fail_mode is open and the revocation store is unreacha
 
   it("logout still completes", function()
     assert.are.equals(200, status)
+  end)
+end)
+
+describe("when a logout opens a session that is due for a rolling refresh", function()
+  test_support.start_server({
+    revocation_test = {
+      fail_mode = "closed",
+      rolling_timeout = 8,
+    },
+  })
+  teardown(test_support.stop_server)
+
+  local _, _, cookie = test_support.login()
+
+  -- past 75% of the rolling timeout, where start() would save the session
+  -- under a new session id
+  os.execute("sleep 7")
+
+  local _, logout_status = http.request({
+    url = "http://127.0.0.1/default/logout",
+    headers = { cookie = cookie },
+    redirect = false,
+  })
+
+  it("logout completes", function()
+    assert.are.equals(200, logout_status)
+  end)
+
+  it("revokes the session id of the cookie presented at logout", function()
+    local _, replay_status = http.request({
+      url = "http://127.0.0.1/default/t",
+      headers = { cookie = cookie },
+      redirect = false,
+    })
+    assert.are.equals(302, replay_status)
   end)
 end)

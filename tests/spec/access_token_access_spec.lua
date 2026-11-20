@@ -43,12 +43,12 @@ describe("if revocation_fail_mode is closed and the revocation store read fails"
   test_support.start_server({
     revocation_test = {
       fail_mode = "closed",
-      get_fails_after = 1,
     },
   })
   teardown(test_support.stop_server)
 
   local _, _, cookies = test_support.login()
+  test_support.fail_revocation_reads()
   local content_table = {}
   local _, status = http.request({
     url = "http://localhost/access_token",
@@ -72,12 +72,12 @@ describe("if revocation_fail_mode is open and the revocation store read fails", 
   test_support.start_server({
     revocation_test = {
       fail_mode = "open",
-      get_fails_after = 1,
     },
   })
   teardown(test_support.stop_server)
 
   local _, _, cookies = test_support.login()
+  test_support.fail_revocation_reads()
   local content_table = {}
   local _, status = http.request({
     url = "http://localhost/access_token",

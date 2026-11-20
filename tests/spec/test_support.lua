@@ -101,7 +101,7 @@ local DEFAULT_INTROSPECTION_RESPONSE_STATUS = "200"
 local DEFAULT_REVOCATION_TEST_ENABLED = "false"
 local DEFAULT_REVOCATION_FAIL_MODE = '"closed"'
 local DEFAULT_REVOCATION_SET_FAILS = "false"
-local DEFAULT_REVOCATION_GET_FAILS_AFTER = "nil"
+local DEFAULT_REVOCATION_ROLLING_TIMEOUT = "nil"
 local DEFAULT_SESSION_START_FAILS = "false"
 
 local DEFAULT_INIT_TEMPLATE = [[
@@ -184,18 +184,21 @@ if REVOCATION_TEST_ENABLED then
   local revoked = ngx.shared.revocation_test
   test_globals.session_opts = {
     storage = "cookie",
+    rolling_timeout = REVOCATION_ROLLING_TIMEOUT,
+    -- observe the stub store directly instead of worker-local cached lookups
+    revocation_cache_ttl = 0,
+    revocation_error_cache_ttl = 0,
     revocation_fail_mode = REVOCATION_FAIL_MODE,
     revocation = {
-      set = function(_, key, value, ttl)
+      set = function(_, _, key, value, ttl)
         if REVOCATION_SET_FAILS then
           return nil, "connection refused"
         end
         revoked:set(key, value, ttl)
         return true
       end,
-      get = function(_, key)
-        local calls = revoked:incr("get_calls", 1, 0)
-        if REVOCATION_GET_FAILS_AFTER and calls > REVOCATION_GET_FAILS_AFTER then
+      get = function(_, _, key)
+        if revoked:get("fail_reads") then
           return nil, "connection refused"
         end
         return revoked:get(key)
@@ -647,6 +650,13 @@ http {
           }
         }
 
+        location /fail-revocation-reads {
+            content_by_lua_block {
+                ngx.shared.revocation_test:set("fail_reads", true)
+                ngx.say("revocation store reads now fail")
+            }
+        }
+
         location /revocation {
             content_by_lua_block {
                 ngx.req.read_body()
@@ -780,8 +790,8 @@ local function write_template(out, template, custom_config)
       ('"' .. (custom_config["revocation_test"].fail_mode or "closed") .. '"') or DEFAULT_REVOCATION_FAIL_MODE)
     :gsub("REVOCATION_SET_FAILS", custom_config["revocation_test"] and
       (custom_config["revocation_test"].set_fails and "true" or "false") or DEFAULT_REVOCATION_SET_FAILS)
-    :gsub("REVOCATION_GET_FAILS_AFTER", custom_config["revocation_test"] and
-      tostring(custom_config["revocation_test"].get_fails_after) or DEFAULT_REVOCATION_GET_FAILS_AFTER)
+    :gsub("REVOCATION_ROLLING_TIMEOUT", custom_config["revocation_test"] and
+      tostring(custom_config["revocation_test"].rolling_timeout) or DEFAULT_REVOCATION_ROLLING_TIMEOUT)
     :gsub("SESSION_START_FAILS", custom_config["session_start_fails"] and "true" or DEFAULT_SESSION_START_FAILS)
   out:write(content)
 end
@@ -859,6 +869,12 @@ local function is_running(pid)
 end
 
 -- tries hard to stop the server started by test_support.start_server
+-- From now on every read of the revocation test store fails, whatever the number
+-- of reads a login or a request makes.
+function test_support.fail_revocation_reads()
+  http.request("http://127.0.0.1/fail-revocation-reads")
+end
+
 function test_support.stop_server()
   local pid = test_support.load("/tmp/server/logs/nginx.pid")
   local sleep = 0.1
