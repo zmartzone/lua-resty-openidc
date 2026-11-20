@@ -1,3 +1,9 @@
+11/20/2026
+- open the session instead of starting it on the logout path, so a rolling
+  refresh no longer rotates the session ID before logout revokes it and the
+  cookie presented at logout is revoked; see #581; thanks @Hockenba
+- require lua-resty-session 4.3.0-1 for the session revocation behavior
+
 10/26/2026
 - reject unsupported ID Token audience claim types instead of accepting them
   without comparing the audience against client_id
